@@ -2,7 +2,7 @@ import { Home, Users, Settings, History } from "lucide-react";
 
 export default function Sidebar() {
     return (
-        <div className="w-64 bg-white shadow-md">
+        <div className="hidden md:block w-64 bg-white shadow-md">
             <div className="p-6">
                 <h1 className="text-2xl font-bold text-gray-800">ZK Payroll</h1>
             </div>
