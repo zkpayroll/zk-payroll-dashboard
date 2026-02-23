@@ -1,83 +1,71 @@
-// These shapes should match your types/ directory from Issue 9.
-// Adjust field names to match your actual TypeScript interfaces.
+import { Employee, Company, PayrollTransaction } from "@/types/models";
 
-export const MOCK_EMPLOYEES = [
+export const MOCK_EMPLOYEES: Employee[] = [
   {
     id: "emp_001",
+    address: "GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W37",
     name: "Alice Mensah",
     email: "alice@zkpayroll.io",
-    walletAddress: "GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W37",
-    salary: 5000,
-    currency: "USDC",
     department: "Engineering",
-    role: "Senior Engineer",
-    status: "active",
-    createdAt: "2024-01-15T00:00:00Z",
+    salary: 5000,
+    salaryCommitment: "0xabc123def456", // ZK commitment hash
+    isActive: true,
+    startDate: "2024-01-15T00:00:00Z",
+    lastPayment: "2025-02-28T09:01:00Z",
   },
   {
     id: "emp_002",
+    address: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",
     name: "Kwame Asante",
     email: "kwame@zkpayroll.io",
-    walletAddress: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",
-    salary: 4500,
-    currency: "USDC",
     department: "Product",
-    role: "Product Manager",
-    status: "active",
-    createdAt: "2024-02-01T00:00:00Z",
+    salary: 4500,
+    salaryCommitment: "0xdef789ghi012",
+    isActive: true,
+    startDate: "2024-02-01T00:00:00Z",
+    lastPayment: "2025-02-28T09:01:05Z",
   },
 ];
 
-export const MOCK_PAYROLL_RUNS = [
+export const MOCK_COMPANIES: Company[] = [
   {
-    id: "pay_001",
-    name: "February 2025 Payroll",
-    status: "completed",
-    scheduledDate: "2025-02-28T00:00:00Z",
-    executedAt: "2025-02-28T09:00:00Z",
-    totalAmount: 9500,
-    currency: "USDC",
+    id: "company_001",
+    name: "ZK Payroll Inc.",
+    admin: "GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W37",
+    treasury: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",
     employeeCount: 2,
-    transactionHash: "abc123def456",
-    createdAt: "2025-02-01T00:00:00Z",
-  },
-  {
-    id: "pay_002",
-    name: "March 2025 Payroll",
-    status: "draft",
-    scheduledDate: "2025-03-31T00:00:00Z",
-    executedAt: null,
-    totalAmount: 9500,
-    currency: "USDC",
-    employeeCount: 2,
-    transactionHash: null,
-    createdAt: "2025-03-01T00:00:00Z",
+    isActive: true,
   },
 ];
 
-export const MOCK_TRANSACTIONS = [
+export const MOCK_TRANSACTIONS: PayrollTransaction[] = [
   {
     id: "tx_001",
-    payrollId: "pay_001",
-    employeeId: "emp_001",
-    employeeName: "Alice Mensah",
-    amount: 5000,
-    currency: "USDC",
-    status: "success",
-    transactionHash: "abc123def456",
-    stellarLedger: 48291034,
-    createdAt: "2025-02-28T09:01:00Z",
+    companyId: "company_001",
+    timestamp: "2025-02-28T09:01:00Z",
+    totalAmount: 9500,
+    employeeCount: 2,
+    proof: "0xzkproof_abc123", // ZK proof string
+    status: "verified",
+    txHash: "abc123def456",
   },
   {
     id: "tx_002",
-    payrollId: "pay_001",
-    employeeId: "emp_002",
-    employeeName: "Kwame Asante",
-    amount: 4500,
-    currency: "USDC",
-    status: "success",
-    transactionHash: "def789ghi012",
-    stellarLedger: 48291035,
-    createdAt: "2025-02-28T09:01:05Z",
+    companyId: "company_001",
+    timestamp: "2025-01-31T09:00:00Z",
+    totalAmount: 9500,
+    employeeCount: 2,
+    proof: "0xzkproof_def789",
+    status: "verified",
+    txHash: "def789ghi012",
+  },
+  {
+    id: "tx_003",
+    companyId: "company_001",
+    timestamp: "2025-03-31T09:00:00Z",
+    totalAmount: 9500,
+    employeeCount: 2,
+    proof: "",
+    status: "pending",
   },
 ];
