@@ -33,15 +33,14 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   private handleReportIssue = () => {
-    const title = encodeURIComponent(\`Bug: \${this.state.error?.message || "Unknown error"}\`);
+    const errorMsg = this.state.error?.message || "Unknown error";
+    const errorStack = this.state.error?.stack || "";
+    const title = encodeURIComponent(`Bug: ${errorMsg}`);
     const body = encodeURIComponent(
-      \`**Error Message:** \${this.state.error?.message}\\n\\n**Stack Trace:**\\n\` +
-        \`\`\`\\n\${this.state.error?.stack}\\n\`\`\`\`
+      `**Error Message:** ${errorMsg}\n\n**Stack Trace:**\n\`\`\`\n${errorStack}\n\`\`\``
     );
-    window.open(
-      \`https://github.com/OluRemiFour/zk-payroll-dashboard/issues/new?title=\${title}&body=\${body}\`,
-      "_blank"
-    );
+    const url = `https://github.com/OluRemiFour/zk-payroll-dashboard/issues/new?title=${title}&body=${body}`;
+    window.open(url, "_blank");
   };
 
   private handleReset = () => {

@@ -25,7 +25,7 @@ export default function Error({
         Something went wrong!
       </h2>
       <p className="text-lg text-gray-600 mb-8 max-w-md">
-        We encountered an unexpected error. Don't worry, your data is safe. 
+        We encountered an unexpected error. Don&apos;t worry, your data is safe. 
         You can try refreshing the page or contact support if the issue persists.
       </p>
       <div className="flex flex-col sm:flex-row gap-4">
