@@ -1,3 +1,6 @@
+![CI Status](https://github.com/zk-payroll/zk-payroll-dashboard/actions/workflows/ci.yml/badge.svg)
+![CD Status](https://github.com/zk-payroll/zk-payroll-dashboard/actions/workflows/deploy.yml/badge.svg)
+
 # ZK Payroll Dashboard
 
 The **ZK Payroll Dashboard** is a privacy-first web application designed for managing decentralized payroll operations on the Stellar network. It leverages Zero-Knowledge Proofs (ZKPs) to ensure salary amounts and payment details remain confidential while maintaining on-chain verifiability.
@@ -31,22 +34,27 @@ The **ZK Payroll Dashboard** is a privacy-first web application designed for man
 ## ⚡️ Getting Started
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/zkpayroll/zk-payroll-dashboard.git
    cd zk-payroll-dashboard
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Configure Environment**
    Copy the example env file and adjust values as needed:
+
    ```bash
    cp .env.example .env.local
    ```
+
    The default variables (already set for Stellar Testnet):
+
    ```bash
    NEXT_PUBLIC_STELLAR_NETWORK=TESTNET
    NEXT_PUBLIC_HORIZON_URL=https://horizon-testnet.stellar.org
@@ -81,12 +89,15 @@ zk-payroll-dashboard/
 ## 📖 Usage Guide
 
 ### 1. connect Wallet
+
 Click the **"Connect Wallet"** button in the top right header. Select your preferred Stellar wallet.
 
 ### 2. Processing Payroll
+
 Navigate to the **Dashboard** tab. You will see a summary of active employees and total payroll volume. Click "Process Payroll" to initiate a ZK-proof generation for the current pay period.
 
 ### 3. Verification
+
 Once the transaction is confirmed, it will appear in the **Transaction History** table. The "Verified" status indicates that the on-chain ZK verifier successfully validated the payment proof.
 
 ## 🤝 Contributing

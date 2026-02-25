@@ -20,6 +20,14 @@ export interface Company {
   isActive: boolean;
 }
 
+export type UserRole = "admin" | "employee";
+
+export interface SessionPayload {
+  publicKey: string;
+  role: UserRole;
+  expiresAt: number;
+}
+
 export interface PayrollTransaction {
   id: string;
   companyId: string;

@@ -10,8 +10,6 @@
   --secondary-color: #10b981;
 }
 
-
-
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -66,4 +64,40 @@
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
   }
+}
+
+/* ===== Accessibility: Focus indicators ===== */
+*:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Remove default outline only when focus-visible provides the indicator */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ===== Accessibility: Reduced motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ===== Accessibility: Visually hidden (screen‑reader only) ===== */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }

@@ -1,0 +1,22 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - STELLAR_NETWORK=standalone
+    command: npm run dev
+
+  stellar:
+    image: stellar/quickstart:latest
+    ports:
+      - "8000:8000" # Horizon
+      - "8001:8001" # RPC (Soroban)
+    command: ["--standalone"]
