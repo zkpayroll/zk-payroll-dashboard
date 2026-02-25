@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import PayrollSummary from '@/components/PayrollSummary';
+import PayrollSummary from '@/components/features/payroll/PayrollSummary';
 
 describe('PayrollSummary', () => {
   it('renders all three summary cards', () => {

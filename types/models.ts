@@ -32,9 +32,16 @@ export interface PayrollTransaction {
   id: string;
   companyId: string;
   timestamp: string;
+  createdAt: string; // Added for consistency with API filters
   totalAmount: number;
   employeeCount: number;
   proof: string;
   status: "pending" | "verified" | "failed";
   txHash?: string;
+}
+
+export interface PayrollRun extends PayrollTransaction {
+  employeeIds: string[];
+  executedAt?: string | null;
+  transactionHash?: string | null;
 }

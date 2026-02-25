@@ -1,4 +1,4 @@
-import { Employee, Company, PayrollTransaction } from "@/types/models";
+import { Employee, Company, PayrollTransaction, PayrollRun } from "@/types/models";
 
 export const MOCK_EMPLOYEES: Employee[] = [
   {
@@ -43,6 +43,7 @@ export const MOCK_TRANSACTIONS: PayrollTransaction[] = [
     id: "tx_001",
     companyId: "company_001",
     timestamp: "2025-02-28T09:01:00Z",
+    createdAt: "2025-02-28T09:01:00Z",
     totalAmount: 9500,
     employeeCount: 2,
     proof: "0xzkproof_abc123", // ZK proof string
@@ -53,6 +54,7 @@ export const MOCK_TRANSACTIONS: PayrollTransaction[] = [
     id: "tx_002",
     companyId: "company_001",
     timestamp: "2025-01-31T09:00:00Z",
+    createdAt: "2025-01-31T09:00:00Z",
     totalAmount: 9500,
     employeeCount: 2,
     proof: "0xzkproof_def789",
@@ -63,9 +65,17 @@ export const MOCK_TRANSACTIONS: PayrollTransaction[] = [
     id: "tx_003",
     companyId: "company_001",
     timestamp: "2025-03-31T09:00:00Z",
+    createdAt: "2025-03-31T09:00:00Z",
     totalAmount: 9500,
     employeeCount: 2,
     proof: "",
     status: "pending",
   },
 ];
+
+export const MOCK_PAYROLL_RUNS: PayrollRun[] = MOCK_TRANSACTIONS.map(tx => ({
+  ...tx,
+  employeeIds: ["emp_001", "emp_002"],
+  executedAt: tx.status === "verified" ? tx.timestamp : null,
+  transactionHash: tx.txHash || null,
+}));

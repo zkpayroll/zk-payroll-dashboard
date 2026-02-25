@@ -34,6 +34,7 @@ export const createPayrollSchema = z.object({
   companyId: z.string().min(1),
   totalAmount: z.number().positive(),
   employeeCount: z.number().int().positive(),
+  employeeIds: z.array(z.string()).min(1),
   proof: z.string().min(1, "ZK proof is required"),
 });
 

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { PayrollRun } from "@/types/models";
 import {
   successResponse,
   notFoundResponse,
@@ -18,14 +19,14 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest, { params }: RouteContext) {
-  const payroll = MOCK_PAYROLL_RUNS.find((p) => p.id === params.id);
+  const payroll = MOCK_PAYROLL_RUNS.find((p: PayrollRun) => p.id === params.id);
   if (!payroll) return withCors(notFoundResponse("Payroll run"), request);
   return withCors(successResponse(payroll), request);
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
   try {
-    const payroll = MOCK_PAYROLL_RUNS.find((p) => p.id === params.id);
+    const payroll = MOCK_PAYROLL_RUNS.find((p: PayrollRun) => p.id === params.id);
     if (!payroll) return withCors(notFoundResponse("Payroll run"), request);
 
     const body = await request.json();
