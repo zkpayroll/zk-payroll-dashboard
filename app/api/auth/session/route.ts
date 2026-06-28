@@ -1,25 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSessionToken, SESSION_COOKIE_NAME } from '@/lib/auth/session';
-import type { UserRole } from '@/types';
-
-function resolveRole(publicKey: string): UserRole {
-  const adminKey = process.env.ADMIN_PUBLIC_KEY;
-  if (publicKey === adminKey) return 'admin';
-
-  const operatorKeys = (process.env.OPERATOR_PUBLIC_KEYS || '')
-    .split(',')
-    .map((k) => k.trim())
-    .filter(Boolean);
-  if (operatorKeys.includes(publicKey)) return 'operator';
-
-  const auditorKeys = (process.env.AUDITOR_PUBLIC_KEYS || '')
-    .split(',')
-    .map((k) => k.trim())
-    .filter(Boolean);
-  if (auditorKeys.includes(publicKey)) return 'auditor';
-
-  return 'employee';
-}
+import { resolveRole } from '@/lib/auth/roles';
 
 export async function POST(request: Request) {
   try {

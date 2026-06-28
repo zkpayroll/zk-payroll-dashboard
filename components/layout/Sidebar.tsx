@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Home,
   Users,
@@ -13,69 +15,68 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { useAuthStore } from "@/stores/authStore";
-import { getVisibleNavLinks } from "@/lib/auth/roles";
+import { getNavigationForRole, ROLE_LABELS } from "@/lib/auth/roles";
+import type { NavigationItem } from "@/lib/auth/roles";
+import type { UserRole } from "@/types";
 
-const ICON_MAP: Record<string, React.ComponentType<any>> = {
-  Home,
-  Users,
-  Play,
-  History,
-  Landmark,
-  Shield,
-  Building2,
-  Settings,
+const icons: Record<NavigationItem['icon'], React.ComponentType<{ className?: string }>> = {
+  home: Home,
+  users: Users,
+  settings: Settings,
+  history: History,
+  shield: Shield,
+  play: Play,
+  building: Building2,
+  treasury: Landmark,
 };
 
-type NavEntry = { href: string; label: string; Icon: React.ComponentType<any> };
+function NavLinks({ role, onClick }: { role: UserRole; onClick?: () => void }) {
+  const pathname = usePathname() ?? '/';
+  const items = getNavigationForRole(role);
 
-const ALL_LINKS: NavEntry[] = [
-  { href: "/", Icon: Home, label: "Dashboard" },
-  { href: "/employees", Icon: Users, label: "Employees" },
-  { href: "/payroll/execute", Icon: Play, label: "Execute Payroll" },
-  { href: "/history", Icon: History, label: "History" },
-  { href: "/treasury", Icon: Landmark, label: "Treasury" },
-  { href: "/compliance", Icon: Shield, label: "Compliance" },
-  { href: "/setup", Icon: Building2, label: "Company Setup" },
-  { href: "/settings", Icon: Settings, label: "Settings" },
-];
+  return items.map((item) => {
+    const Icon = icons[item.icon];
+    const disabled = item.access?.[role] === 'disabled';
+    const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+    const className = active
+      ? 'flex items-center px-6 py-3 text-gray-700 bg-gray-100 border-r-4 border-blue-500'
+      : 'flex items-center px-6 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900';
 
-function resolveLinks(role: string | null): NavEntry[] {
-  if (!role) return ALL_LINKS;
-  return getVisibleNavLinks(role).map(({ href, label, icon }) => ({
-    href,
-    label,
-    Icon: ICON_MAP[icon],
-  }));
-}
-
-function NavLinks({ onClick }: { onClick?: () => void }) {
-  const role = useAuthStore((s) => s.role);
-  const links = resolveLinks(role);
-
-  return (
-    <nav aria-label="Main navigation">
-      {links.map(({ href, Icon, label }) => (
-        <a
-          key={href}
-          href={href}
-          onClick={onClick}
-          className="flex items-center px-6 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+    if (disabled) {
+      return (
+        <span
+          key={item.href}
+          className="flex items-center px-6 py-3 text-gray-400 cursor-not-allowed"
+          aria-disabled="true"
+          title={item.disabledReason?.[role]}
         >
-          <Icon className="w-5 h-5 mr-3" aria-hidden="true" />
-          {label}
-        </a>
-      ))}
-    </nav>
-  );
+          <Icon className="w-5 h-5 mr-3" />
+          {item.label}
+        </span>
+      );
+    }
+
+    return (
+      <Link
+        key={item.href}
+        className={className}
+        href={item.href}
+        onClick={onClick}
+        aria-current={active ? 'page' : undefined}
+      >
+        <Icon className="w-5 h-5 mr-3" />
+        {item.label}
+      </Link>
+    );
+  });
 }
 
-function Sidebar() {
+function Sidebar({ role }: { role: UserRole }) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      {/* Mobile hamburger button – visible only below md */}
+      {/* Mobile hamburger */}
       <button
         type="button"
         onClick={() => setOpen(true)}
@@ -87,7 +88,7 @@ function Sidebar() {
         <Menu className="w-5 h-5" aria-hidden="true" />
       </button>
 
-      {/* Mobile drawer + overlay – only mounted when open */}
+      {/* Mobile drawer */}
       {open && (
         <>
           <div
@@ -106,6 +107,7 @@ function Sidebar() {
               <h1 className="text-xl font-bold text-gray-800">ZK Payroll</h1>
               <button
                 type="button"
+                autoFocus
                 onClick={() => setOpen(false)}
                 className="p-1 rounded-md text-gray-500 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                 aria-label="Close navigation menu"
@@ -113,7 +115,9 @@ function Sidebar() {
                 <X className="w-5 h-5" aria-hidden="true" />
               </button>
             </div>
-            <NavLinks onClick={() => setOpen(false)} />
+            <nav className="mt-2" aria-label="Mobile navigation">
+              <NavLinks role={role} onClick={() => setOpen(false)} />
+            </nav>
           </div>
         </>
       )}
@@ -122,8 +126,13 @@ function Sidebar() {
       <div className="hidden md:block w-64 bg-white shadow-md flex-shrink-0">
         <div className="p-6">
           <h1 className="text-2xl font-bold text-gray-800">ZK Payroll</h1>
+          <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-indigo-600">
+            {ROLE_LABELS[role]} workspace
+          </p>
         </div>
-        <NavLinks />
+        <nav className="mt-6" aria-label={`${ROLE_LABELS[role]} navigation`}>
+          <NavLinks role={role} />
+        </nav>
       </div>
     </>
   );

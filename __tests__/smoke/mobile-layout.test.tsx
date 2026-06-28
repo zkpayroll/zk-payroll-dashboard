@@ -8,26 +8,26 @@ import Header from "@/components/layout/Header";
 describe("Smoke: Mobile layout rendering", () => {
   describe("Sidebar", () => {
     it("renders the hamburger button", () => {
-      render(<Sidebar />);
+      render(<Sidebar role="admin" />);
       expect(screen.getByRole("button", { name: /open navigation menu/i })).toBeInTheDocument();
     });
 
     it("opens the mobile drawer when hamburger is clicked", () => {
-      render(<Sidebar />);
+      render(<Sidebar role="admin" />);
       const trigger = screen.getByRole("button", { name: /open navigation menu/i });
       fireEvent.click(trigger);
       expect(screen.getByRole("dialog", { name: /navigation menu/i })).toBeInTheDocument();
     });
 
     it("closes the mobile drawer when close button is clicked", () => {
-      render(<Sidebar />);
+      render(<Sidebar role="admin" />);
       fireEvent.click(screen.getByRole("button", { name: /open navigation menu/i }));
       fireEvent.click(screen.getByRole("button", { name: /close navigation menu/i }));
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
 
     it("renders all navigation links in the desktop sidebar", () => {
-      render(<Sidebar />);
+      render(<Sidebar role="admin" />);
       expect(screen.getAllByRole("link", { name: /dashboard/i }).length).toBeGreaterThan(0);
       expect(screen.getAllByRole("link", { name: /employees/i }).length).toBeGreaterThan(0);
       expect(screen.getAllByRole("link", { name: /history/i }).length).toBeGreaterThan(0);
@@ -35,13 +35,13 @@ describe("Smoke: Mobile layout rendering", () => {
   });
 
   describe("Header", () => {
-    it("renders the search input", () => {
-      render(<Header />);
-      expect(screen.getByRole("searchbox")).toBeInTheDocument();
+    it("renders the command palette trigger", () => {
+      render(<Header role="admin" />);
+      expect(screen.getByRole("button", { name: /search actions/i })).toBeInTheDocument();
     });
 
     it("renders the notifications button", () => {
-      render(<Header />);
+      render(<Header role="admin" />);
       expect(screen.getByRole("button", { name: /notifications/i })).toBeInTheDocument();
     });
   });

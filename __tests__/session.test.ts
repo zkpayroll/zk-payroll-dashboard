@@ -12,7 +12,7 @@ describe('session tokens', () => {
 
   it('createSessionToken returns a string with two parts', async () => {
     const { createSessionToken } = await getSessionModule();
-    const token = await createSessionToken('GABCDEF', 'employee');
+    const token = await createSessionToken('GABCDEF', 'operator');
 
     expect(typeof token).toBe('string');
     expect(token.split('.')).toHaveLength(2);
@@ -31,7 +31,7 @@ describe('session tokens', () => {
 
   it('verifySessionToken returns null for tampered tokens', async () => {
     const { createSessionToken, verifySessionToken } = await getSessionModule();
-    const token = await createSessionToken('GABCDEF', 'employee');
+    const token = await createSessionToken('GABCDEF', 'operator');
 
     // Tamper with the payload
     const [payloadB64, sig] = token.split('.');
@@ -49,7 +49,7 @@ describe('session tokens', () => {
     // Mock Date.now to create an already-expired token
     const realNow = Date.now;
     vi.spyOn(Date, 'now').mockReturnValue(realNow() - 2 * 24 * 60 * 60 * 1000); // 2 days ago
-    const token = await createSessionToken('GABCDEF', 'employee');
+    const token = await createSessionToken('GABCDEF', 'operator');
     vi.spyOn(Date, 'now').mockReturnValue(realNow()); // restore
 
     const result = await verifySessionToken(token);

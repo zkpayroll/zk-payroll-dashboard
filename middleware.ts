@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/auth/session';
-import { canAccessRoute } from '@/lib/auth/roles';
-import type { UserRole } from '@/types';
+import { canAccessPath } from '@/lib/auth/roles';
 
 // ─── CSP ─────────────────────────────────────────────────────────────────────
 
@@ -82,10 +81,6 @@ function isProtectedRoute(pathname: string): boolean {
   return PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
-function isAdminRoute(pathname: string): boolean {
-  return ADMIN_PATHS.some((path) => pathname.startsWith(path));
-}
-
 function isApiRoute(pathname: string): boolean {
   return pathname.startsWith('/api/');
 }
@@ -140,9 +135,8 @@ export async function middleware(request: NextRequest) {
       return response;
     }
 
-    // Role-based route guard — enforced for page routes only
-    // (API routes use their own auth via lib/api/middleware.ts)
-    if (!isApiRoute(pathname) && !canAccessRoute(pathname, session.role)) {
+    // Role-aware route guard
+    if (!canAccessPath(session.role, pathname)) {
       if (isApiRoute(pathname)) {
         const response = NextResponse.json(
           { error: 'Forbidden' },
@@ -151,8 +145,8 @@ export async function middleware(request: NextRequest) {
         applySecurityHeaders(response);
         return response;
       }
-      const homeUrl = new URL('/', request.url);
-      const response = NextResponse.redirect(homeUrl);
+      const dashboardUrl = new URL('/', request.url);
+      const response = NextResponse.redirect(dashboardUrl);
       applySecurityHeaders(response);
       return response;
     }

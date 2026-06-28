@@ -1,102 +1,86 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { NextRequest } from "next/server";
-import { canAccessRoute, getVisibleNavLinks, ROLE_LABELS } from "@/lib/auth/roles";
+import { canAccessPath, getNavigationForRole, ROLE_LABELS } from "@/lib/auth/roles";
 import Sidebar from "@/components/layout/Sidebar";
+import Header from "@/components/layout/Header";
 import type { UserRole } from "@/types";
 
-// ── Utility: canAccessRoute ───────────────────────────────────────────────
+// ── Utility: canAccessPath ───────────────────────────────────────────────────
 
-describe("canAccessRoute()", () => {
-  const allRoles: UserRole[] = ["admin", "operator", "auditor", "employee"];
-
+describe("canAccessPath()", () => {
   it("allows every role on the root dashboard", () => {
-    for (const role of allRoles) {
-      expect(canAccessRoute("/", role)).toBe(true);
+    for (const role of ["admin", "operator", "auditor"] as UserRole[]) {
+      expect(canAccessPath(role, "/")).toBe(true);
     }
   });
 
-  it("allows only admin on /payroll/run", () => {
-    expect(canAccessRoute("/payroll/run", "admin")).toBe(true);
-    for (const role of ["operator", "auditor", "employee"] as UserRole[]) {
-      expect(canAccessRoute("/payroll/run", role)).toBe(false);
-    }
-  });
-
-  it("allows only admin on /employees/add", () => {
-    expect(canAccessRoute("/employees/add", "admin")).toBe(true);
-    for (const role of ["operator", "auditor", "employee"] as UserRole[]) {
-      expect(canAccessRoute("/employees/add", role)).toBe(false);
+  it("allows only admin on /employees and /employees/add", () => {
+    for (const path of ["/employees", "/employees/add"]) {
+      expect(canAccessPath("admin", path)).toBe(true);
+      for (const role of ["operator", "auditor"] as UserRole[]) {
+        expect(canAccessPath(role, path)).toBe(false);
+      }
     }
   });
 
   it("allows admin and operator on /payroll/execute", () => {
-    expect(canAccessRoute("/payroll/execute", "admin")).toBe(true);
-    expect(canAccessRoute("/payroll/execute", "operator")).toBe(true);
-    expect(canAccessRoute("/payroll/execute", "auditor")).toBe(false);
-    expect(canAccessRoute("/payroll/execute", "employee")).toBe(false);
-  });
-
-  it("allows admin and operator on /employees", () => {
-    expect(canAccessRoute("/employees", "admin")).toBe(true);
-    expect(canAccessRoute("/employees", "operator")).toBe(true);
-    expect(canAccessRoute("/employees", "auditor")).toBe(false);
-    expect(canAccessRoute("/employees", "employee")).toBe(false);
+    expect(canAccessPath("admin", "/payroll/execute")).toBe(true);
+    expect(canAccessPath("operator", "/payroll/execute")).toBe(true);
+    expect(canAccessPath("auditor", "/payroll/execute")).toBe(false);
   });
 
   it("allows admin and auditor on /compliance", () => {
-    expect(canAccessRoute("/compliance", "admin")).toBe(true);
-    expect(canAccessRoute("/compliance", "auditor")).toBe(true);
-    expect(canAccessRoute("/compliance", "operator")).toBe(false);
-    expect(canAccessRoute("/compliance", "employee")).toBe(false);
+    expect(canAccessPath("admin", "/compliance")).toBe(true);
+    expect(canAccessPath("auditor", "/compliance")).toBe(true);
+    expect(canAccessPath("operator", "/compliance")).toBe(false);
   });
 
   it("allows admin, operator, auditor on /history", () => {
     for (const role of ["admin", "operator", "auditor"] as UserRole[]) {
-      expect(canAccessRoute("/history", role)).toBe(true);
+      expect(canAccessPath(role, "/history")).toBe(true);
     }
-    expect(canAccessRoute("/history", "employee")).toBe(false);
   });
 
-  it("allows admin, operator, auditor on /treasury", () => {
-    for (const role of ["admin", "operator", "auditor"] as UserRole[]) {
-      expect(canAccessRoute("/treasury", role)).toBe(true);
+  it("allows only admin on /treasury", () => {
+    expect(canAccessPath("admin", "/treasury")).toBe(true);
+    for (const role of ["operator", "auditor"] as UserRole[]) {
+      expect(canAccessPath(role, "/treasury")).toBe(false);
     }
-    expect(canAccessRoute("/treasury", "employee")).toBe(false);
   });
 
   it("allows only admin on /setup", () => {
-    expect(canAccessRoute("/setup", "admin")).toBe(true);
-    for (const role of ["operator", "auditor", "employee"] as UserRole[]) {
-      expect(canAccessRoute("/setup", role)).toBe(false);
+    expect(canAccessPath("admin", "/setup")).toBe(true);
+    for (const role of ["operator", "auditor"] as UserRole[]) {
+      expect(canAccessPath(role, "/setup")).toBe(false);
     }
   });
 
-  it("allows every role on /settings", () => {
-    for (const role of allRoles) {
-      expect(canAccessRoute("/settings", role)).toBe(true);
-    }
-  });
-
-  it("allows every role on /incidents", () => {
-    for (const role of allRoles) {
-      expect(canAccessRoute("/incidents", role)).toBe(true);
+  it("allows admin, operator, auditor on /settings", () => {
+    for (const role of ["admin", "operator", "auditor"] as UserRole[]) {
+      expect(canAccessPath(role, "/settings")).toBe(true);
     }
   });
 
   it("allows only admin on /admin", () => {
-    expect(canAccessRoute("/admin", "admin")).toBe(true);
-    for (const role of ["operator", "auditor", "employee"] as UserRole[]) {
-      expect(canAccessRoute("/admin", role)).toBe(false);
+    expect(canAccessPath("admin", "/admin")).toBe(true);
+    for (const role of ["operator", "auditor"] as UserRole[]) {
+      expect(canAccessPath(role, "/admin")).toBe(false);
+    }
+  });
+
+  it("allows every role on /incidents", () => {
+    for (const role of ["admin", "operator", "auditor"] as UserRole[]) {
+      expect(canAccessPath(role, "/incidents")).toBe(true);
     }
   });
 });
 
-// ── Utility: getVisibleNavLinks ────────────────────────────────────────────
+// ── Utility: getNavigationForRole ────────────────────────────────────────────
 
-describe("getVisibleNavLinks()", () => {
+describe("getNavigationForRole()", () => {
   it("admin sees all 8 nav links", () => {
-    const links = getVisibleNavLinks("admin");
+    const links = getNavigationForRole("admin");
     expect(links).toHaveLength(8);
     const labels = links.map((l) => l.label);
     expect(labels).toContain("Dashboard");
@@ -109,60 +93,42 @@ describe("getVisibleNavLinks()", () => {
     expect(labels).toContain("Settings");
   });
 
-  it("operator sees 6 links — no Compliance or Company Setup", () => {
-    const links = getVisibleNavLinks("operator");
+  it("operator sees 6 links — Compliance and Company Setup hidden", () => {
+    const links = getNavigationForRole("operator");
     const labels = links.map((l) => l.label);
     expect(labels).toHaveLength(6);
     expect(labels).not.toContain("Compliance");
     expect(labels).not.toContain("Company Setup");
     expect(labels).toContain("Employees");
     expect(labels).toContain("Execute Payroll");
+    expect(labels).toContain("Treasury");
   });
 
-  it("auditor sees 5 links — read-only pages only", () => {
-    const links = getVisibleNavLinks("auditor");
+  it("auditor sees 4 links — read-only pages only", () => {
+    const links = getNavigationForRole("auditor");
     const labels = links.map((l) => l.label);
-    expect(labels).toHaveLength(5);
-    expect(labels).toEqual(["Dashboard", "History", "Treasury", "Compliance", "Settings"]);
-  });
-
-  it("employee sees 2 links — Dashboard and Settings only", () => {
-    const links = getVisibleNavLinks("employee");
-    const labels = links.map((l) => l.label);
-    expect(labels).toHaveLength(2);
-    expect(labels).toEqual(["Dashboard", "Settings"]);
+    expect(labels).toHaveLength(4);
+    expect(labels).toEqual(["Dashboard", "History", "Compliance", "Settings"]);
   });
 });
 
-// ── Component: Sidebar (role-aware rendering) ──────────────────────────────
+// ── Component: Sidebar (role-aware rendering) ────────────────────────────────
 
-vi.mock("@/stores/authStore", () => ({
-  useAuthStore: vi.fn(),
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
-import { useAuthStore } from "@/stores/authStore";
-
-let testRole: UserRole | null = "admin";
-
 describe("Sidebar role-aware rendering", () => {
-  beforeEach(() => {
-    vi.mocked(useAuthStore).mockImplementation((selector?: any) => {
-      const state = { role: testRole, publicKey: null, isConnected: false, setSession: vi.fn(), clearSession: vi.fn() };
-      return typeof selector === "function" ? selector(state) : state;
-    });
-  });
-
   it("renders nav links filtered by admin role", () => {
-    testRole = "admin";
-    render(<Sidebar />);
+    render(<Sidebar role="admin" />);
     expect(screen.getByText("Employees")).toBeInTheDocument();
     expect(screen.getByText("Compliance")).toBeInTheDocument();
     expect(screen.getByText("Company Setup")).toBeInTheDocument();
   });
 
   it("hides compliance and setup for operator", () => {
-    testRole = "operator";
-    render(<Sidebar />);
+    render(<Sidebar role="operator" />);
     expect(screen.getByText("Employees")).toBeInTheDocument();
     expect(screen.getByText("Execute Payroll")).toBeInTheDocument();
     expect(screen.queryByText("Compliance")).not.toBeInTheDocument();
@@ -170,87 +136,48 @@ describe("Sidebar role-aware rendering", () => {
   });
 
   it("shows only read-only links for auditor", () => {
-    testRole = "auditor";
-    render(<Sidebar />);
+    render(<Sidebar role="auditor" />);
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
     expect(screen.getByText("History")).toBeInTheDocument();
-    expect(screen.getByText("Treasury")).toBeInTheDocument();
     expect(screen.getByText("Compliance")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
     expect(screen.queryByText("Employees")).not.toBeInTheDocument();
     expect(screen.queryByText("Execute Payroll")).not.toBeInTheDocument();
-    expect(screen.queryByText("Company Setup")).not.toBeInTheDocument();
-  });
-
-  it("shows only dashboard and settings for employee", () => {
-    testRole = "employee";
-    render(<Sidebar />);
-    expect(screen.getByText("Dashboard")).toBeInTheDocument();
-    expect(screen.getByText("Settings")).toBeInTheDocument();
-    expect(screen.queryByText("Employees")).not.toBeInTheDocument();
-    expect(screen.queryByText("Execute Payroll")).not.toBeInTheDocument();
-    expect(screen.queryByText("History")).not.toBeInTheDocument();
     expect(screen.queryByText("Treasury")).not.toBeInTheDocument();
-    expect(screen.queryByText("Compliance")).not.toBeInTheDocument();
     expect(screen.queryByText("Company Setup")).not.toBeInTheDocument();
   });
 });
 
-// ── Component: Header role label ───────────────────────────────────────────
-
-import Header from "@/components/layout/Header";
+// ── Component: Header role label ─────────────────────────────────────────────
 
 describe("Header role label", () => {
-  beforeEach(() => {
-    vi.mocked(useAuthStore).mockImplementation((selector?: any) => {
-      const state = { role: testRole, publicKey: null, isConnected: false, setSession: vi.fn(), clearSession: vi.fn() };
-      return typeof selector === "function" ? selector(state) : state;
-    });
-  });
-
   it("displays Admin label for admin role", () => {
-    testRole = "admin";
-    render(<Header />);
+    render(<Header role="admin" />);
     expect(screen.getByText("Admin")).toBeInTheDocument();
   });
 
   it("displays Operator label for operator role", () => {
-    testRole = "operator";
-    render(<Header />);
+    render(<Header role="operator" />);
     expect(screen.getByText("Operator")).toBeInTheDocument();
   });
 
   it("displays Auditor label for auditor role", () => {
-    testRole = "auditor";
-    render(<Header />);
+    render(<Header role="auditor" />);
     expect(screen.getByText("Auditor")).toBeInTheDocument();
-  });
-
-  it("displays Employee label for employee role", () => {
-    testRole = "employee";
-    render(<Header />);
-    expect(screen.getByText("Employee")).toBeInTheDocument();
-  });
-
-  it("displays User label when no role is set", () => {
-    testRole = null;
-    render(<Header />);
-    expect(screen.getByText("User")).toBeInTheDocument();
   });
 });
 
-// ── ROLE_LABELS ────────────────────────────────────────────────────────────
+// ── ROLE_LABELS ──────────────────────────────────────────────────────────────
 
 describe("ROLE_LABELS", () => {
   it("provides a human-readable label for each role", () => {
     expect(ROLE_LABELS.admin).toBe("Admin");
     expect(ROLE_LABELS.operator).toBe("Operator");
     expect(ROLE_LABELS.auditor).toBe("Auditor");
-    expect(ROLE_LABELS.employee).toBe("Employee");
   });
 });
 
-// ── Middleware role gating ─────────────────────────────────────────────────
+// ── Middleware role gating ────────────────────────────────────────────────────
 
 describe("Middleware role gating", () => {
   beforeEach(() => {
@@ -289,26 +216,13 @@ describe("Middleware role gating", () => {
     expect(response.status).toBe(307);
   });
 
-  it("redirects employee away from admin-only /employees/add", async () => {
-    const response = await checkRoute("/employees/add", "employee");
-    expect(response.status).toBe(307);
-  });
-
   it("allows admin and operator on /payroll/execute", async () => {
-    const res1 = await checkRoute("/payroll/execute", "admin");
-    expect(res1.status).toBe(200);
-
-    const res2 = await checkRoute("/payroll/execute", "operator");
-    expect(res2.status).toBe(200);
+    expect((await checkRoute("/payroll/execute", "admin")).status).toBe(200);
+    expect((await checkRoute("/payroll/execute", "operator")).status).toBe(200);
   });
 
   it("redirects auditor from /payroll/execute", async () => {
     const response = await checkRoute("/payroll/execute", "auditor");
-    expect(response.status).toBe(307);
-  });
-
-  it("redirects employee from /payroll/execute", async () => {
-    const response = await checkRoute("/payroll/execute", "employee");
     expect(response.status).toBe(307);
   });
 
@@ -328,25 +242,16 @@ describe("Middleware role gating", () => {
     }
   });
 
-  it("redirects employee from /history", async () => {
-    const response = await checkRoute("/history", "employee");
-    expect(response.status).toBe(307);
-  });
-
-  it("allows admin, operator, auditor on /treasury", async () => {
-    for (const role of ["admin", "operator", "auditor"] as UserRole[]) {
-      expect((await checkRoute("/treasury", role)).status).toBe(200);
+  it("allows only admin on /treasury", async () => {
+    expect((await checkRoute("/treasury", "admin")).status).toBe(200);
+    for (const role of ["operator", "auditor"] as UserRole[]) {
+      expect((await checkRoute("/treasury", role)).status).toBe(307);
     }
-  });
-
-  it("redirects employee from /treasury", async () => {
-    const response = await checkRoute("/treasury", "employee");
-    expect(response.status).toBe(307);
   });
 
   it("allows admin on /setup, redirects others", async () => {
     expect((await checkRoute("/setup", "admin")).status).toBe(200);
-    for (const role of ["operator", "auditor", "employee"] as UserRole[]) {
+    for (const role of ["operator", "auditor"] as UserRole[]) {
       expect((await checkRoute("/setup", role)).status).toBe(307);
     }
   });
@@ -360,7 +265,7 @@ describe("Middleware role gating", () => {
   });
 });
 
-// ── Session API role assignment ────────────────────────────────────────────
+// ── Session API role assignment ──────────────────────────────────────────────
 
 describe("Session API role assignment", () => {
   beforeEach(() => {
@@ -401,13 +306,13 @@ describe("Session API role assignment", () => {
     expect(data.role).toBe("auditor");
   });
 
-  it("assigns employee when publicKey matches no known key", async () => {
+  it("assigns operator by default when publicKey matches no known key", async () => {
     vi.stubEnv("ADMIN_PUBLIC_KEY", "GADMIN123");
     vi.stubEnv("OPERATOR_PUBLIC_KEYS", "GOPER1");
     vi.stubEnv("AUDITOR_PUBLIC_KEYS", "GAUDIT1");
     const response = await postSession("GUNKNOWN");
     const data = await response.json();
-    expect(data.role).toBe("employee");
+    expect(data.role).toBe("operator");
   });
 
   it("returns 400 when publicKey is missing", async () => {
