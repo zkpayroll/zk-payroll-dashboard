@@ -167,6 +167,8 @@ Use this checklist to confirm the dashboard is wired correctly:
 
 ## 🐛 Troubleshooting
 
+For a comprehensive list of issues covering CI failures, dependency mismatches, build errors, test failures, and environment misconfiguration, see the [Troubleshooting Guide](./TROUBLESHOOTING.md).
+
 ### "Freighter not detected"
 - Ensure Freighter is installed and unlocked
 - Refresh the page after installing

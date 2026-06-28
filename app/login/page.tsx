@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useStellar } from '@/components/providers/StellarProvider';
 import { useWalletStore } from '@/stores/walletStore';
+import { useAuthStore } from '@/stores/authStore';
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { connect, isFreighterInstalled } = useStellar();
   const { publicKey, isConnected, isLoading } = useWalletStore();
+  const setSession = useAuthStore((s) => s.setSession);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,6 +36,8 @@ export default function LoginPage() {
           throw new Error(data.error || 'Failed to create session');
         }
 
+        const data = await res.json();
+        setSession(publicKey, data.role);
         router.push(redirect);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Session creation failed');
@@ -43,7 +47,7 @@ export default function LoginPage() {
     }
 
     createSession();
-  }, [isConnected, publicKey, redirect, router]);
+  }, [isConnected, publicKey, redirect, router, setSession]);
 
   const handleConnect = async () => {
     setError(null);

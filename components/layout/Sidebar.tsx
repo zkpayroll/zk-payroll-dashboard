@@ -13,22 +13,49 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import { useAuthStore } from "@/stores/authStore";
+import { getVisibleNavLinks } from "@/lib/auth/roles";
 
-const NAV_LINKS = [
-  { href: "/", icon: Home, label: "Dashboard" },
-  { href: "/employees", icon: Users, label: "Employees" },
-  { href: "/payroll/execute", icon: Play, label: "Execute Payroll" },
-  { href: "/history", icon: History, label: "History" },
-  { href: "/treasury", icon: Landmark, label: "Treasury" },
-  { href: "/compliance", icon: Shield, label: "Compliance" },
-  { href: "/setup", icon: Building2, label: "Company Setup" },
-  { href: "/settings", icon: Settings, label: "Settings" },
+const ICON_MAP: Record<string, React.ComponentType<any>> = {
+  Home,
+  Users,
+  Play,
+  History,
+  Landmark,
+  Shield,
+  Building2,
+  Settings,
+};
+
+type NavEntry = { href: string; label: string; Icon: React.ComponentType<any> };
+
+const ALL_LINKS: NavEntry[] = [
+  { href: "/", Icon: Home, label: "Dashboard" },
+  { href: "/employees", Icon: Users, label: "Employees" },
+  { href: "/payroll/execute", Icon: Play, label: "Execute Payroll" },
+  { href: "/history", Icon: History, label: "History" },
+  { href: "/treasury", Icon: Landmark, label: "Treasury" },
+  { href: "/compliance", Icon: Shield, label: "Compliance" },
+  { href: "/setup", Icon: Building2, label: "Company Setup" },
+  { href: "/settings", Icon: Settings, label: "Settings" },
 ];
 
+function resolveLinks(role: string | null): NavEntry[] {
+  if (!role) return ALL_LINKS;
+  return getVisibleNavLinks(role).map(({ href, label, icon }) => ({
+    href,
+    label,
+    Icon: ICON_MAP[icon],
+  }));
+}
+
 function NavLinks({ onClick }: { onClick?: () => void }) {
+  const role = useAuthStore((s) => s.role);
+  const links = resolveLinks(role);
+
   return (
     <nav aria-label="Main navigation">
-      {NAV_LINKS.map(({ href, icon: Icon, label }) => (
+      {links.map(({ href, Icon, label }) => (
         <a
           key={href}
           href={href}

@@ -1,6 +1,13 @@
+"use client";
+
 import { Bell, Search, User } from "lucide-react";
+import { useAuthStore } from "@/stores/authStore";
+import { ROLE_LABELS } from "@/lib/auth/roles";
 
 function Header() {
+  const role = useAuthStore((s) => s.role);
+  const label = role ? ROLE_LABELS[role] : "User";
+
   const triggerPalette = () => {
     window.dispatchEvent(new CustomEvent("open-command-palette"));
   };
@@ -37,7 +44,7 @@ function Header() {
           >
             <User className="w-5 h-5 text-gray-600" />
           </div>
-          <span className="hidden sm:inline text-sm font-medium text-gray-700">Admin</span>
+          <span className="hidden sm:inline text-sm font-medium text-gray-700">{label}</span>
         </div>
       </div>
     </header>

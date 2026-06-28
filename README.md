@@ -103,6 +103,7 @@ Once the transaction is confirmed, it will appear in the **Transaction History**
 ## 📚 Operator docs
 
 - [Dashboard setup guide](docs/SETUP_GUIDE.md)
+- [Troubleshooting guide](docs/TROUBLESHOOTING.md)
 - [Admin recovery guide](docs/ADMIN_RECOVERY_GUIDE.md)
 - [Content style guide](docs/CONTENT_STYLE_GUIDE.md)
 

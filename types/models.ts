@@ -21,7 +21,7 @@ export interface Company {
   isActive: boolean;
 }
 
-export type UserRole = "admin" | "employee";
+export type UserRole = "admin" | "operator" | "auditor" | "employee";
 
 export interface SessionPayload {
   publicKey: string;
