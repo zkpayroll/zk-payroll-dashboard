@@ -130,8 +130,7 @@ function PayrollSummary() {
 							{proofState.message ?? "No proof generated yet."}
 						</p>
 					</article>
-				</>
-			)}
+
 		</section>
 	);
 }

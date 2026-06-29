@@ -60,8 +60,8 @@ export default function EnvironmentBanner() {
   const IconComponent = currentStyle.icon;
 
   return (
-    <div
-      role="status"
+    <button
+      type="button"
       onClick={cycleEnvironment}
       className={`cursor-pointer select-none transition-colors duration-200 text-xs px-4 py-1.5 flex items-center justify-center gap-2.5 font-medium shadow-inner ${currentStyle.bg} ${currentStyle.hover}`}
       title="Click to cycle environments (demo option)"
@@ -72,6 +72,6 @@ export default function EnvironmentBanner() {
         {currentStyle.badge}
       </span>
       <span className="text-[10px] opacity-60 hidden sm:inline">(Click to toggle preview)</span>
-    </div>
+    </button>
   );
 }

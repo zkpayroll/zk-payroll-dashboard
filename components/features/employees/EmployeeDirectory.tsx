@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 
-import { Users, Loader2, UserPlus }
+import { Users, Loader2, UserPlus } from "lucide-react";
 import { useEmployeeStore } from "@/stores/employees";
 import { MOCK_EMPLOYEES } from "@/lib/api/mockData";
 import type { Employee } from "@/types";

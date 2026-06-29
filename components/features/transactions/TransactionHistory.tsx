@@ -8,10 +8,6 @@ import {
   Filter,
   X,
   Eye,
-} from "lucide-react";
-import { MOCK_TRANSACTIONS, MOCK_EMPLOYEES } from "@/lib/api/mockData";
-import type { PayrollTransaction } from "@/types";
-import TransactionDetailDrawer from "./TransactionDetailDrawer";
   Printer,
   Save,
   Bookmark,
@@ -21,6 +17,7 @@ import TransactionDetailDrawer from "./TransactionDetailDrawer";
 } from "lucide-react";
 import { MOCK_TRANSACTIONS, MOCK_EMPLOYEES } from "@/lib/api/mockData";
 import type { PayrollTransaction } from "@/types";
+import TransactionDetailDrawer from "./TransactionDetailDrawer";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 type StatusFilter = "all" | "verified" | "pending" | "failed";

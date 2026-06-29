@@ -180,6 +180,7 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
         };
 
         initialize();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {

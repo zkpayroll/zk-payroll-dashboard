@@ -43,7 +43,7 @@ export default function OnboardingFlow() {
     <div className="w-full max-w-2xl mx-auto">
       {/* Stepper */}
       <nav aria-label="Progress" className="mb-8">
-        <ol role="list" className="flex items-center justify-between w-full">
+        <ol className="flex items-center justify-between w-full">
           {STEPS.map((step, index) => {
             const isCompleted = currentStep > step.id;
             const isCurrent = currentStep === step.id;

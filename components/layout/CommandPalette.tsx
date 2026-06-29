@@ -218,8 +218,10 @@ export default function CommandPalette({ isOpen, onClose }: { isOpen: boolean; o
   if (!isOpen) return null;
 
   return (
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <div
       ref={overlayRef}
+      // eslint-disable-next-line jsx-a11y/click-events-have-key-events
       onClick={handleOverlayClick}
       onKeyDown={handleOverlayKeyDown}
       tabIndex={-1}

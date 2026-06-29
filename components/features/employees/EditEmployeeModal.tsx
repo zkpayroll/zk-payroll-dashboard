@@ -262,10 +262,6 @@ export function EditEmployeeModal({ isOpen, onClose, employeeId }: EditEmployeeM
 
           {/* Success state */}
           {submitStatus === "success" && addedEmployee && (
-            <div
-              role="status"
-              className="flex items-start gap-3 rounded-lg bg-green-50 border border-green-200 px-4 py-4"
-            >
             <div className="flex flex-col items-center py-6">
               <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-4">
                 <CheckCircle className="w-6 h-6 text-green-600" />
