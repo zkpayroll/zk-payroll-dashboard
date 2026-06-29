@@ -8,6 +8,8 @@ import { MOCK_EMPLOYEES } from "@/lib/api/mockData";
 import type { Employee } from "@/types";
 import EmptyState from "@/components/ui/EmptyState";
 import { AddEmployeeModal } from "./AddEmployeeModal";
+import { EditEmployeeModal } from "./EditEmployeeModal";
+import { OnboardingChecklist } from "./OnboardingChecklist";
 
 type StatusFilter = "all" | "active" | "inactive" | "pending";
 
@@ -28,6 +30,7 @@ function EmployeeDirectory() {
   const { employees: storedEmployees, isLoading: storeLoading } = useEmployeeStore();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [fixingEmployeeId, setFixingEmployeeId] = useState<string | null>(null);
   const [localLoading, setLocalLoading] = useState(true);
 
   useEffect(() => {
@@ -53,7 +56,9 @@ function EmployeeDirectory() {
   }, [employees]);
 
   return (
-    <section aria-labelledby="employee-directory-heading">
+    <section aria-labelledby="employee-directory-heading" className="space-y-6">
+      <OnboardingChecklist onFixEmployee={(id) => setFixingEmployeeId(id)} />
+      
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="px-4 sm:px-6 py-4 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h3
@@ -233,6 +238,12 @@ function EmployeeDirectory() {
       <AddEmployeeModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+      />
+
+      <EditEmployeeModal
+        isOpen={fixingEmployeeId !== null}
+        onClose={() => setFixingEmployeeId(null)}
+        employeeId={fixingEmployeeId}
       />
     </section>
   );
