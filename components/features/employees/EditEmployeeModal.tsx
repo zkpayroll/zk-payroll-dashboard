@@ -188,7 +188,7 @@ export function EditEmployeeModal({ isOpen, onClose, employeeId }: EditEmployeeM
       );
       setSubmitStatus("error");
     }
-  }, [form, isConnected, publicKey, network, addEmployee]);
+  }, [form, isConnected, publicKey, network, updateEmployee, employeeToEdit]);
 
   if (!isOpen) return null;
 

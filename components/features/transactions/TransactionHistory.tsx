@@ -351,6 +351,11 @@ function TransactionHistory() {
             <button
               type="button"
               onClick={() => setShowFilters(!showFilters)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+            >
+              <Filter className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Filters</span>
+            </button>
             <button
               type="button"
               onClick={handleExport}
