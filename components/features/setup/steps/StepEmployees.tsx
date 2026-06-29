@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { Users, Plus } from "lucide-react";
-import { useEmployeesStore } from "@/stores/employees";
-import AddEmployeeModal from "@/components/features/employees/AddEmployeeModal";
+import { useEmployeeStore } from "@/stores/employees";
+import { AddEmployeeModal } from "@/components/features/employees/AddEmployeeModal";
 
 interface StepEmployeesProps {
   onNext: () => void;
@@ -12,7 +12,7 @@ interface StepEmployeesProps {
 
 export default function StepEmployees({ onNext, onBack }: StepEmployeesProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { employees } = useEmployeesStore();
+  const { employees } = useEmployeeStore();
 
   const hasEmployees = employees.length > 0;
 

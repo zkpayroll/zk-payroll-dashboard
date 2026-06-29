@@ -35,7 +35,7 @@ const adminSession: SessionPayload = {
 
 const employeeSession: SessionPayload = {
   publicKey: EMPLOYEE_KEY,
-  role: 'employee',
+  role: 'operator',
   expiresAt: Date.now() + 86_400_000,
 };
 

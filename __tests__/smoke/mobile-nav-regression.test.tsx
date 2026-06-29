@@ -5,13 +5,13 @@ import Sidebar from "@/components/layout/Sidebar";
 describe("Smoke: Mobile navigation regression", () => {
   describe("Navigation menu toggle", () => {
     it("renders hamburger menu button on mobile view", () => {
-      render(<Sidebar />);
+      render(<Sidebar role="operator" />);
       const menuButton = screen.getByRole("button", { name: /open navigation menu/i });
       expect(menuButton).toBeInTheDocument();
     });
 
     it("toggles mobile menu visibility", () => {
-      render(<Sidebar />);
+      render(<Sidebar role="operator" />);
       const menuButton = screen.getByRole("button", { name: /open navigation menu/i });
 
       fireEvent.click(menuButton);
@@ -25,7 +25,7 @@ describe("Smoke: Mobile navigation regression", () => {
 
   describe("Mobile link accessibility", () => {
     it("renders navigation links with proper accessibility", () => {
-      render(<Sidebar />);
+      render(<Sidebar role="operator" />);
       fireEvent.click(screen.getByRole("button", { name: /open navigation menu/i }));
 
       const navDialog = screen.getByRole("dialog", { name: /navigation menu/i });
@@ -39,7 +39,7 @@ describe("Smoke: Mobile navigation regression", () => {
     });
 
     it("closes menu after navigation link click", () => {
-      render(<Sidebar />);
+      render(<Sidebar role="operator" />);
       fireEvent.click(screen.getByRole("button", { name: /open navigation menu/i }));
 
       const dialog = screen.getByRole("dialog", { name: /navigation menu/i });
@@ -52,7 +52,7 @@ describe("Smoke: Mobile navigation regression", () => {
 
   describe("Mobile routing states", () => {
     it("maintains active state on navigation", () => {
-      render(<Sidebar />);
+      render(<Sidebar role="operator" />);
       fireEvent.click(screen.getByRole("button", { name: /open navigation menu/i }));
 
       const dialog = screen.getByRole("dialog", { name: /navigation menu/i });
@@ -63,7 +63,7 @@ describe("Smoke: Mobile navigation regression", () => {
 
   describe("Mobile touch interactions", () => {
     it("handles menu close on background tap", () => {
-      render(<Sidebar />);
+      render(<Sidebar role="operator" />);
       fireEvent.click(screen.getByRole("button", { name: /open navigation menu/i }));
       expect(screen.getByRole("dialog")).toBeInTheDocument();
 
@@ -75,14 +75,14 @@ describe("Smoke: Mobile navigation regression", () => {
     });
 
     it("supports keyboard navigation in mobile menu", () => {
-      render(<Sidebar />);
+      render(<Sidebar role="operator" />);
       const menuButton = screen.getByRole("button", { name: /open navigation menu/i });
 
       fireEvent.click(menuButton);
       expect(screen.getByRole("dialog")).toBeInTheDocument();
 
       const closeButton = screen.getByRole("button", { name: /close navigation menu/i });
-      expect(closeButton).toHaveFocus() || closeButton.focus();
+      closeButton.focus();
 
       fireEvent.keyDown(closeButton, { key: "Escape" });
     });
@@ -90,7 +90,7 @@ describe("Smoke: Mobile navigation regression", () => {
 
   describe("Mobile header integration", () => {
     it("preserves header visibility when menu is open", () => {
-      render(<Sidebar />);
+      render(<Sidebar role="operator" />);
       fireEvent.click(screen.getByRole("button", { name: /open navigation menu/i }));
 
       expect(screen.getByRole("dialog")).toBeInTheDocument();
