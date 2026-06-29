@@ -299,6 +299,7 @@ function TransactionHistory() {
                                 if (e.key === "Escape") setEditingViewId(null);
                               }}
                               className="flex-1 min-w-0 rounded border border-gray-300 px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                              // eslint-disable-next-line jsx-a11y/no-autofocus
                               autoFocus
                             />
                             <button
@@ -492,6 +493,7 @@ function TransactionHistory() {
                     }}
                     placeholder="View name..."
                     className="w-40 rounded border border-indigo-300 px-2 py-1 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    // eslint-disable-next-line jsx-a11y/no-autofocus
                     autoFocus
                   />
                   <button
