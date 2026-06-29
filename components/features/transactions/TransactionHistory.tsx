@@ -465,8 +465,115 @@ function TransactionHistory() {
             </div>
           </div>
         )}
+        {/* ── Active filter bar with save button ──────────────────── */}
+        {hasFiltersApplied && (
+          <div className="px-6 py-2 bg-indigo-50 border-b flex items-center justify-between">
+            <p className="text-xs text-indigo-700">
+              {activeFilterCount} filter{activeFilterCount > 1 ? "s" : ""} active
+              {currentView && (
+                <span className="ml-1">
+                  — matching view: <strong>{currentView.name}</strong>
+                </span>
+              )}
+            </p>
+            <div className="flex items-center gap-2">
+              {showSaveDialog ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    value={savingName}
+                    onChange={(e) => setSavingName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSaveView();
+                      if (e.key === "Escape") {
+                        setShowSaveDialog(false);
+                        setSavingName("");
+                      }
+                    }}
+                    placeholder="View name..."
+                    className="w-40 rounded border border-indigo-300 px-2 py-1 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveView}
+                    className="p-1 text-indigo-600 hover:text-indigo-800"
+                    aria-label="Save view"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSaveDialog(false);
+                      setSavingName("");
+                    }}
+                    className="p-1 text-gray-400 hover:text-gray-600"
+                    aria-label="Cancel"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowSaveDialog(true)}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition-colors"
+                >
+                  <Save className="w-3 h-3" />
+                  Save as view
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-gray-600 hover:bg-gray-200 transition-colors"
+              >
+                <X className="w-3 h-3" />
+                Clear all
+              </button>
+            </div>
+          </div>
+        )}
 
-        <table className="w-full text-left">
+        {isLoading ? (
+          <div className="animate-pulse" role="status" aria-label="Loading transactions">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-400 uppercase">Type</th>
+                  <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-400 uppercase">Recipient</th>
+                  <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-400 uppercase">Amount</th>
+                  <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-400 uppercase">Status</th>
+                  <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-400 uppercase">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {[1, 2, 3, 4, 5].map((idx) => (
+                  <tr key={idx}>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-gray-200 rounded w-16"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-gray-200 rounded w-24"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-gray-200 rounded w-20"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-6 bg-gray-200 rounded-full w-14"></div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 bg-gray-200 rounded w-24"></div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <>
+<table className="w-full text-left">
           <caption className="sr-only">
             Payroll transactions with filtering and export
           </caption>
@@ -577,204 +684,11 @@ function TransactionHistory() {
                       Details
                     </button>
                   </td>
-        {/* ── Active filter bar with save button ──────────────────── */}
-        {hasFiltersApplied && (
-          <div className="px-6 py-2 bg-indigo-50 border-b flex items-center justify-between">
-            <p className="text-xs text-indigo-700">
-              {activeFilterCount} filter{activeFilterCount > 1 ? "s" : ""} active
-              {currentView && (
-                <span className="ml-1">
-                  — matching view: <strong>{currentView.name}</strong>
-                </span>
-              )}
-            </p>
-            <div className="flex items-center gap-2">
-              {showSaveDialog ? (
-                <div className="flex items-center gap-1">
-                  <input
-                    type="text"
-                    value={savingName}
-                    onChange={(e) => setSavingName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleSaveView();
-                      if (e.key === "Escape") {
-                        setShowSaveDialog(false);
-                        setSavingName("");
-                      }
-                    }}
-                    placeholder="View name..."
-                    className="w-40 rounded border border-indigo-300 px-2 py-1 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSaveView}
-                    className="p-1 text-indigo-600 hover:text-indigo-800"
-                    aria-label="Save view"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowSaveDialog(false);
-                      setSavingName("");
-                    }}
-                    className="p-1 text-gray-400 hover:text-gray-600"
-                    aria-label="Cancel"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setShowSaveDialog(true)}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition-colors"
-                >
-                  <Save className="w-3 h-3" />
-                  Save as view
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-gray-600 hover:bg-gray-200 transition-colors"
-              >
-                <X className="w-3 h-3" />
-                Clear all
-              </button>
-            </div>
-          </div>
-        )}
-
-        {isLoading ? (
-          <div className="animate-pulse" role="status" aria-label="Loading transactions">
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-400 uppercase">Type</th>
-                  <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-400 uppercase">Recipient</th>
-                  <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-400 uppercase">Amount</th>
-                  <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-400 uppercase">Status</th>
-                  <th scope="col" className="px-6 py-3 text-xs font-medium text-gray-400 uppercase">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {[1, 2, 3, 4, 5].map((idx) => (
-                  <tr key={idx}>
-                    <td className="px-6 py-4">
-                      <div className="h-4 bg-gray-200 rounded w-16"></div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="h-4 bg-gray-200 rounded w-24"></div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="h-4 bg-gray-200 rounded w-20"></div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="h-6 bg-gray-200 rounded-full w-14"></div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="h-4 bg-gray-200 rounded w-24"></div>
-                    </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <>
-            <table className="w-full text-left">
-              <caption className="sr-only">
-                Payroll transactions with filtering and export
-              </caption>
-              <thead className="bg-gray-50">
-                <tr>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-xs font-medium text-gray-600 uppercase"
-                  >
-                    Type
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-xs font-medium text-gray-600 uppercase"
-                  >
-                    Recipient
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-xs font-medium text-gray-600 uppercase"
-                  >
-                    Amount
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-xs font-medium text-gray-600 uppercase"
-                  >
-                    Status
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-xs font-medium text-gray-600 uppercase"
-                  >
-                    Date
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200" aria-live="polite">
-                {filtered.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="px-6 py-8 text-center text-sm text-gray-500"
-                    >
-                      {hasFiltersApplied
-                        ? "No transactions match the current filters. Try broadening your filter criteria."
-                        : "No transactions yet. Process a payroll run to populate the transaction history."}
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((tx) => (
-                    <tr key={tx.id}>
-                      <td className="px-6 py-4 flex items-center">
-                        {tx.totalAmount > 0 ? (
-                          <ArrowDownLeft
-                            className="w-4 h-4 text-green-600 mr-2"
-                            aria-hidden="true"
-                          />
-                        ) : (
-                          <ArrowUpRight
-                            className="w-4 h-4 text-red-600 mr-2"
-                            aria-hidden="true"
-                          />
-                        )}
-                        Payout
-                      </td>
-                      <td className="px-6 py-4 text-gray-900">
-                        {tx.employeeCount} employees
-                      </td>
-                      <td className="px-6 py-4 font-medium text-gray-900">
-                        ${tx.totalAmount.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`px-2 py-1 text-xs font-medium rounded-full ${
-                            STATUS_STYLES[tx.status] ?? "bg-gray-100 text-gray-600"
-                          }`}
-                        >
-                          {tx.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">
-                        {new Date(tx.createdAt).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                ))
+              )}
+            </tbody>
+          </table>
 
             <div className="px-4 sm:px-6 py-3 border-t text-xs text-gray-500">
               Showing {filtered.length} of {MOCK_TRANSACTIONS.length} transactions
