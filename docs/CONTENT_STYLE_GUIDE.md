@@ -89,7 +89,7 @@ Use these exact labels consistently across the app.
 
 ## 📖 Core Terminology
 
-Use these terms consistently throughout the dashboard.
+Use these terms consistently throughout the dashboard. For a comprehensive reference covering terms across the dashboard, SDK, and smart contracts, see the [Shared Terminology Guide](./TERMINOLOGY.md).
 
 | Term | Definition | Usage Notes |
 |------|------------|-------------|
