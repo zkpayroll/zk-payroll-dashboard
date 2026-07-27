@@ -83,6 +83,12 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     roles: ['admin'],
   },
   {
+    label: 'Reconciliation',
+    href: '/reconciliation',
+    icon: 'clipboard',
+    roles: ['admin', 'operator', 'auditor'],
+  },
+  {
     label: 'Settings',
     href: '/settings',
     icon: 'settings',
@@ -106,6 +112,7 @@ export const ROUTE_ROLE_RULES: Array<{ prefix: string; roles: UserRole[] }> = [
   { prefix: '/history', roles: ['admin', 'operator', 'auditor'] },
   { prefix: '/exports', roles: ['admin', 'operator', 'auditor'] },
   { prefix: '/settings', roles: ['admin', 'operator', 'auditor'] },
+  { prefix: '/reconciliation', roles: ['admin', 'operator', 'auditor'] },
   { prefix: '/dashboard', roles: ['admin', 'operator', 'auditor'] },
   { prefix: '/incidents', roles: ['admin', 'operator', 'auditor'] },
   { prefix: '/admin', roles: ['admin'] },
