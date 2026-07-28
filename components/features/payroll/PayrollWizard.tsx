@@ -26,7 +26,7 @@ import { usePayrollWizardStore } from "@/stores/payrollWizard";
 import { useWalletStore } from "@/stores/walletStore";
 import { EXPECTED_NETWORK } from "@/components/providers/StellarProvider";
 import { IncidentBanner } from "@/components/ui/IncidentBanner";
-import { MOCK_EMPLOYEES, MOCK_PAYROLL_RUNS, MOCK_TREASURY_BALANCE } from "@/lib/api/mockData";
+import { MOCK_COMPANIES, MOCK_EMPLOYEES, MOCK_PAYROLL_RUNS, MOCK_TREASURY_BALANCE } from "@/lib/api/mockData";
 import PayrollReceipt from "./PayrollReceipt";
 import type { PayrollWizardStep } from "@/types";
 import { trackEvent, mapErrorToType, bucketEmployeeCount } from "@/lib/telemetry";
@@ -786,7 +786,11 @@ function ConfirmStep({
 
       {/* Explicit Confirmation Checkbox */}
       <div className="bg-indigo-50/50 border border-indigo-150 rounded-lg p-4">
-        <label className="flex items-start gap-3 cursor-pointer select-none">
+        <label
+          htmlFor="confirm-checkbox"
+          aria-labelledby="confirm-checkbox-title"
+          className="flex items-start gap-3 cursor-pointer select-none"
+        >
           <input
             id="confirm-checkbox"
             type="checkbox"
@@ -796,7 +800,10 @@ function ConfirmStep({
             className="w-4 h-4 text-indigo-600 border-gray-300 rounded mt-0.5 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
           />
           <div>
-            <span className="text-sm font-medium text-gray-900">
+            <span
+              id="confirm-checkbox-title"
+              className="text-sm font-medium text-gray-900"
+            >
               Confirm Payroll Execution Summary
             </span>
             <p className="text-xs text-gray-600 mt-0.5">
