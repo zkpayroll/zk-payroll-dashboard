@@ -1,11 +1,12 @@
 "use client";
 
-import type { ComponentType } from "react";
+import { useState, type ComponentType } from "react";
 import {
   AlertTriangle,
   Database,
   Download,
   FileText,
+  HelpCircle,
   Printer,
   ShieldCheck,
 } from "lucide-react";
@@ -27,6 +28,16 @@ interface ExportDefinition {
   actionLabel: string;
   Icon: ComponentType<{ className?: string }>;
   onClick?: () => void;
+  /**
+   * Optional permission info shown as a tooltip.
+   * When set, the action button is wrapped in a container with an info icon
+   * that explains permission constraints based on role, scope, or grant expiry.
+   */
+  permissionTooltip?: {
+    roles: string;
+    detail: string;
+    warning?: string;
+  };
 }
 
 function toCsvRow(values: Array<string | number | null | undefined>) {
@@ -101,6 +112,10 @@ const exportDefinitions: ExportDefinition[] = [
     actionLabel: "Download CSV",
     Icon: Download,
     onClick: exportPayrollHistory,
+    permissionTooltip: {
+      roles: "Admin, Operator, Auditor",
+      detail: "Payroll history is accessible to all dashboard roles. Auditors see aggregated totals only; employee-level detail requires a view key.",
+    },
   },
   {
     title: "Redacted employee directory",
@@ -112,6 +127,11 @@ const exportDefinitions: ExportDefinition[] = [
     actionLabel: "Download CSV",
     Icon: Database,
     onClick: exportEmployeeDirectory,
+    permissionTooltip: {
+      roles: "Admin, Operator",
+      detail: "Employee directory exports are available to admins and operators. Auditors do not have access to employee roster data to maintain privacy boundaries.",
+      warning: "Not available to Auditor role",
+    },
   },
   {
     title: "Audit access requests",
@@ -123,6 +143,11 @@ const exportDefinitions: ExportDefinition[] = [
     actionLabel: "Download CSV",
     Icon: ShieldCheck,
     onClick: exportAuditAccess,
+    permissionTooltip: {
+      roles: "Admin, Auditor",
+      detail: "Audit access exports are limited to admins and auditors. Operators cannot export audit access data to prevent unauthorized compliance data access.",
+      warning: "Not available to Operator role",
+    },
   },
   {
     title: "Cryptographic audit report",
@@ -134,6 +159,10 @@ const exportDefinitions: ExportDefinition[] = [
     actionLabel: "Print report",
     Icon: Printer,
     onClick: () => window.print(),
+    permissionTooltip: {
+      roles: "Admin, Operator, Auditor",
+      detail: "The cryptographic audit report is available to all roles. Report output uses shielded amounts and redacted recipient identifiers to protect privacy.",
+    },
   },
   {
     title: "Treasury funding snapshot",
@@ -144,8 +173,60 @@ const exportDefinitions: ExportDefinition[] = [
     privacy: "Treasury exports avoid employee-level payroll detail by default.",
     actionLabel: "View details",
     Icon: FileText,
+    permissionTooltip: {
+      roles: "Admin",
+      detail: "Treasury funding details are admin-only. Operators and auditors cannot access treasury balance or funding projection data.",
+      warning: "Admin role only",
+    },
   },
 ];
+
+function PermissionTooltip({
+  tooltip,
+}: {
+  tooltip: NonNullable<ExportDefinition["permissionTooltip"]>;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative inline-block">
+      <button
+        type="button"
+        onMouseEnter={() => setIsOpen(true)}
+        onMouseLeave={() => setIsOpen(false)}
+        onFocus={() => setIsOpen(true)}
+        onBlur={() => setIsOpen(false)}
+        onClick={() => setIsOpen(!isOpen)}
+        className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-indigo-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded"
+        aria-label={`Permission info: ${tooltip.detail}`}
+      >
+        <HelpCircle className="w-3.5 h-3.5" />
+        <span>Permissions</span>
+      </button>
+      {isOpen && (
+        <div
+          role="tooltip"
+          className="absolute bottom-full left-0 mb-2 w-72 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-4 z-50 animate-in fade-in slide-in-from-bottom-1 duration-150"
+        >
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5 font-semibold text-indigo-300">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Role Access: {tooltip.roles}</span>
+            </div>
+            <p className="text-gray-300 leading-relaxed">{tooltip.detail}</p>
+            {tooltip.warning && (
+              <div className="flex items-start gap-1.5 pt-2 border-t border-gray-700">
+                <HelpCircle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-amber-300">{tooltip.warning}</p>
+              </div>
+            )}
+          </div>
+          <div className="absolute -bottom-1 left-4 w-2 h-2 bg-gray-900 rotate-45" />
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ExportCenter() {
   const verifiedRuns = MOCK_PAYROLL_RUNS.filter((run) => run.status === "verified").length;
@@ -192,7 +273,7 @@ function ExportCenter() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        {exportDefinitions.map(({ title, description, scope, format, fields, privacy, actionLabel, Icon, onClick }) => (
+        {exportDefinitions.map(({ title, description, scope, format, fields, privacy, actionLabel, Icon, onClick, permissionTooltip }) => (
           <article key={title} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-3">
@@ -225,24 +306,29 @@ function ExportCenter() {
               <p>{privacy}</p>
             </div>
 
-            <div className="mt-4">
-              {onClick ? (
-                <button
-                  type="button"
-                  onClick={onClick}
-                  className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-                >
-                  <Download className="h-4 w-4" aria-hidden="true" />
-                  {actionLabel}
-                </button>
-              ) : (
-                <a
-                  href="/treasury"
-                  className="inline-flex items-center gap-2 rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-                >
-                  <FileText className="h-4 w-4" aria-hidden="true" />
-                  {actionLabel}
-                </a>
+            <div className="mt-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                {onClick ? (
+                  <button
+                    type="button"
+                    onClick={onClick}
+                    className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                  >
+                    <Download className="h-4 w-4" aria-hidden="true" />
+                    {actionLabel}
+                  </button>
+                ) : (
+                  <a
+                    href="/treasury"
+                    className="inline-flex items-center gap-2 rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                  >
+                    <FileText className="h-4 w-4" aria-hidden="true" />
+                    {actionLabel}
+                  </a>
+                )}
+              </div>
+              {permissionTooltip && (
+                <PermissionTooltip tooltip={permissionTooltip} />
               )}
             </div>
           </article>

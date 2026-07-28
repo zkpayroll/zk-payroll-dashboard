@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Key,
   Plus,
@@ -12,6 +12,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Timer,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useViewKeyStore } from "@/stores/viewKeys";
@@ -133,8 +134,95 @@ function ComplianceManager() {
   const inactiveKeys = viewKeys.filter((k) => !k.isActive);
   const pendingRequests = requests.filter((r) => r.status === "pending");
 
+  // ── Auditor Access Expiration Detection ──────────────────────────
+  // Checks active view keys for upcoming or already-expired access.
+  const EXPIRATION_WARNING_DAYS = 30; // warn when key expires within 30 days
+
+  const { expiringKeys, expiredKeys } = useMemo(() => {
+    const now = Date.now();
+    const expiring: ViewKey[] = [];
+    const expired: ViewKey[] = [];
+
+    for (const key of viewKeys) {
+      const expiresAt = new Date(key.expiresAt).getTime();
+      const daysUntilExpiry = Math.floor((expiresAt - now) / (1000 * 60 * 60 * 24));
+
+      if (key.isActive && daysUntilExpiry <= 0) {
+        // Active key that has already passed its expiry date — treat as expired
+        expired.push(key);
+      } else if (key.isActive && daysUntilExpiry <= EXPIRATION_WARNING_DAYS) {
+        expiring.push(key);
+      }
+    }
+
+    return { expiringKeys: expiring, expiredKeys: expired };
+  }, [viewKeys]);
+
   return (
     <section aria-labelledby="compliance-heading" className="space-y-6">
+      {/* ── Auditor Access Expiration Banner ────────────────────────── */}
+      {expiredKeys.length > 0 && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 animate-in fade-in slide-in-from-top-1 duration-300"
+        >
+          <Timer className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-red-800">
+              Auditor Access Expired
+            </p>
+            <p className="text-xs text-red-700 mt-1">
+              {expiredKeys.length} active view key{expiredKeys.length > 1 ? "s have" : " has"} passed their expiration date.
+              {expiredKeys.length > 1 ? " These keys" : " This key"} may no longer function correctly.
+              Please revoke and reissue {expiredKeys.length > 1 ? "them" : "it"} to restore access.
+            </p>
+            <ul className="mt-2 space-y-1">
+              {expiredKeys.map((key) => (
+                <li key={key.id} className="text-xs text-red-700 flex items-center gap-2">
+                  <span className="font-medium">{key.auditorName}</span>
+                  <span className="text-red-500">
+                    (expired {new Date(key.expiresAt).toLocaleDateString()})
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {expiringKeys.length > 0 && expiredKeys.length === 0 && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 animate-in fade-in slide-in-from-top-1 duration-300"
+        >
+          <Timer className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-amber-800">
+              Auditor Access Expiring Soon
+            </p>
+            <p className="text-xs text-amber-700 mt-1">
+              {expiringKeys.length} active view key{expiringKeys.length > 1 ? "s are" : " is"} expiring within {EXPIRATION_WARNING_DAYS} days.
+              Consider renewing {expiringKeys.length > 1 ? "them" : "it"} to avoid interruption.
+            </p>
+            <ul className="mt-2 space-y-1">
+              {expiringKeys.map((key) => {
+                const daysLeft = Math.floor(
+                  (new Date(key.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+                );
+                return (
+                  <li key={key.id} className="text-xs text-amber-700 flex items-center gap-2">
+                    <span className="font-medium">{key.auditorName}</span>
+                    <span className="text-amber-600">
+                      ({daysLeft} day{daysLeft !== 1 ? "s" : ""} remaining — expires {new Date(key.expiresAt).toLocaleDateString()})
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h2
