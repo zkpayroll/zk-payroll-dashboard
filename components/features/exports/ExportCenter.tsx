@@ -1,11 +1,12 @@
 "use client";
 
-import type { ComponentType } from "react";
+import { useState, useEffect, type ComponentType } from "react";
 import {
   AlertTriangle,
   Database,
   Download,
   FileText,
+  Lock,
   Printer,
   ShieldCheck,
 } from "lucide-react";
@@ -16,8 +17,11 @@ import {
   MOCK_TRANSACTIONS,
   MOCK_TREASURY_BALANCE,
 } from "@/lib/api/mockData";
+import { canExport, getExportRestrictionReason, ROLE_LABELS } from "@/lib/auth/roles";
+import type { UserRole } from "@/types";
 
 interface ExportDefinition {
+  permissionKey: string;
   title: string;
   description: string;
   scope: string;
@@ -33,7 +37,7 @@ function toCsvRow(values: Array<string | number | null | undefined>) {
   return values
     .map((value) => {
       const text = value == null ? "" : String(value);
-      return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+      return /[\",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
     })
     .join(",");
 }
@@ -92,6 +96,7 @@ function exportAuditAccess() {
 
 const exportDefinitions: ExportDefinition[] = [
   {
+    permissionKey: "payroll-history",
     title: "Payroll history CSV",
     description: "Aggregate payroll runs for operations review and spreadsheet analysis.",
     scope: "Payroll runs",
@@ -103,6 +108,7 @@ const exportDefinitions: ExportDefinition[] = [
     onClick: exportPayrollHistory,
   },
   {
+    permissionKey: "employee-directory",
     title: "Redacted employee directory",
     description: "A privacy-safe roster export for department and status reconciliation.",
     scope: "Employees",
@@ -114,6 +120,7 @@ const exportDefinitions: ExportDefinition[] = [
     onClick: exportEmployeeDirectory,
   },
   {
+    permissionKey: "audit-requests",
     title: "Audit access requests",
     description: "Auditor request queue for compliance handoff and access review.",
     scope: "Compliance",
@@ -125,6 +132,7 @@ const exportDefinitions: ExportDefinition[] = [
     onClick: exportAuditAccess,
   },
   {
+    permissionKey: "audit-report",
     title: "Cryptographic audit report",
     description: "Print-friendly audit ledger with payroll totals and verification metadata.",
     scope: "Audit ledger",
@@ -136,6 +144,7 @@ const exportDefinitions: ExportDefinition[] = [
     onClick: () => window.print(),
   },
   {
+    permissionKey: "treasury-snapshot",
     title: "Treasury funding snapshot",
     description: "Current balance and projected payroll coverage for funding operations.",
     scope: "Treasury",
@@ -147,7 +156,134 @@ const exportDefinitions: ExportDefinition[] = [
   },
 ];
 
+function ExportCard({
+  exportDef,
+  role,
+}: {
+  exportDef: ExportDefinition;
+  role: UserRole | null;
+}) {
+  const { title, description, scope, format, fields, privacy, actionLabel, Icon, onClick, permissionKey } = exportDef;
+  const hasPermission = role ? canExport(role, permissionKey) : false;
+  const restrictionReason = role ? getExportRestrictionReason(role, permissionKey) : "Log in to access exports.";
+
+  const isLocked = !hasPermission;
+
+  return (
+    <article
+      className={`rounded-lg border bg-white p-5 shadow-sm transition-all ${
+        isLocked
+          ? "border-gray-200 opacity-70 grayscale-[30%]"
+          : "border-gray-200 hover:border-indigo-200 hover:shadow-md"
+      }`}
+      aria-disabled={isLocked}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div
+            className={`rounded-md p-2 ${
+              isLocked ? "bg-gray-100 text-gray-400" : "bg-gray-100 text-gray-700"
+            }`}
+          >
+            {isLocked ? (
+              <Lock className="h-5 w-5" aria-hidden="true" />
+            ) : (
+              <Icon className="h-5 w-5" aria-hidden="true" />
+            )}
+          </div>
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+            <p className="mt-1 text-sm text-gray-600">{description}</p>
+          </div>
+        </div>
+        <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
+          {format}
+        </span>
+      </div>
+
+      <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Scope</dt>
+          <dd className="mt-1 text-gray-900">{scope}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Fields</dt>
+          <dd className="mt-1 text-gray-900">{fields.join(", ")}</dd>
+        </div>
+      </dl>
+
+      <div className="mt-4 flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <p>{privacy}</p>
+      </div>
+
+      <div className="mt-4">
+        {isLocked ? (
+          <div
+            className="inline-flex items-center gap-2 rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-400 cursor-not-allowed"
+            title={restrictionReason ?? undefined}
+          >
+            <Lock className="h-4 w-4" aria-hidden="true" />
+            {actionLabel}
+          </div>
+        ) : onClick ? (
+          <button
+            type="button"
+            onClick={onClick}
+            className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          >
+            <Download className="h-4 w-4" aria-hidden="true" />
+            {actionLabel}
+          </button>
+        ) : (
+          <a
+            href="/treasury"
+            className="inline-flex items-center gap-2 rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          >
+            <FileText className="h-4 w-4" aria-hidden="true" />
+            {actionLabel}
+          </a>
+        )}
+      </div>
+
+      {isLocked && restrictionReason && (
+        <div className="mt-3 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 flex items-start gap-1.5">
+          <Lock className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+          <span>{restrictionReason}</span>
+        </div>
+      )}
+    </article>
+  );
+}
+
 function ExportCenter() {
+  const [role, setRole] = useState<UserRole | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchRole() {
+      try {
+        const res = await fetch("/api/auth/session", { method: "GET", cache: "no-store" });
+        if (!res.ok) {
+          if (!cancelled) setSessionLoading(false);
+          return;
+        }
+        const data = await res.json();
+        if (!cancelled) {
+          setRole(data.role);
+          setSessionLoading(false);
+        }
+      } catch {
+        if (!cancelled) setSessionLoading(false);
+      }
+    }
+
+    fetchRole();
+    return () => { cancelled = true; };
+  }, []);
+
   const verifiedRuns = MOCK_PAYROLL_RUNS.filter((run) => run.status === "verified").length;
   const totalPayroll = MOCK_TRANSACTIONS.reduce((sum, transaction) => sum + transaction.totalAmount, 0);
 
@@ -162,6 +298,11 @@ function ExportCenter() {
           <p className="mt-2 max-w-3xl text-sm text-gray-600">
             Download supported payroll, compliance, and treasury outputs from one place while keeping sensitive payroll fields controlled.
           </p>
+          {role && (
+            <p className="mt-1 text-xs text-gray-500">
+              Signed in as <span className="font-medium text-gray-700">{ROLE_LABELS[role]}</span>. Restricted exports are locked per your role permissions.
+            </p>
+          )}
         </div>
         <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
           <p className="font-semibold">Privacy boundary</p>
@@ -170,6 +311,12 @@ function ExportCenter() {
           </p>
         </div>
       </div>
+
+      {sessionLoading && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-500">
+          Loading session permissions...
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
@@ -192,60 +339,8 @@ function ExportCenter() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        {exportDefinitions.map(({ title, description, scope, format, fields, privacy, actionLabel, Icon, onClick }) => (
-          <article key={title} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <div className="rounded-md bg-gray-100 p-2 text-gray-700">
-                  <Icon className="h-5 w-5" aria-hidden="true" />
-                </div>
-                <div>
-                  <h3 className="text-base font-semibold text-gray-900">{title}</h3>
-                  <p className="mt-1 text-sm text-gray-600">{description}</p>
-                </div>
-              </div>
-              <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
-                {format}
-              </span>
-            </div>
-
-            <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-              <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Scope</dt>
-                <dd className="mt-1 text-gray-900">{scope}</dd>
-              </div>
-              <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Fields</dt>
-                <dd className="mt-1 text-gray-900">{fields.join(", ")}</dd>
-              </div>
-            </dl>
-
-            <div className="mt-4 flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-              <p>{privacy}</p>
-            </div>
-
-            <div className="mt-4">
-              {onClick ? (
-                <button
-                  type="button"
-                  onClick={onClick}
-                  className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-                >
-                  <Download className="h-4 w-4" aria-hidden="true" />
-                  {actionLabel}
-                </button>
-              ) : (
-                <a
-                  href="/treasury"
-                  className="inline-flex items-center gap-2 rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-                >
-                  <FileText className="h-4 w-4" aria-hidden="true" />
-                  {actionLabel}
-                </a>
-              )}
-            </div>
-          </article>
+        {exportDefinitions.map((def) => (
+          <ExportCard key={def.permissionKey} exportDef={def} role={role} />
         ))}
       </div>
     </section>

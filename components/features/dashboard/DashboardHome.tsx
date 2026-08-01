@@ -1,6 +1,7 @@
 "use client";
 
 import { Wallet, Building2, Loader2 } from "lucide-react";
+import OverduePayrollAlertBanner from "@/components/features/payroll/OverduePayrollAlertBanner";
 import { useStellar } from "@/components/providers/StellarProvider";
 import { useWalletStore } from "@/stores/walletStore";
 import { useCompanyStore } from "@/stores/company";
@@ -10,6 +11,7 @@ import SystemStatus from "@/components/features/dashboard/SystemStatus";
 import QuickActions from "@/components/features/dashboard/QuickActions";
 import OnboardingChecklistPanel from "@/components/features/dashboard/OnboardingChecklistPanel";
 import PinnedAlertsPanel from "@/components/features/dashboard/PinnedAlertsPanel";
+import { SessionTimeoutBanner } from "@/components/features/dashboard/SessionTimeoutBanner";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 function DashboardHome() {
@@ -121,6 +123,10 @@ function DashboardHome() {
         </div>
         <WalletConnect />
       </div>
+      <ErrorBoundary>
+        <OverduePayrollAlertBanner />
+        <SessionTimeoutBanner />
+      </ErrorBoundary>
       <ErrorBoundary>
         <PinnedAlertsPanel alerts={sampleAlerts} tasks={sampleTasks} />
       </ErrorBoundary>

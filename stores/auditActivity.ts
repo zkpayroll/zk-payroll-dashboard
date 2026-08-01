@@ -5,7 +5,9 @@ export type AuditActionType =
   | "key_granted"
   | "key_revoked"
   | "request_approved"
-  | "request_rejected";
+  | "request_rejected"
+  | "export_prepared"
+  | "export_downloaded";
 
 export interface AuditActivityEntry {
   id: string;

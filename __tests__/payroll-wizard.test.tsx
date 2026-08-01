@@ -90,7 +90,7 @@ describe("PayrollWizard UI & Receipt Flow", () => {
 
     // Success toast and next step should have loaded
     expect(toast.success).toHaveBeenCalledWith("Proof generated successfully");
-    expect(screen.getByText("Confirm & Submit")).toBeInTheDocument();
+    expect(screen.getByText("Review & Confirm Payroll")).toBeInTheDocument();
 
     randomSpy.mockRestore();
   });
@@ -137,8 +137,9 @@ describe("PayrollWizard UI & Receipt Flow", () => {
 
     render(<PayrollWizard />);
 
-    expect(screen.getByText("Confirm & Submit")).toBeInTheDocument();
+    expect(screen.getByText("Review & Confirm Payroll")).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("checkbox"));
     const submitBtn = screen.getByRole("button", { name: /submit payroll/i });
     fireEvent.click(submitBtn);
 
@@ -177,6 +178,7 @@ describe("PayrollWizard UI & Receipt Flow", () => {
 
     render(<PayrollWizard />);
 
+    fireEvent.click(screen.getByRole("checkbox"));
     const submitBtn = screen.getByRole("button", { name: /submit payroll/i });
     fireEvent.click(submitBtn);
 

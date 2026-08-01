@@ -6,18 +6,50 @@ exports[`Visual Regression - Payroll Exception States > captures payroll executi
     aria-labelledby="payroll-wizard-heading"
     class="space-y-6"
   >
-    <h2
-      class="text-lg font-semibold text-gray-900"
-      id="payroll-wizard-heading"
+    <div
+      class="flex items-center justify-between"
     >
-      Execute Payroll
-    </h2>
+      <h2
+        class="text-lg font-semibold text-gray-900"
+        id="payroll-wizard-heading"
+      >
+        Execute Payroll
+      </h2>
+      <button
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+        type="button"
+      >
+        <svg
+          class="lucide lucide-history w-4 h-4"
+          fill="none"
+          height="24"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"
+          />
+          <path
+            d="M3 3v5h5"
+          />
+          <path
+            d="M12 7v5l4 2"
+          />
+        </svg>
+        Approval History
+      </button>
+    </div>
     <nav
       aria-label="Payroll execution progress"
       class="flex items-center"
     >
       <div
-        class="flex items-center"
+        class="flex items-center shrink-0"
       >
         <div
           class="flex items-center gap-2"
@@ -39,17 +71,17 @@ exports[`Visual Regression - Payroll Exception States > captures payroll executi
             />
           </svg>
           <span
-            class="text-sm font-medium text-gray-900"
+            class="text-sm font-medium text-gray-900 block"
           >
             Review
           </span>
         </div>
         <div
-          class="w-12 h-px mx-3 bg-gray-200"
+          class="w-8 sm:w-12 h-px mx-2 sm:mx-3 bg-gray-200"
         />
       </div>
       <div
-        class="flex items-center"
+        class="flex items-center shrink-0"
       >
         <div
           class="flex items-center gap-2"
@@ -73,17 +105,17 @@ exports[`Visual Regression - Payroll Exception States > captures payroll executi
             />
           </svg>
           <span
-            class="text-sm font-medium text-gray-400"
+            class="text-sm font-medium text-gray-400 hidden sm:block"
           >
             Proof Generation
           </span>
         </div>
         <div
-          class="w-12 h-px mx-3 bg-gray-200"
+          class="w-8 sm:w-12 h-px mx-2 sm:mx-3 bg-gray-200"
         />
       </div>
       <div
-        class="flex items-center"
+        class="flex items-center shrink-0"
       >
         <div
           class="flex items-center gap-2"
@@ -107,17 +139,17 @@ exports[`Visual Regression - Payroll Exception States > captures payroll executi
             />
           </svg>
           <span
-            class="text-sm font-medium text-gray-400"
+            class="text-sm font-medium text-gray-400 hidden sm:block"
           >
             Confirmation
           </span>
         </div>
         <div
-          class="w-12 h-px mx-3 bg-gray-200"
+          class="w-8 sm:w-12 h-px mx-2 sm:mx-3 bg-gray-200"
         />
       </div>
       <div
-        class="flex items-center"
+        class="flex items-center shrink-0"
       >
         <div
           class="flex items-center gap-2"
@@ -141,7 +173,7 @@ exports[`Visual Regression - Payroll Exception States > captures payroll executi
             />
           </svg>
           <span
-            class="text-sm font-medium text-gray-400"
+            class="text-sm font-medium text-gray-400 hidden sm:block"
           >
             Submission
           </span>
@@ -149,7 +181,7 @@ exports[`Visual Regression - Payroll Exception States > captures payroll executi
       </div>
     </nav>
     <div
-      class="bg-white rounded-lg shadow-sm p-6"
+      class="bg-white rounded-lg shadow-sm p-4 sm:p-6"
     >
       <div
         class="text-center py-8"
@@ -1048,12 +1080,14 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Failed S
               >
                 Failed
               </span>
-              <span
-                class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800"
+              <div
+                aria-label="Status: Failed"
+                class="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-red-100 text-red-800 inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium rounded-full border transition-colors"
+                role="status"
               >
                 <svg
                   aria-hidden="true"
-                  class="lucide lucide-xcircle w-3.5 h-3.5"
+                  class="lucide lucide-xcircle w-3.5 h-3.5 shrink-0"
                   fill="none"
                   height="24"
                   stroke="currentColor"
@@ -1076,8 +1110,10 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Failed S
                     d="m9 9 6 6"
                   />
                 </svg>
-                Failed
-              </span>
+                <span>
+                  Failed
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -1429,6 +1465,131 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Failed S
          in this run
       </div>
     </div>
+    <section
+      aria-label="Operator reconciliation diff"
+      class="bg-white rounded-lg shadow-sm overflow-hidden"
+      data-testid="reconciliation-diff-panel"
+    >
+      <header
+        class="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b bg-gray-50"
+      >
+        <span
+          class="flex items-center gap-2 text-sm font-semibold text-gray-900"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-terminal w-4 h-4 text-indigo-600"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <polyline
+              points="4 17 10 11 4 5"
+            />
+            <line
+              x1="12"
+              x2="20"
+              y1="19"
+              y2="19"
+            />
+          </svg>
+          Operator view (contains unredacted stroops)
+        </span>
+        <div
+          class="flex items-center gap-3"
+        >
+          <span
+            class="text-xs font-medium px-2 py-0.5 rounded-full border bg-green-50 text-green-700 border-green-200"
+          >
+            All payments reconcile cleanly
+          </span>
+          <button
+            aria-label="Copy reconciliation diff"
+            class="inline-flex items-center gap-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-medium px-2 py-1 transition-colors border border-slate-700"
+            data-testid="reconciliation-diff-copy"
+            type="button"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-clipboard w-3.5 h-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect
+                height="4"
+                rx="1"
+                ry="1"
+                width="8"
+                x="8"
+                y="2"
+              />
+              <path
+                d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+              />
+            </svg>
+            Copy
+          </button>
+        </div>
+      </header>
+      <div
+        class="p-4 sm:p-6 space-y-4"
+      >
+        <div
+          class="flex items-start gap-3 text-xs text-gray-600"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-shield-alert w-4 h-4 mt-0.5 text-amber-500 shrink-0"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"
+            />
+            <path
+              d="M12 8v4"
+            />
+            <path
+              d="M12 16h.01"
+            />
+          </svg>
+          <p>
+            This view is intended for operators triaging a run. It surfaces per-recipient reconciliation status and per-stroop amounts that are not shown elsewhere on this page. Do not share outside the operations team.
+          </p>
+        </div>
+        <div
+          class="relative bg-slate-900 rounded-md overflow-hidden"
+        >
+          <pre
+            class="text-slate-100 text-xs font-mono leading-relaxed p-4 overflow-x-auto whitespace-pre-wrap break-words"
+            data-testid="reconciliation-diff-text"
+          >
+            reconciliation: fully reconciled — no entries
+
+          </pre>
+        </div>
+      </div>
+    </section>
     <div
       class="flex flex-wrap gap-3"
     >
@@ -1476,6 +1637,51 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Pending 
         </svg>
         Back
       </button>
+    </div>
+    <div
+      aria-label="Payroll Run Locked: confirmation"
+      class="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3"
+      role="alert"
+    >
+      <svg
+        aria-hidden="true"
+        class="lucide lucide-lock w-5 h-5 text-amber-600 mt-0.5 shrink-0"
+        fill="none"
+        height="24"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+        width="24"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect
+          height="11"
+          rx="2"
+          ry="2"
+          width="18"
+          x="3"
+          y="11"
+        />
+        <path
+          d="M7 11V7a5 5 0 0 1 10 0v4"
+        />
+      </svg>
+      <div>
+        <h3
+          class="text-sm font-semibold text-amber-800 uppercase tracking-wider text-xs"
+        >
+          Payroll Run Locked (
+          confirmation
+          )
+        </h3>
+        <p
+          class="text-sm text-amber-700 mt-1"
+        >
+          This payroll run is locked for confirmation. It is currently awaiting on-chain verification on the Stellar network. No edits are allowed.
+        </p>
+      </div>
     </div>
     <header
       class="bg-white rounded-lg shadow-sm p-6"
@@ -1534,12 +1740,14 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Pending 
               >
                 Scheduled
               </span>
-              <span
-                class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800"
+              <div
+                aria-label="Status: Pending"
+                class="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-yellow-100 text-yellow-800 inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium rounded-full border transition-colors"
+                role="status"
               >
                 <svg
                   aria-hidden="true"
-                  class="lucide lucide-clock w-3.5 h-3.5"
+                  class="lucide lucide-clock w-3.5 h-3.5 shrink-0"
                   fill="none"
                   height="24"
                   stroke="currentColor"
@@ -1559,17 +1767,13 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Pending 
                     points="12 6 12 12 16 14"
                   />
                 </svg>
-                Pending
-              </span>
+                <span>
+                  Pending
+                </span>
+              </div>
             </div>
           </div>
         </div>
-        <a
-          class="inline-flex items-center justify-center px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors shrink-0"
-          href="/payroll/execute"
-        >
-          Process payroll
-        </a>
       </div>
     </header>
     <div
@@ -1918,6 +2122,131 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Pending 
          in this run
       </div>
     </div>
+    <section
+      aria-label="Operator reconciliation diff"
+      class="bg-white rounded-lg shadow-sm overflow-hidden"
+      data-testid="reconciliation-diff-panel"
+    >
+      <header
+        class="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b bg-gray-50"
+      >
+        <span
+          class="flex items-center gap-2 text-sm font-semibold text-gray-900"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-terminal w-4 h-4 text-indigo-600"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <polyline
+              points="4 17 10 11 4 5"
+            />
+            <line
+              x1="12"
+              x2="20"
+              y1="19"
+              y2="19"
+            />
+          </svg>
+          Operator view (contains unredacted stroops)
+        </span>
+        <div
+          class="flex items-center gap-3"
+        >
+          <span
+            class="text-xs font-medium px-2 py-0.5 rounded-full border bg-green-50 text-green-700 border-green-200"
+          >
+            All payments reconcile cleanly
+          </span>
+          <button
+            aria-label="Copy reconciliation diff"
+            class="inline-flex items-center gap-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-medium px-2 py-1 transition-colors border border-slate-700"
+            data-testid="reconciliation-diff-copy"
+            type="button"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-clipboard w-3.5 h-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect
+                height="4"
+                rx="1"
+                ry="1"
+                width="8"
+                x="8"
+                y="2"
+              />
+              <path
+                d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+              />
+            </svg>
+            Copy
+          </button>
+        </div>
+      </header>
+      <div
+        class="p-4 sm:p-6 space-y-4"
+      >
+        <div
+          class="flex items-start gap-3 text-xs text-gray-600"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-shield-alert w-4 h-4 mt-0.5 text-amber-500 shrink-0"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"
+            />
+            <path
+              d="M12 8v4"
+            />
+            <path
+              d="M12 16h.01"
+            />
+          </svg>
+          <p>
+            This view is intended for operators triaging a run. It surfaces per-recipient reconciliation status and per-stroop amounts that are not shown elsewhere on this page. Do not share outside the operations team.
+          </p>
+        </div>
+        <div
+          class="relative bg-slate-900 rounded-md overflow-hidden"
+        >
+          <pre
+            class="text-slate-100 text-xs font-mono leading-relaxed p-4 overflow-x-auto whitespace-pre-wrap break-words"
+            data-testid="reconciliation-diff-text"
+          >
+            reconciliation: fully reconciled — no entries
+
+          </pre>
+        </div>
+      </div>
+    </section>
     <div
       class="flex flex-wrap gap-3"
     >
@@ -1965,6 +2294,51 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Verified
         </svg>
         Back
       </button>
+    </div>
+    <div
+      aria-label="Payroll Run Locked: reconciliation"
+      class="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3"
+      role="alert"
+    >
+      <svg
+        aria-hidden="true"
+        class="lucide lucide-lock w-5 h-5 text-amber-600 mt-0.5 shrink-0"
+        fill="none"
+        height="24"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+        width="24"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect
+          height="11"
+          rx="2"
+          ry="2"
+          width="18"
+          x="3"
+          y="11"
+        />
+        <path
+          d="M7 11V7a5 5 0 0 1 10 0v4"
+        />
+      </svg>
+      <div>
+        <h3
+          class="text-sm font-semibold text-amber-800 uppercase tracking-wider text-xs"
+        >
+          Payroll Run Locked (
+          reconciliation
+          )
+        </h3>
+        <p
+          class="text-sm text-amber-700 mt-1"
+        >
+          This payroll run is locked for reconciliation. The transaction is verified on-chain. Edits are disabled to preserve the audit trail.
+        </p>
+      </div>
     </div>
     <header
       class="bg-white rounded-lg shadow-sm p-6"
@@ -2021,12 +2395,14 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Verified
               >
                 Completed
               </span>
-              <span
-                class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800"
+              <div
+                aria-label="Status: Verified"
+                class="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-green-100 text-green-800 inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium rounded-full border transition-colors"
+                role="status"
               >
                 <svg
                   aria-hidden="true"
-                  class="lucide lucide-check-circle w-3.5 h-3.5"
+                  class="lucide lucide-check-circle2 w-3.5 h-3.5 shrink-0"
                   fill="none"
                   height="24"
                   stroke="currentColor"
@@ -2037,15 +2413,19 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Verified
                   width="24"
                   xmlns="http://www.w3.org/2000/svg"
                 >
-                  <path
-                    d="M22 11.08V12a10 10 0 1 1-5.93-9.14"
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
                   />
                   <path
-                    d="m9 11 3 3L22 4"
+                    d="m9 12 2 2 4-4"
                   />
                 </svg>
-                Verified
-              </span>
+                <span>
+                  Verified
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -2397,6 +2777,131 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Verified
          in this run
       </div>
     </div>
+    <section
+      aria-label="Operator reconciliation diff"
+      class="bg-white rounded-lg shadow-sm overflow-hidden"
+      data-testid="reconciliation-diff-panel"
+    >
+      <header
+        class="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b bg-gray-50"
+      >
+        <span
+          class="flex items-center gap-2 text-sm font-semibold text-gray-900"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-terminal w-4 h-4 text-indigo-600"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <polyline
+              points="4 17 10 11 4 5"
+            />
+            <line
+              x1="12"
+              x2="20"
+              y1="19"
+              y2="19"
+            />
+          </svg>
+          Operator view (contains unredacted stroops)
+        </span>
+        <div
+          class="flex items-center gap-3"
+        >
+          <span
+            class="text-xs font-medium px-2 py-0.5 rounded-full border bg-green-50 text-green-700 border-green-200"
+          >
+            All payments reconcile cleanly
+          </span>
+          <button
+            aria-label="Copy reconciliation diff"
+            class="inline-flex items-center gap-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-medium px-2 py-1 transition-colors border border-slate-700"
+            data-testid="reconciliation-diff-copy"
+            type="button"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-clipboard w-3.5 h-3.5"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect
+                height="4"
+                rx="1"
+                ry="1"
+                width="8"
+                x="8"
+                y="2"
+              />
+              <path
+                d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"
+              />
+            </svg>
+            Copy
+          </button>
+        </div>
+      </header>
+      <div
+        class="p-4 sm:p-6 space-y-4"
+      >
+        <div
+          class="flex items-start gap-3 text-xs text-gray-600"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-shield-alert w-4 h-4 mt-0.5 text-amber-500 shrink-0"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"
+            />
+            <path
+              d="M12 8v4"
+            />
+            <path
+              d="M12 16h.01"
+            />
+          </svg>
+          <p>
+            This view is intended for operators triaging a run. It surfaces per-recipient reconciliation status and per-stroop amounts that are not shown elsewhere on this page. Do not share outside the operations team.
+          </p>
+        </div>
+        <div
+          class="relative bg-slate-900 rounded-md overflow-hidden"
+        >
+          <pre
+            class="text-slate-100 text-xs font-mono leading-relaxed p-4 overflow-x-auto whitespace-pre-wrap break-words"
+            data-testid="reconciliation-diff-text"
+          >
+            reconciliation: fully reconciled — no entries
+
+          </pre>
+        </div>
+      </div>
+    </section>
     <div
       class="flex flex-wrap gap-3"
     >
@@ -2417,18 +2922,50 @@ exports[`Visual Regression - Payroll Flow States > Payroll Wizard - Initial Stat
     aria-labelledby="payroll-wizard-heading"
     class="space-y-6"
   >
-    <h2
-      class="text-lg font-semibold text-gray-900"
-      id="payroll-wizard-heading"
+    <div
+      class="flex items-center justify-between"
     >
-      Execute Payroll
-    </h2>
+      <h2
+        class="text-lg font-semibold text-gray-900"
+        id="payroll-wizard-heading"
+      >
+        Execute Payroll
+      </h2>
+      <button
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+        type="button"
+      >
+        <svg
+          class="lucide lucide-history w-4 h-4"
+          fill="none"
+          height="24"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"
+          />
+          <path
+            d="M3 3v5h5"
+          />
+          <path
+            d="M12 7v5l4 2"
+          />
+        </svg>
+        Approval History
+      </button>
+    </div>
     <nav
       aria-label="Payroll execution progress"
       class="flex items-center"
     >
       <div
-        class="flex items-center"
+        class="flex items-center shrink-0"
       >
         <div
           class="flex items-center gap-2"
@@ -2450,17 +2987,17 @@ exports[`Visual Regression - Payroll Flow States > Payroll Wizard - Initial Stat
             />
           </svg>
           <span
-            class="text-sm font-medium text-gray-900"
+            class="text-sm font-medium text-gray-900 block"
           >
             Review
           </span>
         </div>
         <div
-          class="w-12 h-px mx-3 bg-gray-200"
+          class="w-8 sm:w-12 h-px mx-2 sm:mx-3 bg-gray-200"
         />
       </div>
       <div
-        class="flex items-center"
+        class="flex items-center shrink-0"
       >
         <div
           class="flex items-center gap-2"
@@ -2484,17 +3021,17 @@ exports[`Visual Regression - Payroll Flow States > Payroll Wizard - Initial Stat
             />
           </svg>
           <span
-            class="text-sm font-medium text-gray-400"
+            class="text-sm font-medium text-gray-400 hidden sm:block"
           >
             Proof Generation
           </span>
         </div>
         <div
-          class="w-12 h-px mx-3 bg-gray-200"
+          class="w-8 sm:w-12 h-px mx-2 sm:mx-3 bg-gray-200"
         />
       </div>
       <div
-        class="flex items-center"
+        class="flex items-center shrink-0"
       >
         <div
           class="flex items-center gap-2"
@@ -2518,17 +3055,17 @@ exports[`Visual Regression - Payroll Flow States > Payroll Wizard - Initial Stat
             />
           </svg>
           <span
-            class="text-sm font-medium text-gray-400"
+            class="text-sm font-medium text-gray-400 hidden sm:block"
           >
             Confirmation
           </span>
         </div>
         <div
-          class="w-12 h-px mx-3 bg-gray-200"
+          class="w-8 sm:w-12 h-px mx-2 sm:mx-3 bg-gray-200"
         />
       </div>
       <div
-        class="flex items-center"
+        class="flex items-center shrink-0"
       >
         <div
           class="flex items-center gap-2"
@@ -2552,7 +3089,7 @@ exports[`Visual Regression - Payroll Flow States > Payroll Wizard - Initial Stat
             />
           </svg>
           <span
-            class="text-sm font-medium text-gray-400"
+            class="text-sm font-medium text-gray-400 hidden sm:block"
           >
             Submission
           </span>
@@ -2560,7 +3097,7 @@ exports[`Visual Regression - Payroll Flow States > Payroll Wizard - Initial Stat
       </div>
     </nav>
     <div
-      class="bg-white rounded-lg shadow-sm p-6"
+      class="bg-white rounded-lg shadow-sm p-4 sm:p-6"
     >
       <div
         class="text-center py-8"

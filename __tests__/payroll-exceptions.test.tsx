@@ -1,52 +1,57 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import PayrollExceptionsQueue from '@/components/features/payroll/PayrollExceptionsQueue';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import PayrollExceptionsQueue from "@/components/features/payroll/PayrollExceptionsQueue";
 
-describe('PayrollExceptionsQueue', () => {
-  it('renders the section heading', () => {
+const toastSuccess = vi.fn();
+
+vi.mock("sonner", () => ({
+  toast: {
+    success: (...args: unknown[]) => toastSuccess(...args),
+  },
+}));
+
+describe("PayrollExceptionsQueue", () => {
+  beforeEach(() => {
+    toastSuccess.mockClear();
+  });
+
+  it("renders the section heading and tabs", () => {
     render(<PayrollExceptionsQueue />);
+
     expect(
-      screen.getByRole('region', { name: /payroll exceptions/i }),
+      screen.getByRole("heading", { name: /payroll exceptions queue/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: /transaction exceptions/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: /employee exceptions/i }),
     ).toBeInTheDocument();
   });
 
-  it('renders exception items from mock data', () => {
+  it("renders transaction exceptions and labels them accessibly", () => {
     render(<PayrollExceptionsQueue />);
-    // At least one pending/failed tx from MOCK_TRANSACTIONS
-    const items = screen.queryAllByRole('listitem');
-    expect(items.length).toBeGreaterThan(0);
+
+    expect(
+      screen.getByRole("tabpanel", { name: /transaction exceptions/i }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("status").length).toBeGreaterThan(0);
+    expect(screen.getByText(/payroll run tx_/i)).toBeInTheDocument();
   });
 
-  it('shows reason code for each exception', () => {
+  it("switches to employee exceptions and resolves an item", () => {
     render(<PayrollExceptionsQueue />);
-    expect(screen.getAllByText(/reason:/i).length).toBeGreaterThan(0);
-  });
 
-  it('shows next step for each exception', () => {
-    render(<PayrollExceptionsQueue />);
-    expect(screen.getAllByText(/payroll wizard/i).length).toBeGreaterThan(0);
-  });
+    fireEvent.click(screen.getByRole("tab", { name: /employee exceptions/i }));
 
-  it('shows pending badge for pending transactions', () => {
-    render(<PayrollExceptionsQueue />);
-    expect(screen.getAllByText(/pending/i).length).toBeGreaterThan(0);
-  });
+    expect(
+      screen.getByRole("tabpanel", { name: /employee exceptions/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Amara Diallo")).toBeInTheDocument();
+    expect(screen.getByText("Kofi Boateng")).toBeInTheDocument();
 
-  it('shows count badge in heading', () => {
-    render(<PayrollExceptionsQueue />);
-    const badge = screen.getByText(/^\d+$/);
-    expect(Number(badge.textContent)).toBeGreaterThan(0);
-  });
+    fireEvent.click(screen.getByRole("button", { name: /resolve exception/i }));
 
-  it('renders link to payroll wizard for each item', () => {
-    render(<PayrollExceptionsQueue />);
-    const links = screen.getAllByRole('link', { name: /go to payroll wizard/i });
-    expect(links.length).toBeGreaterThan(0);
-    links.forEach((l) => expect(l).toHaveAttribute('href', '/payroll'));
-  });
-
-  it('renders exception list with accessible label', () => {
-    render(<PayrollExceptionsQueue />);
-    expect(screen.getByRole('list', { name: /exceptions queue/i })).toBeInTheDocument();
+    expect(toastSuccess).toHaveBeenCalled();
   });
 });

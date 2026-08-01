@@ -7,6 +7,7 @@ import Sidebar from "./Sidebar";
 import EnvironmentBanner from "./EnvironmentBanner";
 import CommandPalette from "./CommandPalette";
 import PrintAuditReport from "../features/transactions/PrintAuditReport";
+import AuditorAccessExpirationBanner from "../features/compliance/AuditorAccessExpirationBanner";
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
@@ -40,6 +41,9 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden">
           <EnvironmentBanner />
+          <div className="px-6 pt-4 print:hidden" data-testid="auditor-expiration-banner-wrapper">
+            <AuditorAccessExpirationBanner />
+          </div>
           <Header />
           <main
             id="main-content"

@@ -434,6 +434,22 @@ For approved requests:
 4. Wait 2 minutes and retry
 5. Contact support if issue persists
 
+#### Transaction Signing Failure Mid-Run
+
+**Symptoms:**
+
+- The dashboard overlays one of: "🚫 Transaction Rejected", "🔒 Session Expired", or "🔧 Invalid Transaction Data".
+- Freighter closes its confirmation popup without producing a signed transaction.
+- A payroll run hangs at the "Approve in Freighter" step.
+
+**Solutions:**
+
+1. Open the [Wallet Signing Failure Recovery Guide](./WALLET_SIGNING_RECOVERY_GUIDE.md) and follow the section that matches the overlay you see.
+2. For rejections: verify the transaction details, click **Retry**, and approve in Freighter without closing the popup.
+3. For session-expired: unlock Freighter and re-connect from the header.
+4. For malformed-tx: hard-refresh the dashboard and try again in an incognito window. If the failure persists, escalate.
+5. Capture the overlay text, the console error, and the payroll run ID before retrying, so escalation has the full picture.
+
 #### Transaction Confirmation Delayed
 
 **Symptoms:**
@@ -591,6 +607,8 @@ The ZK Payroll system is designed to protect employee privacy:
 
 - [Architecture Overview](./ARCHITECTURE.md)
 - [Setup Guide](./SETUP_GUIDE.md)
+- [Admin recovery guide](./ADMIN_RECOVERY_GUIDE.md)
+- [Wallet signing failure recovery guide](./WALLET_SIGNING_RECOVERY_GUIDE.md)
 - [Feature Demo](./FEATURE_DEMO.md)
 - [Transaction Details](./TRANSACTION_DETAIL_USAGE.md)
 - [Visual Regression Testing](./VISUAL_REGRESSION_TESTING.md)

@@ -1,6 +1,7 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PayrollCalendar from "@/components/features/payroll/PayrollCalendar";
 import TreasuryFundingStatus from "@/components/features/treasury/TreasuryFundingStatus";
+import PayrollHistory from "@/components/features/payroll/PayrollHistory";
 
 function PayrollSchedulePage() {
   return (
@@ -9,6 +10,7 @@ function PayrollSchedulePage() {
         <TreasuryFundingStatus />
         <PayrollCalendar />
       </div>
+      <PayrollHistory />
     </DashboardLayout>
   );
 }

@@ -22,6 +22,7 @@ import { useWalletStore, NETWORK_PASSPHRASES, StellarNetwork } from '@/stores/wa
 import { WalletErrorOverlay } from './WalletErrorOverlay';
 import { createLogger } from '@/lib/logger';
 import { startPerformanceMark, endPerformanceMark } from '@/lib/monitoring';
+import { categorizeSigningError } from '@/lib/wallet/signingErrors';
 
 // ─── Network Configuration ────────────────────────────────────────────────────
 
@@ -112,10 +113,21 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
     const [isFreighterInstalled, setIsFreighterInstalled] = useState(false);
     const [overlayState, setOverlayState] = useState<{
         show: boolean;
-        type: 'no-wallet' | 'wrong-network' | 'generic';
+        type:
+            | 'no-wallet'
+            | 'wrong-network'
+            | 'generic'
+            | 'signing-rejected'
+            | 'session-expired'
+            | 'malformed-tx';
         currentNetwork?: string;
         message?: string;
     }>({ show: false, type: 'generic' });
+    // The Retry button on the wallet overlay calls back with no arguments —
+    // it closes over the original XDR via signTxRef below so that retrying
+    // re-attempts the same envelope. Type the state as a no-arg callback
+    // to keep the WalletErrorOverlay `onRetry?: () => void` contract clean.
+    const [signRetry, setSignRetry] = useState<null | (() => Promise<string | null>)>(null);
 
     const initializingRef = useRef(false);
 
@@ -126,8 +138,19 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const showOverlay = useCallback(
         (
-            type: 'no-wallet' | 'wrong-network' | 'generic',
-            extra?: { currentNetwork?: string; message?: string }
+            type:
+                | 'no-wallet'
+                | 'wrong-network'
+                | 'generic'
+                | 'signing-rejected'
+                | 'session-expired'
+                | 'malformed-tx',
+            extra?: {
+                currentNetwork?: string;
+                message?: string;
+                retry?: (xdr: string) => Promise<string | null>;
+                pendingXdr?: string;
+            }
         ) => {
             setOverlayState({ show: true, type, ...extra });
         },
@@ -292,6 +315,12 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
         reset();
     }, [reset]);
 
+    // ── signTx ──────────────────────────────────────────────────────────
+    //
+    // Signs an XDR envelope with Freighter. On failure, the error message is
+    // categorized via `categorizeSigningError` so we can surface the right
+    // overlay type (rejected, session-expired, malformed-tx) with matching
+    // recovery steps — see WalletErrorOverlay and WALLET_SIGNING_RECOVERY_GUIDE.
     const signTx = useCallback(
         async (xdr: string): Promise<string | null> => {
             const connectionResult = await isConnected();
@@ -308,6 +337,39 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
                 return null;
             }
 
+            // Stable retry fn bound to this xdr so Retry from the overlay
+            // re-attempts the *same* envelope instead of losing context.
+            const retry = async () => signTxRef.current(xdr);
+            const routeOverlay = (
+                category: ReturnType<typeof categorizeSigningError>['category'],
+                rawMessage: string
+            ) => {
+                log.warn('Wallet signing failed', {
+                    category,
+                    label: rawMessage,
+                });
+                setError(rawMessage);
+                switch (category) {
+                    case 'rejected':
+                        setSignRetry(() => retry);
+                        showOverlay('signing-rejected', { message: rawMessage });
+                        break;
+                    case 'expired-session':
+                        setSignRetry(() => retry);
+                        showOverlay('session-expired', { message: rawMessage });
+                        break;
+                    case 'malformed-transaction':
+                        setSignRetry(() => retry);
+                        showOverlay('malformed-tx', { message: rawMessage });
+                        break;
+                    case 'wrong-network':
+                        showOverlay('wrong-network', { currentNetwork: network });
+                        break;
+                    default:
+                        showOverlay('generic', { message: rawMessage });
+                }
+            };
+
             try {
                 setLoading(true);
                 const result = await signTransaction(xdr, {
@@ -316,21 +378,39 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
                 });
 
                 if (result.error) {
-                    setError(result.error.message ?? 'Transaction signing failed.');
+                    const failure = categorizeSigningError(result.error.message);
+                    routeOverlay(
+                        failure.category,
+                        result.error.message ?? 'Transaction signing failed.'
+                    );
                     return null;
                 }
 
                 return result.signedTxXdr;
             } catch (err: unknown) {
-                const message = err instanceof Error ? err.message : 'Signing failed.';
-                setError(message);
+                const failure = categorizeSigningError(err);
+                const rawMessage =
+                    err instanceof Error ? err.message : 'Signing failed.';
+                routeOverlay(failure.category, rawMessage);
                 return null;
             } finally {
                 setLoading(false);
             }
         },
+        // signTxRef.current is kept in sync below, so no need to list `retry`
+        // (which closes over signTxRef) here. Listed everything else used.
         [storeConnected, publicKey, network, isWrongNetwork, showOverlay, setLoading, setError]
     );
+
+    // Keep signTxRef pointing at the latest signTx so the retry callback
+    // closure inside signTx can re-enter without a stale identity.
+    const signTxRef = useRef(signTx);
+    useEffect(() => {
+        signTxRef.current = signTx;
+    }, [signTx]);
+    // Note: the `useRef` / `useEffect` pair intentionally lives below signTx
+    // so it can reference signTx; the helper above uses signTxRef.current to
+    // avoid the chicken-and-egg closure.
 
     // ── invokeContract() ─────────────────────────────────────────────────────
 
@@ -412,6 +492,7 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
                     expectedNetwork={EXPECTED_NETWORK}
                     message={overlayState.message}
                     onDismiss={dismissOverlay}
+                    onRetry={signRetry ?? undefined}
                 />
             )}
         </StellarContext.Provider>
@@ -426,4 +507,8 @@ export const useStellar = (): StellarContextValue => {
         throw new Error('useStellar must be used within a <StellarProvider>');
     }
     return context;
+};
+
+export const useOptionalStellar = (): StellarContextValue | null => {
+    return useContext(StellarContext);
 };

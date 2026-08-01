@@ -1,18 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Calendar,
   CheckCircle,
   ChevronLeft,
   ChevronRight,
+  ChevronRight as ChevronRightIcon,
   Clock,
   XCircle,
 } from "lucide-react";
 import { MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import type { PayrollRun } from "@/types/models";
 import EmptyState from "@/components/ui/EmptyState";
+import PayrollDetailSheet from "@/components/features/payroll/PayrollDetailSheet";
 import {
   classifyRun,
   formatPayrollDate,
@@ -79,6 +81,36 @@ function RunListItem({ run }: { run: PayrollRun }) {
         </div>
         <ChevronRight className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" aria-hidden="true" />
       </Link>
+    </li>
+  );
+}
+
+function MobileRunListItem({ run, onSelect }: { run: PayrollRun; onSelect: (run: PayrollRun) => void }) {
+  const kind = classifyRun(run);
+  const styles = RUN_KIND_STYLES[kind];
+  const date = getRunDate(run);
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => onSelect(run)}
+        className={`w-full flex items-start gap-3 p-4 rounded-lg border transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 text-left ${styles.badge}`}
+      >
+        <RunKindIcon kind={kind} />
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-gray-900">
+              {formatPayrollDate(date)}
+            </span>
+            <RunBadge kind={kind} />
+          </div>
+          <p className="text-sm text-gray-600 mt-0.5">
+            ${run.totalAmount.toLocaleString()} · {run.employeeCount} employees
+          </p>
+        </div>
+        <ChevronRightIcon className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" aria-hidden="true" />
+      </button>
     </li>
   );
 }
@@ -245,6 +277,21 @@ function MonthCalendar({
 }
 
 function PayrollCalendar({ runs = MOCK_PAYROLL_RUNS }: PayrollCalendarProps) {
+  const [selectedRun, setSelectedRun] = useState<PayrollRun | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const handleRunSelect = useCallback((run: PayrollRun) => {
+    setSelectedRun(run);
+    setSheetOpen(true);
+  }, []);
+
+  const handleSheetOpenChange = useCallback((open: boolean) => {
+    setSheetOpen(open);
+    if (!open) {
+      setSelectedRun(null);
+    }
+  }, []);
+
   const nextUp = useMemo(() => getNextUpcoming(runs), [runs]);
   const sortedRuns = useMemo(() => sortRunsForSchedule(runs), [runs]);
   const runsByDate = useMemo(() => groupRunsByDateKey(runs), [runs]);
@@ -323,7 +370,7 @@ function PayrollCalendar({ runs = MOCK_PAYROLL_RUNS }: PayrollCalendarProps) {
         </div>
         <ul className="divide-y divide-gray-100 p-3 space-y-2">
           {sortedRuns.map((run) => (
-            <RunListItem key={run.id} run={run} />
+            <MobileRunListItem key={run.id} run={run} onSelect={handleRunSelect} />
           ))}
         </ul>
       </div>
@@ -403,6 +450,12 @@ function PayrollCalendar({ runs = MOCK_PAYROLL_RUNS }: PayrollCalendarProps) {
           </ul>
         </div>
       )}
+
+      <PayrollDetailSheet
+        run={selectedRun}
+        open={sheetOpen}
+        onOpenChange={handleSheetOpenChange}
+      />
     </section>
   );
 }

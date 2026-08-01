@@ -10,6 +10,19 @@ Use this guide when wallet, network, or funding issues block payroll work. It is
 4. Check whether the treasury account has enough XLM for fees and enough payroll asset balance for the run.
 5. Retry only after checking the transaction history or Stellar explorer, so you do not submit duplicate payroll operations.
 
+## Wallet signing problems (mid-run recovery)
+
+For signing failures that happen **after** the wallet is connected (Freighter rejected the signature prompt, the active network no longer matches the dashboard, the wallet session expired before signing, or the XDR could not be decoded), use the dedicated [Wallet Signing Failure Recovery Guide](./WALLET_SIGNING_RECOVERY_GUIDE.md). That guide is also surfaced inside the dashboard via the wallet error overlay and the help drawer.
+
+The categories tracked for those failures map 1-to-1 across the dashboard overlay, local telemetry, and the dedicated doc:
+
+| Dashboard overlay | Telemetry label | Guide section |
+| ------------------- | ----------------- | --------------- |
+| 🚫 Transaction Rejected | `wallet_rejected` | [Wallet Signing Recovery Guide § 1](./WALLET_SIGNING_RECOVERY_GUIDE.md#1-transaction-rejected-wallet_rejected) |
+| 🔒 Session Expired | `session_expired` | [Wallet Signing Recovery Guide § 3](./WALLET_SIGNING_RECOVERY_GUIDE.md#3-expired-session-expired-session) |
+| 🔧 Invalid Transaction Data | `malformed_tx` | [Wallet Signing Recovery Guide § 4](./WALLET_SIGNING_RECOVERY_GUIDE.md#4-malformed-transaction-data-malformed_tx) |
+| ⚠️ Wrong Network | `wrong_network` | [Wallet Signing Recovery Guide § 2](./WALLET_SIGNING_RECOVERY_GUIDE.md#2-wrong-network-at-signing-time-wrong_network) |
+
 ## Wallet connection problems
 
 ### Freighter is not detected
@@ -101,6 +114,17 @@ Recovery steps:
 4. Refresh the dashboard and check the history page.
 5. Do not retry the payroll run until you confirm the previous submission failed or never reached the network.
 
+## Operation classification cheatsheet
+
+When handing off to engineering, tag the issue with the matching telemetry label so it routes to the right team:
+
+| Dashboard overlay | Telemetry label | Guide section |
+| ------------------- | ----------------- | --------------- |
+| 🚫 Transaction Rejected | `wallet_rejected` | [Wallet Signing Recovery Guide § 1](./WALLET_SIGNING_RECOVERY_GUIDE.md#1-transaction-rejected-wallet_rejected) |
+| 🔒 Session Expired | `session_expired` | [Wallet Signing Recovery Guide § 3](./WALLET_SIGNING_RECOVERY_GUIDE.md#3-expired-session-expired-session) |
+| 🔧 Invalid Transaction Data | `malformed_tx` | [Wallet Signing Recovery Guide § 4](./WALLET_SIGNING_RECOVERY_GUIDE.md#4-malformed-transaction-data-malformed_tx) |
+| ⚠️ Wrong Network | `wrong_network` | [Wallet Signing Recovery Guide § 2](./WALLET_SIGNING_RECOVERY_GUIDE.md#2-wrong-network-at-signing-time-wrong_network) |
+
 ## Funding problems
 
 ### Treasury has insufficient payroll asset balance
@@ -185,6 +209,8 @@ When handing off to engineering or operations, include:
 ## Related docs
 
 - [Dashboard setup guide](./SETUP_GUIDE.md)
+- [Operator handbook](./OPERATOR_HANDBOOK.md)
+- [Wallet signing failure recovery guide](./WALLET_SIGNING_RECOVERY_GUIDE.md)
 - [Content style guide](./CONTENT_STYLE_GUIDE.md)
 - [Stellar Testnet guide](https://developers.stellar.org/docs/network/testnet)
 - [Freighter wallet docs](https://docs.freighter.app/)

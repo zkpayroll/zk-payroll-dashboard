@@ -15,16 +15,19 @@ import {
   LinkIcon,
   EyeOff,
   AlertTriangle,
+  Lock,
 } from "lucide-react";
 import { MOCK_EMPLOYEES, MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import type { PayrollRun } from "@/types/models";
 import StatusBadge from "@/components/ui/StatusBadge";
+import PayrollApprovalAuditTrail from "./PayrollApprovalAuditTrail";
 import {
   classifyRun,
   formatPayrollDate,
   getRunDate,
   RUN_KIND_STYLES,
 } from "@/lib/payroll/scheduleUtils";
+import ReconciliationDiffPanel from "@/components/features/payroll/ReconciliationDiffPanel";
 
 
 
@@ -39,6 +42,22 @@ const STATUS_ICONS: Record<string, LucideIcon> = {
 
 export function findPayrollRun(id: string, runs = MOCK_PAYROLL_RUNS): PayrollRun | undefined {
   return runs.find((run) => run.id === id);
+}
+
+export type LockState = "submission" | "confirmation" | "reconciliation" | "cancellation" | null;
+
+export function getPayrollLockState(run: PayrollRun): LockState {
+  if (run.status === "cancelled") {
+    return "cancellation";
+  }
+  if (run.status === "pending") {
+    const txHash = run.transactionHash ?? run.txHash;
+    return txHash ? "confirmation" : "submission";
+  }
+  if (run.status === "verified") {
+    return "reconciliation";
+  }
+  return null;
 }
 
 interface PayrollRunDetailProps {
@@ -126,6 +145,7 @@ export default function PayrollRunDetail({ run: propRun }: PayrollRunDetailProps
   const runDate = getRunDate(run);
   const StatusIcon = STATUS_ICONS[run.status] ?? Clock;
   const txHash = run.transactionHash ?? run.txHash;
+  const lockState = getPayrollLockState(run);
 
   return (
     <section aria-labelledby="payroll-run-detail-heading" className="space-y-6">
@@ -139,6 +159,31 @@ export default function PayrollRunDetail({ run: propRun }: PayrollRunDetailProps
           Back
         </button>
       </div>
+
+      {lockState && (
+        <div
+          role="alert"
+          aria-label={`Payroll Run Locked: ${lockState}`}
+          className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3"
+        >
+          <Lock className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" aria-hidden="true" />
+          <div>
+            <h3 className="text-sm font-semibold text-amber-800 uppercase tracking-wider text-xs">
+              Payroll Run Locked ({lockState})
+            </h3>
+            <p className="text-sm text-amber-700 mt-1">
+              {lockState === "submission" &&
+                "This payroll run is locked for submission. The transaction details are finalized and cannot be edited while submission is in progress."}
+              {lockState === "confirmation" &&
+                "This payroll run is locked for confirmation. It is currently awaiting on-chain verification on the Stellar network. No edits are allowed."}
+              {lockState === "reconciliation" &&
+                "This payroll run is locked for reconciliation. The transaction is verified on-chain. Edits are disabled to preserve the audit trail."}
+              {lockState === "cancellation" &&
+                "This payroll run has been cancelled and is locked. No further modifications or processing can be performed."}
+            </p>
+          </div>
+        </div>
+      )}
 
       <header className="bg-white rounded-lg shadow-sm p-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -166,7 +211,7 @@ export default function PayrollRunDetail({ run: propRun }: PayrollRunDetailProps
               </div>
             </div>
           </div>
-          {kind === "scheduled" && (
+          {kind === "scheduled" && !lockState && (
             <Link
               href="/payroll/execute"
               className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors shrink-0"
@@ -347,6 +392,10 @@ export default function PayrollRunDetail({ run: propRun }: PayrollRunDetailProps
           {employeesInRun.length} employee{employeesInRun.length !== 1 ? "s" : ""} in this run
         </div>
       </div>
+
+      {/* Approval Audit Trail */}
+      <PayrollApprovalAuditTrail payrollRunId={run.id} compact />
+      <ReconciliationDiffPanel run={run} employees={employeesInRun} />
 
       <div className="flex flex-wrap gap-3">
         <Link

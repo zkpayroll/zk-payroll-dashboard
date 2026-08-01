@@ -15,9 +15,10 @@ import {
 import { toast } from "sonner";
 import { useEmployeeStore } from "@/stores/employees";
 import { sha256Hex } from "@/lib/zk/hash";
+import { ImportConflictResolver } from "./ImportConflictResolver";
 import type { Employee } from "@/types";
 
-interface CsvRow {
+export interface CsvRow {
   rowIndex: number;
   name: string;
   email: string;
@@ -37,7 +38,8 @@ const REQUIRED_COLUMNS = ["name", "address", "salary", "start_date"];
 const OPTIONAL_COLUMNS = ["email", "department"];
 
 const CSV_TEMPLATE_HEADER = "name,email,department,address,salary,start_date";
-const CSV_TEMPLATE_ROW = "Jane Doe,jane@company.io,Engineering,GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W37,5000,2025-06-01";
+const CSV_TEMPLATE_ROW =
+  "Jane Doe,jane@company.io,Engineering,GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W37,5000,2025-06-01";
 
 function parseCsv(text: string): CsvRow[] {
   const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "");
@@ -99,34 +101,70 @@ function validateRow(row: CsvRow): RowValidationError[] {
   const errors: RowValidationError[] = [];
 
   if (!row.name.trim()) {
-    errors.push({ rowIndex: row.rowIndex, field: "name", message: "Name is required" });
+    errors.push({
+      rowIndex: row.rowIndex,
+      field: "name",
+      message: "Name is required",
+    });
   }
 
   if (row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email.trim())) {
-    errors.push({ rowIndex: row.rowIndex, field: "email", message: "Invalid email format" });
+    errors.push({
+      rowIndex: row.rowIndex,
+      field: "email",
+      message: "Invalid email format",
+    });
   }
 
   if (!row.address.trim()) {
-    errors.push({ rowIndex: row.rowIndex, field: "address", message: "Stellar wallet address is required" });
+    errors.push({
+      rowIndex: row.rowIndex,
+      field: "address",
+      message: "Stellar wallet address is required",
+    });
   } else if (row.address.trim().length !== 56) {
-    errors.push({ rowIndex: row.rowIndex, field: "address", message: `Address must be 56 characters (got ${row.address.trim().length})` });
+    errors.push({
+      rowIndex: row.rowIndex,
+      field: "address",
+      message: `Address must be 56 characters (got ${row.address.trim().length})`,
+    });
   } else if (!row.address.trim().startsWith("G")) {
-    errors.push({ rowIndex: row.rowIndex, field: "address", message: "Stellar addresses must start with G" });
+    errors.push({
+      rowIndex: row.rowIndex,
+      field: "address",
+      message: "Stellar addresses must start with G",
+    });
   }
 
   if (!row.salary.trim()) {
-    errors.push({ rowIndex: row.rowIndex, field: "salary", message: "Salary is required" });
+    errors.push({
+      rowIndex: row.rowIndex,
+      field: "salary",
+      message: "Salary is required",
+    });
   } else {
     const parsed = parseFloat(row.salary);
     if (isNaN(parsed) || parsed <= 0) {
-      errors.push({ rowIndex: row.rowIndex, field: "salary", message: "Salary must be a positive number" });
+      errors.push({
+        rowIndex: row.rowIndex,
+        field: "salary",
+        message: "Salary must be a positive number",
+      });
     }
   }
 
   if (!row.startDate.trim()) {
-    errors.push({ rowIndex: row.rowIndex, field: "start_date", message: "Start date is required" });
+    errors.push({
+      rowIndex: row.rowIndex,
+      field: "start_date",
+      message: "Start date is required",
+    });
   } else if (isNaN(Date.parse(row.startDate))) {
-    errors.push({ rowIndex: row.rowIndex, field: "start_date", message: "Invalid date format (use YYYY-MM-DD)" });
+    errors.push({
+      rowIndex: row.rowIndex,
+      field: "start_date",
+      message: "Invalid date format (use YYYY-MM-DD)",
+    });
   }
 
   return errors;
@@ -147,11 +185,14 @@ export default function CsvImport() {
   const { addEmployee, employees } = useEmployeeStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parsedRows, setParsedRows] = useState<CsvRow[]>([]);
-  const [validationErrors, setValidationErrors] = useState<RowValidationError[]>([]);
+  const [validationErrors, setValidationErrors] = useState<
+    RowValidationError[]
+  >([]);
   const [fileName, setFileName] = useState<string>("");
   const [importingRow, setImportingRow] = useState<number | null>(null);
   const [importedIds, setImportedIds] = useState<Set<string>>(new Set());
   const [allImported, setAllImported] = useState(false);
+  const [showConflictResolver, setShowConflictResolver] = useState(false);
 
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -166,7 +207,8 @@ export default function CsvImport() {
 
         if (rows.length === 0) {
           toast.error("Invalid CSV", {
-            description: "The file must have 'name', 'address', and 'salary' columns with at least one data row.",
+            description:
+              "The file must have 'name', 'address', and 'salary' columns with at least one data row.",
           });
           setParsedRows([]);
           setValidationErrors([]);
@@ -182,25 +224,33 @@ export default function CsvImport() {
         setValidationErrors(allErrors);
         setImportedIds(new Set());
 
-        const errorCount = allErrors.filter((e) => e.field !== "email" || allErrors.length <= 2).length;
+        const errorCount = allErrors.filter(
+          (e) => e.field !== "email" || allErrors.length <= 2,
+        ).length;
         const warningCount = rows.filter((r) => {
           const rowErrors = allErrors.filter((e) => e.rowIndex === r.rowIndex);
           return rowErrors.length > 0;
         }).length;
 
         if (errorCount === 0) {
-          toast.success(`Parsed ${rows.length} employee record${rows.length !== 1 ? "s" : ""}`, {
-            description: "All rows passed validation.",
-          });
+          toast.success(
+            `Parsed ${rows.length} employee record${rows.length !== 1 ? "s" : ""}`,
+            {
+              description: "All rows passed validation.",
+            },
+          );
         } else {
-          toast.warning(`Parsed ${rows.length} row${rows.length !== 1 ? "s" : ""}`, {
-            description: `${warningCount} row${warningCount !== 1 ? "s" : ""} with validation issues.`,
-          });
+          toast.warning(
+            `Parsed ${rows.length} row${rows.length !== 1 ? "s" : ""}`,
+            {
+              description: `${warningCount} row${warningCount !== 1 ? "s" : ""} with validation issues.`,
+            },
+          );
         }
       };
       reader.readAsText(file);
     },
-    []
+    [],
   );
 
   const handleImportRow = useCallback(
@@ -234,20 +284,34 @@ export default function CsvImport() {
         setImportingRow(null);
       }
     },
-    [addEmployee]
+    [addEmployee],
   );
 
-  const handleImportAll = useCallback(async () => {
+  const handleImportAll = useCallback(() => {
     const validRows = parsedRows.filter((row) => {
-      const rowErrors = validationErrors.filter((e) => e.rowIndex === row.rowIndex);
+      const rowErrors = validationErrors.filter(
+        (e) => e.rowIndex === row.rowIndex,
+      );
       return rowErrors.length === 0;
     });
 
-    for (const row of validRows) {
-      await handleImportRow(row);
-    }
-    setAllImported(true);
-  }, [parsedRows, validationErrors, handleImportRow]);
+    // Show conflict resolver before importing
+    setShowConflictResolver(true);
+  }, [parsedRows, validationErrors]);
+
+  const handleConflictResolve = useCallback(
+    async (resolvedRows: CsvRow[], _skippedIds: string[]) => {
+      setShowConflictResolver(false);
+      for (const row of resolvedRows) {
+        await handleImportRow(row);
+      }
+      setAllImported(true);
+      toast.success(
+        `Imported ${resolvedRows.length} employee${resolvedRows.length !== 1 ? "s" : ""}`,
+      );
+    },
+    [handleImportRow],
+  );
 
   const handleClear = () => {
     setParsedRows([]);
@@ -273,11 +337,15 @@ export default function CsvImport() {
     <section aria-labelledby="csv-import-heading" className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 id="csv-import-heading" className="text-lg font-semibold text-gray-900">
+          <h2
+            id="csv-import-heading"
+            className="text-lg font-semibold text-gray-900"
+          >
             Import Employees
           </h2>
           <p className="text-sm text-gray-600 mt-1">
-            Upload a CSV file to onboard multiple employees at once. Each row is validated before import.
+            Upload a CSV file to onboard multiple employees at once. Each row is
+            validated before import.
           </p>
         </div>
         <button
@@ -293,7 +361,9 @@ export default function CsvImport() {
       <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 flex items-start gap-3">
         <ShieldCheck className="w-5 h-5 text-indigo-500 mt-0.5 shrink-0" />
         <div>
-          <h3 className="text-sm font-medium text-indigo-800">Privacy Notice</h3>
+          <h3 className="text-sm font-medium text-indigo-800">
+            Privacy Notice
+          </h3>
           <p className="text-sm text-indigo-700 mt-1">
             Employee salary data from the CSV is used only to generate ZK salary
             commitments. Raw salary values are never stored in plaintext. A ZK
@@ -307,7 +377,8 @@ export default function CsvImport() {
         <div className="bg-white rounded-lg shadow-sm border-2 border-dashed border-gray-300 p-12 text-center">
           <Upload className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <p className="text-sm text-gray-600 mb-4">
-            Drop a CSV file here or click to browse. The file must include columns:
+            Drop a CSV file here or click to browse. The file must include
+            columns:
           </p>
           <div className="inline-flex flex-wrap items-center gap-1.5 justify-center mb-4">
             {REQUIRED_COLUMNS.map((col) => (
@@ -347,8 +418,9 @@ export default function CsvImport() {
                 Parsed Records
               </h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                {fileName} &middot; {parsedRows.length} row{parsedRows.length !== 1 ? "s" : ""} &middot;{" "}
-                {validRowCount} valid
+                {fileName} &middot; {parsedRows.length} row
+                {parsedRows.length !== 1 ? "s" : ""} &middot; {validRowCount}{" "}
+                valid
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -376,10 +448,13 @@ export default function CsvImport() {
             <div className="px-4 sm:px-6 py-3 bg-yellow-50 border-b flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-yellow-600 shrink-0" />
               <p className="text-sm text-yellow-700">
-                {validationErrors.length} validation issue{validationErrors.length !== 1 ? "s" : ""} across{" "}
+                {validationErrors.length} validation issue
+                {validationErrors.length !== 1 ? "s" : ""} across{" "}
                 {new Set(validationErrors.map((e) => e.rowIndex)).size} row
-                {new Set(validationErrors.map((e) => e.rowIndex)).size !== 1 ? "s" : ""}.
-                Fix errors before importing affected rows.
+                {new Set(validationErrors.map((e) => e.rowIndex)).size !== 1
+                  ? "s"
+                  : ""}
+                . Fix errors before importing affected rows.
               </p>
             </div>
           )}
@@ -391,31 +466,58 @@ export default function CsvImport() {
               </caption>
               <thead className="bg-gray-50">
                 <tr>
-                  <th scope="col" className="px-3 py-3 text-xs font-medium text-gray-600 uppercase w-12">
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-xs font-medium text-gray-600 uppercase w-12"
+                  >
                     Row
                   </th>
-                  <th scope="col" className="px-3 py-3 text-xs font-medium text-gray-600 uppercase">
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-xs font-medium text-gray-600 uppercase"
+                  >
                     Name
                   </th>
-                  <th scope="col" className="px-3 py-3 text-xs font-medium text-gray-600 uppercase">
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-xs font-medium text-gray-600 uppercase"
+                  >
                     Email
                   </th>
-                  <th scope="col" className="px-3 py-3 text-xs font-medium text-gray-600 uppercase">
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-xs font-medium text-gray-600 uppercase"
+                  >
                     Department
                   </th>
-                  <th scope="col" className="px-3 py-3 text-xs font-medium text-gray-600 uppercase">
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-xs font-medium text-gray-600 uppercase"
+                  >
                     Address
                   </th>
-                  <th scope="col" className="px-3 py-3 text-xs font-medium text-gray-600 uppercase">
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-xs font-medium text-gray-600 uppercase"
+                  >
                     Salary
                   </th>
-                  <th scope="col" className="px-3 py-3 text-xs font-medium text-gray-600 uppercase">
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-xs font-medium text-gray-600 uppercase"
+                  >
                     Start Date
                   </th>
-                  <th scope="col" className="px-3 py-3 text-xs font-medium text-gray-600 uppercase">
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-xs font-medium text-gray-600 uppercase"
+                  >
                     Issues
                   </th>
-                  <th scope="col" className="px-3 py-3 text-xs font-medium text-gray-600 uppercase text-right">
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-xs font-medium text-gray-600 uppercase text-right"
+                  >
                     Action
                   </th>
                 </tr>
@@ -430,7 +532,13 @@ export default function CsvImport() {
                   return (
                     <tr
                       key={row.rowIndex}
-                      className={hasErrors ? "bg-red-50/30" : isImported ? "bg-green-50/30" : "hover:bg-gray-50"}
+                      className={
+                        hasErrors
+                          ? "bg-red-50/30"
+                          : isImported
+                            ? "bg-green-50/30"
+                            : "hover:bg-gray-50"
+                      }
                     >
                       <td className="px-3 py-3 text-xs font-mono text-gray-500">
                         {row.rowIndex}
@@ -480,7 +588,9 @@ export default function CsvImport() {
                             Imported
                           </span>
                         ) : hasErrors ? (
-                          <span className="text-xs text-gray-400">Fix errors</span>
+                          <span className="text-xs text-gray-400">
+                            Fix errors
+                          </span>
                         ) : isImporting ? (
                           <Loader2 className="w-4 h-4 text-indigo-600 animate-spin inline" />
                         ) : (
@@ -503,15 +613,36 @@ export default function CsvImport() {
 
           <div className="px-4 sm:px-6 py-3 border-t text-xs text-gray-500 flex items-center justify-between">
             <span>
-              {parsedRows.length} row{parsedRows.length !== 1 ? "s" : ""} parsed &middot;{" "}
-              {importedIds.size} imported &middot;{" "}
-              {employees.length} total in directory
+              {parsedRows.length} row{parsedRows.length !== 1 ? "s" : ""} parsed
+              &middot; {importedIds.size} imported &middot; {employees.length}{" "}
+              total in directory
             </span>
-            <a href="/employees" className="text-indigo-600 hover:text-indigo-700 font-medium">
+            <a
+              href="/employees"
+              className="text-indigo-600 hover:text-indigo-700 font-medium"
+            >
               View directory &rarr;
             </a>
           </div>
         </div>
+      )}
+
+      {showConflictResolver && (
+        <ImportConflictResolver
+          rows={parsedRows.filter((row) => {
+            const rowErrors = validationErrors.filter(
+              (e) => e.rowIndex === row.rowIndex,
+            );
+            return rowErrors.length === 0;
+          })}
+          existingEmployees={employees.map((e) => ({
+            name: e.name,
+            email: e.email,
+            address: e.address,
+          }))}
+          onResolve={handleConflictResolve}
+          onCancel={() => setShowConflictResolver(false)}
+        />
       )}
     </section>
   );

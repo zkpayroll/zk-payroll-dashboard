@@ -28,7 +28,7 @@ describe("TransactionHistory & Reconciliation Flow", () => {
     const filterToggle = screen.getByRole("button", { name: /filter/i });
     fireEvent.click(filterToggle);
 
-    const statusSelect = screen.getByLabelText(/status/i);
+    const statusSelect = screen.getByRole("combobox", { name: /^status$/i });
     expect(statusSelect).toBeInTheDocument();
 
     // Change status filter to 'pending'
@@ -79,7 +79,7 @@ describe("TransactionHistory & Reconciliation Flow", () => {
     // Apply a filter first
     const filterToggle = screen.getByRole("button", { name: /filter/i });
     fireEvent.click(filterToggle);
-    const statusSelect = screen.getByLabelText(/status/i);
+    const statusSelect = screen.getByRole("combobox", { name: /^status$/i });
     fireEvent.change(statusSelect, { target: { value: "pending" } });
 
     // Click "Save as view"

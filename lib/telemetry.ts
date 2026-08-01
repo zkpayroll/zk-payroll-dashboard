@@ -1,17 +1,41 @@
 import { logger } from './logger';
+import { categorizeSigningError } from './wallet/signingErrors';
 
 export type TelemetryErrorType =
   | 'circuit_error'
   | 'network_timeout'
   | 'wallet_rejected'
+  | 'session_expired'
+  | 'malformed_tx'
+  | 'wrong_network'
   | 'unknown';
 
 export function mapErrorToType(errorText: string | null): TelemetryErrorType {
   if (!errorText) return 'unknown';
+
+  // Wallet signing failures have their own carefully-tuned categorizer so
+  // the overlay and telemetry stay in lock-step. Fall back to the broader
+  // heuristics below for non-signing errors (proof, RPC, etc.).
+  const signing = categorizeSigningError(errorText);
+  switch (signing.category) {
+    case 'rejected':
+      return 'wallet_rejected';
+    case 'expired-session':
+      return 'session_expired';
+    case 'malformed-transaction':
+      return 'malformed_tx';
+    case 'wrong-network':
+      return 'wrong_network';
+    case 'unknown':
+      break;
+  }
+
   const lower = errorText.toLowerCase();
   if (lower.includes('circuit') || lower.includes('proof')) return 'circuit_error';
   if (lower.includes('timeout') || lower.includes('network') || lower.includes('disconnect')) return 'network_timeout';
   if (lower.includes('wallet') || lower.includes('reject') || lower.includes('user denied')) return 'wallet_rejected';
+  if (lower.includes('expire') || lower.includes('locked') || lower.includes('unauthorized')) return 'session_expired';
+  if (lower.includes('malformed') || lower.includes('invalid xdr') || lower.includes('envelope')) return 'malformed_tx';
   return 'unknown';
 }
 

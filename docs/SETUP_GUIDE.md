@@ -205,6 +205,7 @@ npm run dev -- -p 3001
 ## 📚 Additional Resources
 
 - [Admin Recovery Guide](./ADMIN_RECOVERY_GUIDE.md)
+- [Wallet Signing Failure Recovery Guide](./WALLET_SIGNING_RECOVERY_GUIDE.md)
 - [Stellar Testnet Guide](https://developers.stellar.org/docs/network/testnet)
 - [Freighter Wallet Docs](https://docs.freighter.app/)
 - [Stellar Expert Explorer](https://testnet.stellarexpert.com/)

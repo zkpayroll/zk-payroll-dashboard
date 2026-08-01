@@ -13,16 +13,21 @@ export function getRunDate(run: PayrollRun): Date {
 }
 
 export function formatPayrollDate(date: Date): string {
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
     year: "numeric",
+    timeZone: "UTC",
   });
 }
 
 export function formatPayrollMonthYear(date: Date): string {
-  return date.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 export function getNextUpcoming(runs: PayrollRun[]): PayrollRun | null {

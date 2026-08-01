@@ -27,9 +27,6 @@ jobs:
       - name: Lint Markdown
         run: npm run lint:md
 
-      - name: Type Check
-        run: npx tsc --noEmit
-
       - name: Unit Tests
         run: npm test || echo "No tests found yet"
 
@@ -40,3 +37,6 @@ jobs:
         run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: 1
+
+      - name: Type Check
+        run: npx tsc --noEmit

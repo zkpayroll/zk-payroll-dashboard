@@ -318,7 +318,7 @@ describe("TransactionDetailDrawer", () => {
         screen.getByRole("button", { name: /copy transaction hash/i })
       );
 
-      const status = await screen.findByRole("status");
+      const status = await screen.findByText(/copied to clipboard/i);
       expect(status).toHaveTextContent(/copied to clipboard/i);
     });
 

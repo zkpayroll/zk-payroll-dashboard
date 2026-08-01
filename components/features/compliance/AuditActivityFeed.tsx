@@ -10,6 +10,7 @@ import {
   UserCheck,
   UserX,
   Shield,
+  Download,
 } from "lucide-react";
 import {
   useAuditActivityStore,
@@ -25,6 +26,8 @@ const ACTION_CONFIG: Record<
   key_revoked: { icon: KeyRound, color: "text-red-600 bg-red-50", label: "Key Revoked" },
   request_approved: { icon: CheckCircle, color: "text-green-600 bg-green-50", label: "Request Approved" },
   request_rejected: { icon: XCircle, color: "text-red-600 bg-red-50", label: "Request Rejected" },
+  export_prepared: { icon: Shield, color: "text-indigo-600 bg-indigo-50", label: "Export Prepared" },
+  export_downloaded: { icon: Download, color: "text-green-600 bg-green-50", label: "Export Downloaded" },
 };
 
 function formatTimestamp(ts: string): string {

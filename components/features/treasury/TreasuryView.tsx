@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle, ArrowDownLeft, Plus } from "lucide-react";
 import { MOCK_TREASURY_BALANCE, MOCK_TRANSACTIONS, MOCK_COMPANIES } from "@/lib/api/mockData";
 import FundingForecast from "./FundingForecast";
 import StatusBadge from "@/components/ui/StatusBadge";
+import TreasuryReadinessChecklist from "./TreasuryReadinessChecklist";
 
 function TreasuryView() {
   const [toastVisible, setToastVisible] = useState(false);
@@ -83,6 +84,8 @@ function TreasuryView() {
           </div>
         </article>
       </div>
+
+      <TreasuryReadinessChecklist />
 
       <FundingForecast />
 

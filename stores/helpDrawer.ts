@@ -111,6 +111,39 @@ export const HELP_CONTENT: Record<string, HelpContent> = {
       },
     ],
   },
+  "wallet-signing": {
+    title: "Wallet Signing Recovery",
+    description:
+      "Step-by-step recovery for the four high-priority wallet signing failure modes: rejection, wrong network, expired session, and malformed transaction data.",
+    sections: [
+      {
+        heading: "Transaction rejected",
+        content:
+          "Symptom: the dashboard shows the '🚫 Transaction Rejected' overlay. Cause: Freighter's signing prompt was declined or closed. Recovery: verify the transaction details on the dashboard, click Retry, and click Approve in Freighter without closing the popup. No funds were moved. See the Operator Handbook for the full Wallet Signing Recovery Guide.",
+      },
+      {
+        heading: "Wrong network at signing",
+        content:
+          "Symptom: the dashboard shows the '⚠️ Wrong Network' overlay during signing. Cause: Freighter's active network no longer matches the dashboard's expected network (e.g. dashboard is on Testnet but Freighter is on Public). Recovery: open Freighter → Settings → Network, select the expected network, return to the dashboard, and Retry.",
+      },
+      {
+        heading: "Session expired",
+        content:
+          "Symptom: '🔒 Session Expired' overlay or Freighter shows its lock screen. Cause: Freighter was locked by inactivity, the browser restarted, or the access grant was revoked. Recovery: unlock Freighter with your password, re-connect from the header button, verify the account and network, and Retry. Treat unexpected re-auth prompts on admin accounts as a possible security event.",
+      },
+      {
+        heading: "Invalid transaction data",
+        content:
+          "Symptom: '🔧 Invalid Transaction Data' overlay. Cause: the dashboard's XDR could not be decoded — usually stale browser state, an SDK mismatch, or a server-side issue. Recovery: do not retry blindly, perform a hard refresh (Cmd/Ctrl + Shift + R), retry in an incognito window, and escalate with the captured console error and run ID if the failure persists.",
+      },
+    ],
+    tips: [
+      "Never close the Freighter popup until the dashboard confirms submission.",
+      "Capture the exact browser console error and the payroll run ID before escalating.",
+      "Compare the connected Freighter account against the configured ADMIN_PUBLIC_KEY after every recovery.",
+      "For admin accounts, treat unexpected re-auth prompts as a possible security event.",
+    ],
+  },
   print: {
     title: "Printable Reports Help",
     description: "Generate formatted reports ready for printing.",

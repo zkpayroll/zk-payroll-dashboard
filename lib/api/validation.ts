@@ -57,6 +57,16 @@ export const transactionQuerySchema = paginationSchema.extend({
   to: z.string().optional(),
 });
 
+// ─── Payroll Cancellation Schema ─────────────────────────────────────────────────
+
+export const cancelPayrollSchema = z.object({
+  status: z.literal("cancelled"),
+  reason: z.string().min(3, "Cancellation reason must be at least 3 characters").optional(),
+  signature: z.string().min(1, "Signature is required for cancellation"),
+});
+
+export type CancelPayrollInput = z.infer<typeof cancelPayrollSchema>;
+
 // ─── Validation Helper ────────────────────────────────────────────────────────
 
 export function parseBody<T>(

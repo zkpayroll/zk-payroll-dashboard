@@ -123,11 +123,13 @@ function TransactionDetailDrawer({
         year: "numeric",
         month: "long",
         day: "numeric",
+        timeZone: "UTC",
       }),
       time: date.toLocaleTimeString("en-US", {
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
+        timeZone: "UTC",
       }),
     };
   };
