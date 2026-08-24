@@ -139,3 +139,4 @@ Before opening a PR, please review our [Contributor Issue Validation Checklist](
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
