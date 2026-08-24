@@ -23,6 +23,7 @@ import AuditActivityFeed from "./AuditActivityFeed";
 import type { ViewKey } from "@/types";
 import AuditExportRequest from "./AuditExportRequest";
 import ComplianceEvidenceBundleView from "./ComplianceEvidenceBundleView";
+import AuditReadyTimeline from "@/components/features/payroll/AuditReadyTimeline";
 import type { AuditAccessRequest } from "@/types/models";
 
 function generateKeyId(): string {
@@ -37,7 +38,7 @@ function generateKeyId(): string {
 function ComplianceManager() {
   const { viewKeys, addViewKey, revokeViewKey, setViewKeys } =
     useViewKeyStore();
-  const [activeTab, setActiveTab] = useState<"access" | "exports" | "bundles">("access");
+  const [activeTab, setActiveTab] = useState<"access" | "exports" | "bundles" | "timeline">("access");
   const {
     requests,
     setRequests,
@@ -390,6 +391,20 @@ function ComplianceManager() {
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 animate-in fade-in slide-in-from-bottom-1" />
           )}
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("timeline")}
+          className={`px-6 py-3 text-sm font-medium transition-colors relative ${
+            activeTab === "timeline"
+              ? "text-indigo-600 font-semibold"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Audit Timeline
+          {activeTab === "timeline" && (
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 animate-in fade-in slide-in-from-bottom-1" />
+          )}
+        </button>
       </div>
 
       {activeTab === "access" ? (
@@ -704,6 +719,8 @@ function ComplianceManager() {
         </div>
       ) : activeTab === "exports" ? (
         <AuditExportRequest />
+      ) : activeTab === "timeline" ? (
+        <AuditReadyTimeline />
       ) : (
         <ComplianceEvidenceBundleView />
       )}
