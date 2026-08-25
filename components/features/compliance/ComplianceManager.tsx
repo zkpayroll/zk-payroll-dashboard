@@ -25,7 +25,7 @@ import AuditActivityFeed from "./AuditActivityFeed";
 import type { ViewKey } from "@/types";
 import AuditExportRequest from "./AuditExportRequest";
 import ComplianceEvidenceBundleView from "./ComplianceEvidenceBundleView";
-import AuditReadyTimeline from "@/components/features/payroll/AuditReadyTimeline";
+import { AuditReadyTimeline } from "@/components/features/payroll/AuditReadyTimeline";
 import type { AuditAccessRequest } from "@/types/models";
 
 function generateKeyId(): string {
