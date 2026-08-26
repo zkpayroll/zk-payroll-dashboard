@@ -1,12 +1,13 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import TransactionHistory from "@/components/features/transactions/TransactionHistory";
+import PayrollArchiveCenter from "@/components/features/archive/PayrollArchiveCenter";
 
 function ArchivedHistoryPage() {
   return (
     <DashboardLayout>
-      <TransactionHistory mode="archived" />
+      <PayrollArchiveCenter />
     </DashboardLayout>
   );
 }
 
 export default ArchivedHistoryPage;
+

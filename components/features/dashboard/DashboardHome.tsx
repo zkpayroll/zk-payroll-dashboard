@@ -7,6 +7,7 @@ import { useWalletStore } from "@/stores/walletStore";
 import { useCompanyStore } from "@/stores/company";
 import WalletConnect from "@/components/features/wallet/WalletConnect";
 import PayrollSummary from "@/components/features/payroll/PayrollSummary";
+import PeriodSummaryCard from "@/components/features/payroll/PeriodSummaryCard";
 import SystemStatus from "@/components/features/dashboard/SystemStatus";
 import QuickActions from "@/components/features/dashboard/QuickActions";
 import OnboardingChecklistPanel from "@/components/features/dashboard/OnboardingChecklistPanel";
@@ -142,6 +143,9 @@ function DashboardHome() {
       </ErrorBoundary>
       <ErrorBoundary>
         <SystemStatus />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <PeriodSummaryCard />
       </ErrorBoundary>
       <ErrorBoundary>
         <PayrollSummary />

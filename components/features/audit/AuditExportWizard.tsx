@@ -381,6 +381,7 @@ function SelectStep() {
               </div>
             </label>
           ))
+
         )}
       </div>
     </div>
@@ -636,6 +637,7 @@ function ConfigureStep() {
         <div className="flex flex-col sm:flex-row gap-3">
           <input
             type="date"
+            aria-label="Start date"
             value={dateRangeStart}
             onChange={(event) =>
               setDateRange(
@@ -652,6 +654,7 @@ function ConfigureStep() {
 
           <input
             type="date"
+            aria-label="End date"
             value={dateRangeEnd}
             onChange={(event) =>
               setDateRange(
@@ -667,6 +670,7 @@ function ConfigureStep() {
       <div className="border rounded-lg p-4">
         <label className="flex items-start gap-3 cursor-pointer">
           <input
+            id="include-metadata-checkbox"
             type="checkbox"
             checked={includeMetadata}
             onChange={(event) =>

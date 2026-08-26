@@ -18,8 +18,10 @@ import {
   Lock,
 } from "lucide-react";
 import { MOCK_EMPLOYEES, MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
-import type { PayrollRun } from "@/types/models";
+import type { PayrollRun, ProofReference } from "@/types/models";
 import StatusBadge from "@/components/ui/StatusBadge";
+import ProofFreshnessBadge from "@/components/features/proofs/ProofFreshnessBadge";
+import { evaluateProofFreshness } from "@/lib/formatting/proofFreshness";
 import PayrollApprovalAuditTrail from "./PayrollApprovalAuditTrail";
 import {
   classifyRun,
@@ -62,9 +64,11 @@ export function getPayrollLockState(run: PayrollRun): LockState {
 
 interface PayrollRunDetailProps {
   run?: PayrollRun;
+  /** Optional proof metadata driving the freshness warning experience. */
+  proofReference?: ProofReference | null;
 }
 
-export default function PayrollRunDetail({ run: propRun }: PayrollRunDetailProps = {}) {
+export default function PayrollRunDetail({ run: propRun, proofReference }: PayrollRunDetailProps = {}) {
   const router = useRouter();
   const params = useParams();
   const runId = params?.id as string;
@@ -146,6 +150,7 @@ export default function PayrollRunDetail({ run: propRun }: PayrollRunDetailProps
   const StatusIcon = STATUS_ICONS[run.status] ?? Clock;
   const txHash = run.transactionHash ?? run.txHash;
   const lockState = getPayrollLockState(run);
+  const freshness = evaluateProofFreshness({ reference: proofReference });
 
   return (
     <section aria-labelledby="payroll-run-detail-heading" className="space-y-6">
@@ -211,13 +216,22 @@ export default function PayrollRunDetail({ run: propRun }: PayrollRunDetailProps
               </div>
             </div>
           </div>
-          {kind === "scheduled" && !lockState && (
+          {kind === "scheduled" && !lockState && !freshness.blocksExecution && (
             <Link
               href="/payroll/execute"
               className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors shrink-0"
             >
               Process payroll
             </Link>
+          )}
+          {kind === "scheduled" && !lockState && freshness.blocksExecution && (
+            <span
+              data-testid="execution-blocked-by-proof"
+              role="alert"
+              className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-gray-100 text-gray-500 text-sm font-medium cursor-not-allowed shrink-0"
+            >
+              Execution blocked — proof expired
+            </span>
           )}
         </div>
       </header>
@@ -263,6 +277,11 @@ export default function PayrollRunDetail({ run: propRun }: PayrollRunDetailProps
                 ? `${run.proof.slice(0, 12)}...${run.proof.slice(-8)}`
                 : "Pending generation"}
             </p>
+            {proofReference && (
+              <div className="mt-2">
+                <ProofFreshnessBadge reference={proofReference} />
+              </div>
+            )}
           </div>
         </div>
 

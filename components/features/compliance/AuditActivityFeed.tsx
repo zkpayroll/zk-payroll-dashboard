@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Key,
   KeyRound,
@@ -36,14 +36,15 @@ function formatTimestamp(ts: string): string {
 
 function AuditActivityFeed() {
   const { activities: storedActivities, setActivities } = useAuditActivityStore();
-  const [initialized, setInitialized] = useState(false);
 
-  if (!initialized && storedActivities.length === 0) {
-    setActivities(MOCK_AUDIT_ACTIVITIES);
-    setInitialized(true);
-  }
+  useEffect(() => {
+    if (storedActivities.length === 0) {
+      setActivities(MOCK_AUDIT_ACTIVITIES);
+    }
+  }, [storedActivities.length, setActivities]);
 
   const activities = storedActivities.length > 0 ? storedActivities : MOCK_AUDIT_ACTIVITIES;
+
 
   return (
     <section aria-labelledby="audit-activity-heading" className="space-y-4">

@@ -1,4 +1,4 @@
-import { Employee, Company, CompanyConfig, PayrollTransaction, PayrollRun, ViewKey, FundingForecast, AuditAccessRequest, MultiAssetPayrollRun, ComplianceEvidenceBundle, PayrollLock, PayrollTemplate, OverduePayrollAlert, ApprovalComment } from "@/types/models";
+import { Employee, Company, CompanyConfig, PayrollTransaction, PayrollRun, ViewKey, FundingForecast, AuditAccessRequest, MultiAssetPayrollRun, ComplianceEvidenceBundle, PayrollLock, PayrollTemplate, OverduePayrollAlert, ApprovalComment, ProofReference } from "@/types/models";
 
 export const MOCK_EMPLOYEES: Employee[] = [
   {
@@ -825,3 +825,43 @@ export const MOCK_COMPLIANCE_EVIDENCE_BUNDLES: ComplianceEvidenceBundle[] = [
   },
 ];
 
+
+// ─── Proof freshness references (#335) ───────────────────────────────────────
+// Expiry dates are computed relative to load time so every freshness state
+// stays reachable in the demo data regardless of when the app is opened.
+
+function hoursFromNow(hours: number): string {
+  return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+}
+
+export const MOCK_PROOF_REFERENCES: Record<string, ProofReference> = {
+  tx_001: {
+    proofId: "zkp_ref_tx_001",
+    verifierContract: "CCVERIFIER_STATION_001",
+    circuitHash: "0xsnark_groth16_bn254_circuit_889a",
+    publicSignalsDigest: "0xpubdigest_tx001",
+    proofStatus: "verified",
+    verifiedAt: "2025-02-28T09:01:12Z",
+    expiresAt: hoursFromNow(24 * 14),
+    rawProofHash: "0xzkproof_abc123_full_digest_hash",
+  },
+  tx_002: {
+    proofId: "zkp_ref_tx_002",
+    verifierContract: "CCVERIFIER_STATION_001",
+    circuitHash: "0xsnark_groth16_bn254_circuit_889a",
+    publicSignalsDigest: "0xpubdigest_tx002",
+    proofStatus: "verified",
+    verifiedAt: "2026-01-31T09:01:12Z",
+    expiresAt: hoursFromNow(6),
+    rawProofHash: "0xzkproof_def789_full_digest_hash",
+  },
+  tx_003: {
+    proofId: "zkp_ref_tx_003",
+    verifierContract: "CCVERIFIER_STATION_001",
+    circuitHash: "0xsnark_groth16_bn254_circuit_889a",
+    publicSignalsDigest: "0xpubdigest_tx003",
+    proofStatus: "expired",
+    expiresAt: hoursFromNow(-48),
+    rawProofHash: "0xzkproof_pending123_full_digest_hash",
+  },
+};

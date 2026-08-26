@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Key,
   Plus,
@@ -52,7 +52,6 @@ function ComplianceManager() {
   } = useAuditRequestStore();
   const { addActivity } = useAuditActivityStore();
   
-  const [initialized, setInitialized] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [revealedKeys, setRevealedKeys] = useState<Set<string>>(new Set());
   const [form, setForm] = useState({
@@ -63,11 +62,11 @@ function ComplianceManager() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [preparingId, setPreparingId] = useState<string | null>(null);
 
-  if (!initialized && (viewKeys.length === 0 || requests.length === 0)) {
+  useEffect(() => {
     if (viewKeys.length === 0) setViewKeys(MOCK_VIEW_KEYS);
     if (requests.length === 0) setRequests(MOCK_AUDIT_REQUESTS);
-    setInitialized(true);
-  }
+  }, [viewKeys.length, requests.length, setViewKeys, setRequests]);
+
 
   const handleApproveRequest = (request: AuditAccessRequest) => {
     const keyId = generateKeyId();

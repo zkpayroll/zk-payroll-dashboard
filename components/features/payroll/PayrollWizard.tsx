@@ -23,6 +23,8 @@ import {
   History,
 } from "lucide-react";
 import { toast } from "sonner";
+import type { Employee } from "@/types/models";
+import DuplicateWarningPanel from "@/components/employees/DuplicateWarningPanel";
 import { usePayrollWizardStore } from "@/stores/payrollWizard";
 import { useWalletStore } from "@/stores/walletStore";
 import { useApprovalHistory } from "@/stores/approvalHistory";
@@ -36,6 +38,7 @@ import { usePayrollAuditTrailStore } from "@/stores/payrollAuditTrail";
 import ApprovalHistoryDrawer from "./ApprovalHistoryDrawer";
 import { PayrollRiskWarnings } from "./PayrollRiskWarnings";
 import { WalletReconnectRecoveryBanner } from "@/components/features/wallet/WalletReconnectRecoveryBanner";
+import { ContractErrorHelpButton } from "@/components/features/errors/ContractErrorDrawer";
 import type { PayrollRun, PayrollWizardStep } from "@/types";
 import { trackEvent, mapErrorToType, bucketEmployeeCount } from "@/lib/telemetry";
 
@@ -545,7 +548,7 @@ function ReviewStep({
   isWrongNetwork,
 }: {
   employeeIds: string[];
-  selectedEmployees: { id: string; name: string; salary: number }[];
+  selectedEmployees: Employee[];
   totalAmount: number;
   onStart: () => void;
   onNext: () => void;
@@ -577,6 +580,7 @@ function ReviewStep({
         Review the employees and amounts included in this payroll run before
         generating the ZK proof.
       </p>
+      <DuplicateWarningPanel employees={selectedEmployees} />
       <div className="border rounded-lg divide-y">
         {selectedEmployees.map((emp) => (
           <div key={emp.id} className="px-4 py-3 flex justify-between">
@@ -665,14 +669,17 @@ function ProofStep({
         <div className="text-center py-6 space-y-3">
           <AlertCircle className="w-8 h-8 text-red-500 mx-auto" />
           <p className="text-sm text-red-700">{error}</p>
-          <button
-            type="button"
-            onClick={onRetry}
-            className="w-full sm:w-auto px-4 py-2 rounded-md bg-red-50 text-red-700 text-sm font-medium hover:bg-red-100 border border-red-200 transition-colors inline-flex justify-center items-center gap-1"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Retry
-          </button>
+          <div className="flex flex-col sm:flex-row justify-center gap-3">
+            <button
+              type="button"
+              onClick={onRetry}
+              className="w-full sm:w-auto px-4 py-2 rounded-md bg-red-50 text-red-700 text-sm font-medium hover:bg-red-100 border border-red-200 transition-colors inline-flex justify-center items-center gap-1"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Retry
+            </button>
+            <ContractErrorHelpButton error={error} />
+          </div>
         </div>
       )}
 
@@ -1307,6 +1314,7 @@ function SubmitStep({
             >
               Start Over
             </button>
+            <ContractErrorHelpButton error={error} />
           </div>
         </div>
       )}
