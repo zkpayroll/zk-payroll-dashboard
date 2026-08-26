@@ -10,6 +10,7 @@ import PayrollSummary from "@/components/features/payroll/PayrollSummary";
 import SystemStatus from "@/components/features/dashboard/SystemStatus";
 import QuickActions from "@/components/features/dashboard/QuickActions";
 import OnboardingChecklistPanel from "@/components/features/dashboard/OnboardingChecklistPanel";
+import OnboardingReadinessTracker from "@/components/features/employees/OnboardingReadinessTracker";
 import PinnedAlertsPanel from "@/components/features/dashboard/PinnedAlertsPanel";
 import { SessionTimeoutBanner } from "@/components/features/dashboard/SessionTimeoutBanner";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -135,6 +136,9 @@ function DashboardHome() {
       </ErrorBoundary>
       <ErrorBoundary>
         <OnboardingChecklistPanel />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <OnboardingReadinessTracker />
       </ErrorBoundary>
       <ErrorBoundary>
         <SystemStatus />

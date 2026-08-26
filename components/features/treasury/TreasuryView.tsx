@@ -6,6 +6,8 @@ import { MOCK_TREASURY_BALANCE, MOCK_TRANSACTIONS, MOCK_COMPANIES } from "@/lib/
 import FundingForecast from "./FundingForecast";
 import StatusBadge from "@/components/ui/StatusBadge";
 import TreasuryReadinessChecklist from "./TreasuryReadinessChecklist";
+import TreasuryDrainWarning from "./TreasuryDrainWarning";
+import FundingImbalanceDashboard from "./FundingImbalanceDashboard";
 
 function TreasuryView() {
   const [toastVisible, setToastVisible] = useState(false);
@@ -84,6 +86,13 @@ function TreasuryView() {
           </div>
         </article>
       </div>
+
+      <TreasuryDrainWarning
+        currentBalance={balance}
+        projectedDrain={projectedPayroll}
+      />
+
+      <FundingImbalanceDashboard />
 
       <TreasuryReadinessChecklist />
 

@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  AlertCircle,
   Calendar,
   CheckCircle,
   ChevronLeft,
@@ -20,6 +21,8 @@ import {
   formatPayrollDate,
   formatPayrollMonthYear,
   getCalendarMonthDays,
+  getDominantRunKind,
+  getHeatmapIntensity,
   getNextUpcoming,
   getRunDate,
   groupRunsByDateKey,
@@ -41,6 +44,9 @@ function RunKindIcon({ kind }: { kind: RunScheduleKind }) {
   }
   if (kind === "failed") {
     return <XCircle className="w-4 h-4 text-red-600 shrink-0" aria-hidden="true" />;
+  }
+  if (kind === "pending_approval") {
+    return <AlertCircle className="w-4 h-4 text-purple-600 shrink-0" aria-hidden="true" />;
   }
   return <Clock className="w-4 h-4 text-yellow-600 shrink-0" aria-hidden="true" />;
 }
@@ -168,9 +174,10 @@ function MonthCalendar({
   onPrevMonth: () => void;
   onNextMonth: () => void;
 }) {
-  const year = viewDate.getFullYear();
-  const month = viewDate.getMonth();
+  const year = viewDate.getUTCFullYear();
+  const month = viewDate.getUTCMonth();
   const days = getCalendarMonthDays(year, month);
+
   const todayKey = toDateKey(new Date());
 
   return (
@@ -210,7 +217,7 @@ function MonthCalendar({
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7 gap-1" role="grid" aria-label="Payroll calendar">
+        <div className="grid grid-cols-7 gap-1" role="grid" aria-label="Payroll calendar heatmap">
           {days.map((day, index) => {
             if (!day) {
               return <div key={`empty-${index}`} className="aspect-square" />;
@@ -219,14 +226,24 @@ function MonthCalendar({
             const dateKey = toDateKey(day);
             const dayRuns = runsByDate.get(dateKey) ?? [];
             const isToday = dateKey === todayKey;
+            const dominantKind = getDominantRunKind(dayRuns);
+            const intensity = getHeatmapIntensity(dayRuns);
+            const heatBg = dominantKind
+              ? RUN_KIND_STYLES[dominantKind].heatBg[Math.max(0, intensity - 1)]
+              : "";
+            const heatSummary = dayRuns.length
+              ? `, ${dayRuns.length} run${dayRuns.length > 1 ? "s" : ""} (${dominantKind ? RUN_KIND_STYLES[dominantKind].label.toLowerCase() : "activity"})`
+              : "";
 
             return (
               <div
                 key={dateKey}
                 role="gridcell"
-                className={`aspect-square p-1 rounded-md border ${
-                  isToday ? "border-indigo-300 bg-indigo-50/50" : "border-transparent"
-                } ${dayRuns.length > 0 ? "bg-gray-50" : ""}`}
+                aria-label={`${formatPayrollDate(day)}${heatSummary}`}
+                title={dayRuns.length ? `${dayRuns.length} run${dayRuns.length > 1 ? "s" : ""} on ${formatPayrollDate(day)}` : undefined}
+                className={`aspect-square p-1 rounded-md border transition-colors ${
+                  isToday ? "border-indigo-300" : "border-transparent"
+                } ${heatBg || (dayRuns.length === 0 ? "" : "bg-gray-50")}`}
               >
                 <span
                   className={`block text-xs font-medium mb-0.5 ${
@@ -263,12 +280,19 @@ function MonthCalendar({
             Scheduled
           </span>
           <span className="inline-flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-purple-500" aria-hidden="true" />
+            Pending approval
+          </span>
+          <span className="inline-flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-green-500" aria-hidden="true" />
             Completed
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-red-500" aria-hidden="true" />
             Failed
+          </span>
+          <span className="inline-flex items-center gap-1.5 ml-auto text-gray-400">
+            Darker = busier day
           </span>
         </div>
       </div>
@@ -306,12 +330,13 @@ function PayrollCalendar({ runs = MOCK_PAYROLL_RUNS }: PayrollCalendarProps) {
 
   const initialViewDate = nextUp ? getRunDate(nextUp) : new Date();
   const [viewDate, setViewDate] = useState(
-    () => new Date(initialViewDate.getFullYear(), initialViewDate.getMonth(), 1),
+    () => new Date(Date.UTC(initialViewDate.getUTCFullYear(), initialViewDate.getUTCMonth(), 1)),
   );
 
   const shiftMonth = (delta: number) => {
-    setViewDate((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+    setViewDate((current) => new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth() + delta, 1)));
   };
+
 
   if (runs.length === 0) {
     return (

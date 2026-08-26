@@ -4,6 +4,7 @@ import { StellarDebugPanel } from '@/components/debug/StellarDebugPanel';
 import { MonitoringProvider } from '@/components/providers/MonitoringProvider';
 import { Toaster } from "@/components/ui/sonner";
 import { HelpDrawer } from "@/components/ui/HelpDrawer";
+import { RetryToastCenter } from "@/components/features/network/RetryToastCenter";
 import "./globals.css";
 export const metadata: Metadata = {
   title: "ZK Payroll Dashboard",
@@ -22,6 +23,7 @@ export default function RootLayout({
           <MonitoringProvider />
           {children}
           <HelpDrawer />
+          <RetryToastCenter />
           {process.env.NODE_ENV === 'development' && <StellarDebugPanel />}
           <Toaster />
         </StellarProvider>
@@ -29,3 +31,4 @@ export default function RootLayout({
     </html>
   );
 }
+

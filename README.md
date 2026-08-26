@@ -1,5 +1,5 @@
-![CI Status](https://github.com/zk-payroll/zk-payroll-dashboard/actions/workflows/ci.yml/badge.svg)
-![CD Status](https://github.com/zk-payroll/zk-payroll-dashboard/actions/workflows/deploy.yml/badge.svg)
+![CI Status](https://github.com/zkpayroll/zk-payroll-dashboard/actions/workflows/ci.yml/badge.svg)
+![CD Status](https://github.com/zkpayroll/zk-payroll-dashboard/actions/workflows/deploy.yml/badge.svg)
 
 # ZK Payroll Dashboard
 

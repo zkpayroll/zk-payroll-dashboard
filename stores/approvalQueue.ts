@@ -5,7 +5,11 @@ import { persist } from "zustand/middleware";
 import type { PayrollRun } from "@/types/models";
 
 export interface ApprovalDraft extends PayrollRun {
-  approvalStatus: "pending_executive_approval" | "approved" | "rejected";
+  approvalStatus:
+    | "pending_executive_approval"
+    | "approved"
+    | "rejected"
+    | "correction_requested";
   requiresExecutiveReview: boolean;
   notes?: string;
 }
@@ -14,6 +18,10 @@ interface ApprovalQueueState {
   drafts: ApprovalDraft[];
   approveDraft: (id: string, reviewerName: string, role: string, comment?: string) => void;
   rejectDraft: (id: string, reviewerName: string, role: string, comment?: string) => void;
+  /** Comment is required — it tells the drafter exactly what to fix. */
+  requestCorrection: (id: string, reviewerName: string, role: string, comment: string) => void;
+  /** Simulates the drafter addressing feedback and putting the draft back in the queue. */
+  resubmitDraft: (id: string, submitterName: string, role: string, comment?: string) => void;
   addDraftForApproval: (draft: PayrollRun, notes?: string) => void;
 }
 
@@ -73,6 +81,7 @@ export const useApprovalQueueStore = create<ApprovalQueueState>()(
                       approvedAt: new Date().toISOString(),
                       role,
                       comment,
+                      action: "approved",
                     },
                   ],
                 }
@@ -94,6 +103,53 @@ export const useApprovalQueueStore = create<ApprovalQueueState>()(
                       approvedAt: new Date().toISOString(),
                       role,
                       comment,
+                      action: "rejected",
+                    },
+                  ],
+                }
+              : d,
+          ),
+        })),
+      requestCorrection: (id, reviewerName, role, comment) =>
+        set((state) => ({
+          drafts: state.drafts.map((d) =>
+            d.id === id
+              ? {
+                  ...d,
+                  // Correction requests keep the run in "pending" (not cancelled) since
+                  // the drafter is expected to fix and resubmit rather than start over.
+                  approvalStatus: "correction_requested",
+                  status: "pending",
+                  approvalHistory: [
+                    ...(d.approvalHistory || []),
+                    {
+                      approvedBy: reviewerName,
+                      approvedAt: new Date().toISOString(),
+                      role,
+                      comment,
+                      action: "correction_requested",
+                    },
+                  ],
+                }
+              : d,
+          ),
+        })),
+      resubmitDraft: (id, submitterName, role, comment) =>
+        set((state) => ({
+          drafts: state.drafts.map((d) =>
+            d.id === id
+              ? {
+                  ...d,
+                  approvalStatus: "pending_executive_approval",
+                  status: "pending",
+                  approvalHistory: [
+                    ...(d.approvalHistory || []),
+                    {
+                      approvedBy: submitterName,
+                      approvedAt: new Date().toISOString(),
+                      role,
+                      comment: comment || "Corrections addressed; resubmitted for review",
+                      action: "resubmitted",
                     },
                   ],
                 }
