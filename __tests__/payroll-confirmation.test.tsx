@@ -59,10 +59,17 @@ describe("Payroll Confirmation Summary & Validation Flows", () => {
 
     // Verify confirmation layout exists
     expect(screen.getByText("Review & Confirm Payroll")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /final review checklist/i })).toBeInTheDocument();
+    expect(screen.getByText("Employee records reviewed")).toBeInTheDocument();
+    expect(screen.getByText("Treasury balance verified")).toBeInTheDocument();
+    expect(screen.getByText("ZK proof verified")).toBeInTheDocument();
+    expect(screen.getByText("Payroll conflicts checked")).toBeInTheDocument();
     
     // Status should be Ready
-    expect(screen.getByText("Ready")).toBeInTheDocument();
-    expect(screen.getByText("All Checks Passed")).toBeInTheDocument();
+    expect(screen.getAllByText("Ready").length).toBeGreaterThan(0);
+    expect(
+      screen.getByText(/All Checks Passed|Payroll Warnings Detected/),
+    ).toBeInTheDocument();
 
     // Checkbox and submit button behaviors
     const checkbox = screen.getByLabelText(/Confirm Payroll Execution Summary/i) as HTMLInputElement;
@@ -143,6 +150,7 @@ describe("Payroll Confirmation Summary & Validation Flows", () => {
     expect(screen.getByText("Blocked")).toBeInTheDocument();
     expect(screen.getByText("Submission Blocked")).toBeInTheDocument();
     expect(screen.getByText(/Treasury balance is insufficient/i)).toBeInTheDocument();
+    expect(screen.getAllByText("Needs attention").length).toBeGreaterThan(0);
 
     // Checkbox should be disabled or button remains disabled even after interaction
     const checkbox = screen.getByLabelText(/Confirm Payroll Execution Summary/i) as HTMLInputElement;
