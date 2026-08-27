@@ -30,7 +30,7 @@ import {
   RUN_KIND_STYLES,
 } from "@/lib/payroll/scheduleUtils";
 import ReconciliationDiffPanel from "@/components/features/payroll/ReconciliationDiffPanel";
-
+import CancelPayrollDialog from "./CancelPayrollDialog";
 
 
 import type { LucideIcon } from "lucide-react";
@@ -74,6 +74,7 @@ export default function PayrollRunDetail({ run: propRun, proofReference }: Payro
   const runId = params?.id as string;
 
   const [isLoading, setIsLoading] = useState(!propRun);
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
 
   useEffect(() => {
     if (propRun) {
@@ -216,25 +217,48 @@ export default function PayrollRunDetail({ run: propRun, proofReference }: Payro
               </div>
             </div>
           </div>
-          {kind === "scheduled" && !lockState && !freshness.blocksExecution && (
-            <Link
-              href="/payroll/execute"
-              className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors shrink-0"
-            >
-              Process payroll
-            </Link>
-          )}
-          {kind === "scheduled" && !lockState && freshness.blocksExecution && (
-            <span
-              data-testid="execution-blocked-by-proof"
-              role="alert"
-              className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-gray-100 text-gray-500 text-sm font-medium cursor-not-allowed shrink-0"
-            >
-              Execution blocked — proof expired
-            </span>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {kind === "scheduled" && !lockState && !freshness.blocksExecution && (
+              <Link
+                href="/payroll/execute"
+                className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors"
+              >
+                Process payroll
+              </Link>
+            )}
+            {run.status === "pending" && (
+              <button
+                type="button"
+                onClick={() => setIsCancelDialogOpen(true)}
+                className="inline-flex items-center justify-center px-4 py-2 rounded-md border border-red-300 text-red-700 bg-white text-sm font-medium hover:bg-red-50 transition-colors"
+              >
+                Cancel Batch
+              </button>
+            )}
+            {kind === "scheduled" && !lockState && freshness.blocksExecution && (
+              <span
+                data-testid="execution-blocked-by-proof"
+                role="alert"
+                className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-gray-100 text-gray-500 text-sm font-medium cursor-not-allowed"
+              >
+                Execution blocked — proof expired
+              </span>
+            )}
+          </div>
         </div>
       </header>
+
+      {isCancelDialogOpen && run && (
+        <CancelPayrollDialog
+          isOpen={isCancelDialogOpen}
+          payroll={run}
+          onCancel={() => setIsCancelDialogOpen(false)}
+          onSuccess={() => {
+            setIsCancelDialogOpen(false);
+            router.refresh();
+          }}
+        />
+      )}
 
       {/* Run metadata */}
       <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">

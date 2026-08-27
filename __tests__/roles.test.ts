@@ -18,6 +18,7 @@ describe('role-aware navigation and route rules', () => {
     expect(getNavigationForRole('operator').map((item) => item.label)).toContain('Execute Payroll');
     expect(getNavigationForRole('auditor').map((item) => item.label)).toEqual([
       'Dashboard',
+      'Verify Proof',
       'History',
       'Archived Payrolls',
       'Exports',

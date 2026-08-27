@@ -37,6 +37,7 @@ import PayrollApprovalAuditTrail from "./PayrollApprovalAuditTrail";
 import { usePayrollAuditTrailStore } from "@/stores/payrollAuditTrail";
 import ApprovalHistoryDrawer from "./ApprovalHistoryDrawer";
 import { PayrollRiskWarnings } from "./PayrollRiskWarnings";
+import { NoteHashPreview } from "@/components/payroll/NoteHashPreview";
 import { WalletReconnectRecoveryBanner } from "@/components/features/wallet/WalletReconnectRecoveryBanner";
 import { ContractErrorHelpButton } from "@/components/features/errors/ContractErrorDrawer";
 import type { PayrollRun, PayrollWizardStep } from "@/types";
@@ -1172,6 +1173,11 @@ function ConfirmStep({
           </div>
         </div>
       </div>
+
+      {/* Optional Note Hash Attachment */}
+      <NoteHashPreview
+        label="Attach Payroll Note Hash (Optional)"
+      />
 
       {/* Explicit Confirmation Checkbox */}
       <div className="bg-indigo-50/50 border border-indigo-150 rounded-lg p-4">

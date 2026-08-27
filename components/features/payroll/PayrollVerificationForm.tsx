@@ -45,7 +45,6 @@ export function PayrollVerificationForm() {
           value={reference}
           onChange={setReference}
           onValidityChange={setIsValid}
-          autoFocus
         />
 
         <button
