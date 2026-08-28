@@ -11,6 +11,7 @@ import {
   UserX,
   Shield,
   Download,
+  Building2,
 } from "lucide-react";
 import {
   useAuditActivityStore,
@@ -28,6 +29,7 @@ const ACTION_CONFIG: Record<
   request_rejected: { icon: XCircle, color: "text-red-600 bg-red-50", label: "Request Rejected" },
   export_prepared: { icon: Shield, color: "text-indigo-600 bg-indigo-50", label: "Export Prepared" },
   export_downloaded: { icon: Download, color: "text-green-600 bg-green-50", label: "Export Downloaded" },
+  employer_onboarded: { icon: Building2, color: "text-blue-600 bg-blue-50", label: "Employer Onboarded" },
 };
 
 function formatTimestamp(ts: string): string {

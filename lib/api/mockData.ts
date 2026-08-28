@@ -1,4 +1,4 @@
-import { Employee, Company, CompanyConfig, PayrollTransaction, PayrollRun, ViewKey, FundingForecast, AuditAccessRequest, MultiAssetPayrollRun, ComplianceEvidenceBundle, PayrollLock, PayrollTemplate, OverduePayrollAlert, ApprovalComment, ProofReference } from "@/types/models";
+import { Employee, Company, CompanyConfig, PayrollTransaction, PayrollRun, ViewKey, FundingForecast, AuditAccessRequest, MultiAssetPayrollRun, ComplianceEvidenceBundle, PayrollLock, PayrollTemplate, OverduePayrollAlert, ApprovalComment, ProofReference, ComplianceEvidencePointer, ApproverThresholdPolicy, PayrollDispute, FundingReservation } from "@/types/models";
 
 export const MOCK_EMPLOYEES: Employee[] = [
   {
@@ -865,3 +865,103 @@ export const MOCK_PROOF_REFERENCES: Record<string, ProofReference> = {
     rawProofHash: "0xzkproof_pending123_full_digest_hash",
   },
 };
+
+export const MOCK_COMPLIANCE_EVIDENCE_POINTERS: ComplianceEvidencePointer[] = [
+  {
+    id: "cep_001",
+    reviewCaseId: "case_2025_02_014",
+    payrollRunId: "tx_001",
+    pointerType: "document-hash",
+    reference: "0x8f3a1c9d4e5b6a7f8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b",
+    description: "Signed dispute resolution memo (hash of notarized PDF)",
+    status: "valid",
+    createdAt: "2025-02-28T10:12:00Z",
+    createdBy: "Admin (Alice Mensah)",
+  },
+  {
+    id: "cep_002",
+    reviewCaseId: "case_2025_02_014",
+    payrollRunId: "tx_001",
+    pointerType: "case-reference",
+    reference: "EXT-CASE-2025-4471",
+    description: "External regulator case reference number",
+    status: "valid",
+    createdAt: "2025-02-28T10:15:00Z",
+    createdBy: "Admin (Alice Mensah)",
+  },
+  {
+    id: "cep_003",
+    reviewCaseId: "case_2025_03_002",
+    payrollRunId: "tx_002",
+    pointerType: "url",
+    reference: "not-a-valid-url",
+    description: "Broken link submitted by a maintainer",
+    status: "invalid",
+    validationError: "Reference is not a valid URL",
+    createdAt: "2025-03-05T14:20:00Z",
+    createdBy: "Maintainer (Kojo Boateng)",
+  },
+  {
+    id: "cep_004",
+    reviewCaseId: "case_2025_03_002",
+    payrollRunId: "tx_002",
+    pointerType: "ipfs",
+    reference: "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+    description: "Bank statement excerpt pinned to IPFS",
+    status: "valid",
+    createdAt: "2025-03-05T14:25:00Z",
+    createdBy: "Maintainer (Kojo Boateng)",
+  },
+];
+
+export const MOCK_COMPLIANCE_EVIDENCE_POINTERS_EMPTY: ComplianceEvidencePointer[] = [];
+
+export const MOCK_APPROVER_THRESHOLD_POLICY: ApproverThresholdPolicy = {
+  companyId: "company_001",
+  version: 3,
+  requiredApprovals: 2,
+  effectiveFrom: "2025-02-01T00:00:00Z",
+  createdBy: "GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W37",
+};
+
+/** Batches already locked to the current policy version — see PayrollLock/PayrollRun ids. */
+export const MOCK_BATCHES_ON_CURRENT_POLICY: string[] = ["tx_001", "tx_002"];
+
+export const MOCK_PAYROLL_DISPUTES: PayrollDispute[] = [
+  {
+    id: "dsp_001",
+    payrollRunId: "tx_002",
+    raisedBy: "emp_002",
+    reason: "Reported amount does not match agreed contract rate for March.",
+    isResolved: false,
+  },
+  {
+    id: "dsp_002",
+    payrollRunId: "tx_004",
+    raisedBy: "emp_004",
+    reason: "Missing overtime hours for the last week of the period.",
+    isResolved: true,
+    resolvedAt: "2025-04-05T12:00:00Z",
+  },
+];
+
+export const MOCK_FUNDING_RESERVATIONS: FundingReservation[] = [
+  {
+    id: "rsv_001",
+    payrollRunId: "tx_003",
+    amount: 5000,
+    purpose: "Reserved for pending bonus adjustment approval.",
+    isReleased: false,
+  },
+  {
+    id: "rsv_002",
+    payrollRunId: "tx_001",
+    amount: 1200,
+    purpose: "Reserved for a since-cancelled off-cycle correction.",
+    isReleased: true,
+    releasedAt: "2025-03-29T00:00:00Z",
+  },
+];
+
+/** Audit-ready timelines that have been generated and exported, keyed by payrollId. */
+export const MOCK_EXPORTED_AUDIT_TIMELINE_RUN_IDS: string[] = ["tx_001", "tx_004"];

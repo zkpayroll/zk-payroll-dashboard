@@ -17,6 +17,10 @@ The **ZK Payroll Dashboard** is a privacy-first web application designed for man
 - **Transaction History**: Verifiable history of all payroll events.
 - **Transaction Detail View**: 🆕 Comprehensive transaction inspection with verification metadata, timestamps, and blockchain details.
 - **Compliance View**: Optional view-key generation for auditing purposes.
+- **Employer Onboarding Timeline**: 🆕 Activity timeline item for employer onboarding events with privacy-safe employer identifiers and setup progress.
+- **Cancellation Panel**: 🆕 Payroll detail panel explaining why a batch was cancelled and what actions remain available, without exposing salary values.
+- **Approval Expiry Badge**: 🆕 Badge showing whether payroll approvals are active, expiring soon, expired, or missing before execution.
+- **Asset Symbol Normalization Warning**: 🆕 Small UI warning when an entered asset symbol is normalized (trimmed/uppercased) before validation or submission.
 
 ## 🛠 Tech Stack
 

@@ -121,6 +121,15 @@ export interface PayrollTransaction {
   isArchived?: boolean;
 }
 
+export type PayrollCancellationReason =
+  | "treasury_insufficient"
+  | "approval_rejected"
+  | "compliance_hold"
+  | "duplicate_batch"
+  | "manual_request"
+  | "expired_proof"
+  | "unknown";
+
 export interface PayrollRun extends PayrollTransaction {
   employeeIds: string[];
   executedAt?: string | null;
@@ -132,6 +141,11 @@ export interface PayrollRun extends PayrollTransaction {
     discrepancies?: string[];
     lastReconciliedAt?: string;
   };
+  /** Cancellation details — present only when status is cancelled. */
+  cancellationReason?: PayrollCancellationReason;
+  cancellationDetail?: string;
+  cancelledAt?: string | null;
+  cancelledBy?: string | null;
 }
 
 export interface ViewKey {
@@ -562,5 +576,122 @@ export interface AuditReadyTimeline {
   generatedAt: string;
   /** Whether this timeline has been exported for audit */
   exported: boolean;
+}
+
+// ─── Compliance Evidence Pointer Manager (#338) ──────────────────────────────
+
+export type EvidencePointerType = "url" | "ipfs" | "document-hash" | "case-reference";
+
+export type EvidencePointerStatus = "valid" | "invalid" | "pending";
+
+export interface ComplianceEvidencePointer {
+  id: string;
+  /** Review case this pointer is attached to — e.g. an audit or dispute case id */
+  reviewCaseId: string;
+  /** Payroll period/run this evidence pertains to */
+  payrollRunId: string;
+  pointerType: EvidencePointerType;
+  /**
+   * Reference to where the evidence lives (URL, IPFS CID, document hash, or
+   * external case reference number). Never the evidence content itself —
+   * this app never stores or displays raw evidence.
+   */
+  reference: string;
+  description: string;
+  status: EvidencePointerStatus;
+  /** Populated when status is "invalid" */
+  validationError?: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+// ─── Payroll Schedule Calendar Editor (#339) ─────────────────────────────────
+
+/**
+ * A draft, unsaved edit to a recurring payroll template's settlement window
+ * — proposed before being submitted as the template's new policy. Kept
+ * separate from `PayrollTemplate` itself so the calendar editor can preview
+ * changes without mutating the live schedule.
+ */
+export interface DraftSettlementWindow {
+  id: string;
+  templateId: string;
+  /** ISO date (yyyy-mm-dd) the settlement window opens */
+  windowStart: string;
+  /** ISO date (yyyy-mm-dd) the settlement window closes */
+  windowEnd: string;
+  createdAt: string;
+}
+
+// ─── Approver Threshold Rotation (#340) ──────────────────────────────────────
+
+/**
+ * A versioned approval-threshold policy: how many approvers must sign off
+ * on a payroll batch before it can execute. Rotating the threshold creates
+ * a new version rather than mutating the old one, so batches already locked
+ * to a prior version keep their original requirement — see
+ * `ApproverThresholdRotationRequest.affectedBatchIds`.
+ */
+export interface ApproverThresholdPolicy {
+  companyId: string;
+  version: number;
+  requiredApprovals: number;
+  effectiveFrom: string;
+  createdBy: string;
+}
+
+export type ThresholdRotationStatus = "pending" | "confirmed" | "cancelled";
+
+export interface ApproverThresholdRotationRequest {
+  id: string;
+  companyId: string;
+  currentPolicy: ApproverThresholdPolicy;
+  proposedRequiredApprovals: number;
+  /** Payroll batch ids already locked to `currentPolicy.version` — they keep the old threshold. */
+  affectedBatchIds: string[];
+  status: ThresholdRotationStatus;
+  createdAt: string;
+  createdBy: string;
+  confirmedAt?: string | null;
+}
+
+// ─── Period Close Reconciliation Dashboard (#341) ────────────────────────────
+
+export interface PayrollDispute {
+  id: string;
+  payrollRunId: string;
+  raisedBy: string;
+  reason: string;
+  isResolved: boolean;
+  resolvedAt?: string | null;
+}
+
+export interface FundingReservation {
+  id: string;
+  payrollRunId: string;
+  amount: number;
+  purpose: string;
+  isReleased: boolean;
+  releasedAt?: string | null;
+}
+
+export type PeriodCloseBlockerCategory = "holds" | "disputes" | "funding_reservations" | "audit_references";
+
+export interface PeriodCloseBlocker {
+  category: PeriodCloseBlockerCategory;
+  description: string;
+}
+
+export interface PeriodCloseChecklistItem {
+  category: PeriodCloseBlockerCategory;
+  label: string;
+  isSatisfied: boolean;
+  blockers: PeriodCloseBlocker[];
+}
+
+export interface PeriodCloseChecklist {
+  payrollRunId: string;
+  items: PeriodCloseChecklistItem[];
+  canClose: boolean;
 }
 

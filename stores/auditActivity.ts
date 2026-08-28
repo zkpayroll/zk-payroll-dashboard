@@ -7,7 +7,8 @@ export type AuditActionType =
   | "request_approved"
   | "request_rejected"
   | "export_prepared"
-  | "export_downloaded";
+  | "export_downloaded"
+  | "employer_onboarded";
 
 export interface AuditActivityEntry {
   id: string;
