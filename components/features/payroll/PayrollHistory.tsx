@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Filter, Search, X } from "lucide-react";
 import PayrollCalendar from "./PayrollCalendar";
 import { MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
@@ -8,6 +8,14 @@ import type { PayrollRun } from "@/types/models";
 import { searchPayrollRuns } from "@/lib/payrollSearch";
 import EmptyState from "@/components/ui/EmptyState";
 import { useHelpDrawer, HELP_CONTENT } from "@/stores/helpDrawer";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 type StatusFilter = "all" | "pending" | "verified" | "failed" | "cancelled";
 type OutcomeFilter = "all" | "pending" | "partial" | "complete" | "failed";
@@ -36,6 +44,12 @@ function PayrollHistory({ runs = MOCK_PAYROLL_RUNS }: PayrollHistoryProps) {
   const [filters, setFilters] = useState<Filters>(initialFilters);
   const [showFilters, setShowFilters] = useState(false);
   const { openHelp } = useHelpDrawer();
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters]);
 
   const filteredRuns = useMemo(() => {
     let results = runs;
@@ -60,6 +74,13 @@ function PayrollHistory({ runs = MOCK_PAYROLL_RUNS }: PayrollHistoryProps) {
 
     return results;
   }, [runs, filters]);
+
+  const totalPages = Math.ceil(filteredRuns.length / pageSize);
+
+  const paginatedRuns = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredRuns.slice(startIndex, startIndex + pageSize);
+  }, [filteredRuns, currentPage, pageSize]);
 
   const activeFilterCount = [
     !!filters.search.trim(),
@@ -227,7 +248,36 @@ function PayrollHistory({ runs = MOCK_PAYROLL_RUNS }: PayrollHistoryProps) {
           />
         </div>
       ) : (
-        <PayrollCalendar runs={filteredRuns} />
+        <>
+          <PayrollCalendar runs={paginatedRuns} />
+          {totalPages > 1 && (
+            <div className="mt-6 flex justify-center">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      aria-disabled={currentPage === 1}
+                      className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <span className="px-4 text-sm font-medium text-gray-700">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      aria-disabled={currentPage === totalPages}
+                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
+        </>
       )}
     </>
   );
