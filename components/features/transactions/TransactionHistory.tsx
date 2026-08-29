@@ -23,6 +23,8 @@ import {
   Trash2,
   Check,
   ExternalLink,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { MOCK_TRANSACTIONS, MOCK_EMPLOYEES } from "@/lib/api/mockData";
@@ -256,6 +258,35 @@ function TransactionHistoryInner({
     return results;
   }, [filters, mode]);
 
+  const PAGE_SIZE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginated = useMemo(
+    () => filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [filtered, safePage],
+  );
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const isFirstPageRender = useRef(true);
+
+  // Reset to page 1 whenever the filtered result set changes shape.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, mode]);
+
+  // Scroll (and move focus for screen-reader users) back to the top of the
+  // list on every page change, since Prev/Next live at the bottom of a list
+  // that can be much taller than the viewport — otherwise the click leaves
+  // you scrolled past the rows that just changed underneath you.
+  useEffect(() => {
+    if (isFirstPageRender.current) {
+      isFirstPageRender.current = false;
+      return;
+    }
+    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    sectionRef.current?.focus({ preventScroll: true });
+  }, [safePage]);
+
   const activeFilterCount = [
     !!filters.search.trim(),
     filters.status !== "all",
@@ -327,7 +358,11 @@ function TransactionHistoryInner({
   );
 
   return (
-    <section aria-labelledby="transaction-history-heading">
+    <section
+      ref={sectionRef}
+      aria-labelledby="transaction-history-heading"
+      tabIndex={-1}
+    >
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         {/* Header bar */}
         <div className="px-4 sm:px-6 py-4 border-b flex items-center justify-between gap-2">
@@ -787,7 +822,7 @@ function TransactionHistoryInner({
                       : "No transactions yet. Process a payroll run to populate the transaction history."}
                 </li>
               ) : (
-                filtered.map((tx) => (
+                paginated.map((tx) => (
                   <li key={tx.id} className="px-4 py-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -904,7 +939,7 @@ function TransactionHistoryInner({
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((tx) => (
+                  paginated.map((tx) => (
                     <tr key={tx.id}>
                       <td className="px-6 py-4 flex items-center">
                         {tx.totalAmount > 0 ? (
@@ -971,15 +1006,50 @@ function TransactionHistoryInner({
               </tbody>
             </table>
 
-            <div className="px-4 sm:px-6 py-3 border-t text-xs text-gray-500">
-              {(() => {
-                const poolSize = MOCK_TRANSACTIONS.filter((t) =>
-                  mode === "archived" ? t.isArchived : !t.isArchived,
-                ).length;
-                return `Showing ${filtered.length} of ${poolSize} ${
-                  mode === "archived" ? "archived payrolls" : "transactions"
-                }`;
-              })()}
+            <div className="px-4 sm:px-6 py-3 border-t text-xs text-gray-500 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <span>
+                {(() => {
+                  const poolSize = MOCK_TRANSACTIONS.filter((t) =>
+                    mode === "archived" ? t.isArchived : !t.isArchived,
+                  ).length;
+                  return `Showing ${filtered.length} of ${poolSize} ${
+                    mode === "archived" ? "archived payrolls" : "transactions"
+                  }`;
+                })()}
+              </span>
+
+              {filtered.length > PAGE_SIZE && (
+                <div
+                  className="flex items-center gap-3"
+                  data-testid="transaction-history-pagination"
+                >
+                  <button
+                    type="button"
+                    disabled={safePage <= 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    Prev
+                  </button>
+                  <span>
+                    Page {safePage} of {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={safePage >= totalPages}
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                    aria-label="Next page"
+                  >
+                    Next
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}
