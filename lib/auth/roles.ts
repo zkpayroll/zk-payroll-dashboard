@@ -11,7 +11,7 @@ export type NavigationAccess = 'enabled' | 'disabled';
 export interface NavigationItem {
   label: string;
   href: string;
-  icon: 'home' | 'users' | 'play' | 'history' | 'archive' | 'shield' | 'building' | 'treasury' | 'settings' | 'file-search' | 'alert' | 'clipboard' | 'upload' | 'calendar' | 'download';
+  icon: 'home' | 'users' | 'play' | 'history' | 'archive' | 'shield' | 'building' | 'treasury' | 'settings' | 'file-search' | 'alert' | 'clipboard' | 'upload' | 'calendar' | 'download' | 'gavel';
   roles: UserRole[];
   access?: Partial<Record<UserRole, NavigationAccess>>;
   disabledReason?: Partial<Record<UserRole, string>>;
@@ -43,6 +43,12 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     href: '/payroll/execute',
     icon: 'play',
     roles: ['admin', 'operator'],
+  },
+  {
+    label: 'Verify Proof',
+    href: '/payroll/verify',
+    icon: 'shield',
+    roles: ['admin', 'operator', 'auditor'],
   },
   {
     label: 'History',
@@ -113,6 +119,7 @@ export const ROUTE_ROLE_RULES: Array<{ prefix: string; roles: UserRole[] }> = [
   { prefix: '/employees', roles: ['admin', 'operator'] },
   { prefix: '/payroll/approvals', roles: ['admin', 'operator'] },
   { prefix: '/payroll/execute', roles: ['admin', 'operator'] },
+  { prefix: '/payroll/verify', roles: ['admin', 'operator', 'auditor'] },
   { prefix: '/payroll/run', roles: ['admin'] },
   { prefix: '/payroll/exceptions', roles: ['admin', 'operator', 'auditor'] },
   { prefix: '/payroll/runs', roles: ['admin', 'operator', 'auditor'] },
@@ -127,7 +134,10 @@ export const ROUTE_ROLE_RULES: Array<{ prefix: string; roles: UserRole[] }> = [
   { prefix: '/history/archived', roles: ['admin', 'operator', 'auditor'] },
   { prefix: '/history', roles: ['admin', 'operator', 'auditor'] },
   { prefix: '/exports', roles: ['admin', 'operator', 'auditor'] },
+  { prefix: '/settings/payroll-policy', roles: ['admin'] },
+  { prefix: '/settings/roles', roles: ['admin'] },
   { prefix: '/settings', roles: ['admin', 'operator', 'auditor'] },
+
   { prefix: '/dashboard', roles: ['admin', 'operator', 'auditor'] },
   { prefix: '/incidents', roles: ['admin', 'operator', 'auditor'] },
   { prefix: '/admin', roles: ['admin'] },

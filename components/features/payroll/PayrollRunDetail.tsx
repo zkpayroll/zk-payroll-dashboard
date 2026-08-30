@@ -23,6 +23,8 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import ProofFreshnessBadge from "@/components/features/proofs/ProofFreshnessBadge";
 import { evaluateProofFreshness } from "@/lib/formatting/proofFreshness";
 import PayrollApprovalAuditTrail from "./PayrollApprovalAuditTrail";
+import { PeriodLabelBadge } from "@/components/features/payroll/PeriodLabelBadge";
+import { formatPeriodLabel } from "@/lib/date/periodLabel";
 import {
   classifyRun,
   formatPayrollDate,
@@ -30,11 +32,16 @@ import {
   RUN_KIND_STYLES,
 } from "@/lib/payroll/scheduleUtils";
 import ReconciliationDiffPanel from "@/components/features/payroll/ReconciliationDiffPanel";
+import BatchRootComparison from "@/components/features/reconciliation/BatchRootComparison";
+import { useReconciliationStore, computeBatchRootStatus } from "@/stores/reconciliation";
+import { PayrollCancellationPanel } from "@/components/features/payroll/PayrollCancellationPanel";
+import { ApprovalExpiryBadge } from "@/components/signing/ApprovalExpiryBadge";
+import { MissingProofWarning, ExpiredProofWarning } from "@/components/features/proofs/MissingProofWarning";
+
 
 
 
 import type { LucideIcon } from "lucide-react";
-
 const STATUS_ICONS: Record<string, LucideIcon> = {
   verified: CheckCircle,
   pending: Clock,
@@ -92,6 +99,31 @@ export default function PayrollRunDetail({ run: propRun, proofReference }: Payro
   const employeesInRun = useMemo(() => {
     if (!run) return [];
     return MOCK_EMPLOYEES.filter((e) => run.employeeIds.includes(e.id));
+  }, [run]);
+
+  // Derive approval expiry input from run approval history/status — must be before early returns to satisfy hooks rules
+  const approvalInput = useMemo(() => {
+    if (!run) return { hasApproval: false as const };
+    const latest = run.approvalHistory?.[run.approvalHistory.length - 1];
+    const hasApproval = Boolean(run.approvalHistory && run.approvalHistory.length > 0) || Boolean(run.approvalStatus);
+    const approvedAt = latest?.approvedAt ?? null;
+    let expiresAt: string | null = null;
+    if (latest?.approvedAt && run.approvalStatus === "approved") {
+      const d = new Date(latest.approvedAt);
+      d.setDate(d.getDate() + 7);
+      expiresAt = d.toISOString();
+    } else if (latest?.approvedAt && (run.approvalStatus as string) === "expired") {
+      const d = new Date(latest.approvedAt);
+      d.setDate(d.getDate() - 1);
+      expiresAt = d.toISOString();
+    }
+    if (!hasApproval) return { hasApproval: false as const };
+    return {
+      approvedAt,
+      expiresAt,
+      approvalStatus: run.approvalStatus ?? null,
+      hasApproval: true as const,
+    };
   }, [run]);
 
   if (isLoading) {
@@ -190,6 +222,17 @@ export default function PayrollRunDetail({ run: propRun, proofReference }: Payro
         </div>
       )}
 
+      {/* Cancellation detail panel — only for cancelled batches */}
+      {run.status === "cancelled" && <PayrollCancellationPanel run={run} />}
+
+      {/* Proof blocker warnings — actionable guidance when payroll cannot proceed */}
+      {kind === "scheduled" && freshness.state === "missing" && (
+        <MissingProofWarning runId={run.id} actionHref="/payroll/execute" />
+      )}
+      {kind === "scheduled" && freshness.state === "expired" && (
+        <ExpiredProofWarning actionHref="/payroll/execute" />
+      )}
+
       <header className="bg-white rounded-lg shadow-sm p-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex items-start gap-3">
@@ -212,11 +255,21 @@ export default function PayrollRunDetail({ run: propRun, proofReference }: Payro
                 >
                   {kindStyles.label}
                 </span>
+                <PeriodLabelBadge period={run} size="xs" variant="badge" />
                 <StatusBadge status={run.status} />
               </div>
             </div>
           </div>
-          {kind === "scheduled" && !lockState && !freshness.blocksExecution && (
+          {kind === "scheduled" && freshness.state === "missing" && (
+            <span
+              data-testid="execution-blocked-missing-proof"
+              role="alert"
+              className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-amber-100 text-amber-800 border border-amber-200 text-sm font-medium cursor-not-allowed shrink-0"
+            >
+              Execution blocked — proof missing
+            </span>
+          )}
+          {kind === "scheduled" && !freshness.blocksExecution && freshness.state !== "missing" && freshness.state !== "expired" && !lockState && (
             <Link
               href="/payroll/execute"
               className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors shrink-0"
@@ -224,7 +277,7 @@ export default function PayrollRunDetail({ run: propRun, proofReference }: Payro
               Process payroll
             </Link>
           )}
-          {kind === "scheduled" && !lockState && freshness.blocksExecution && (
+          {kind === "scheduled" && freshness.blocksExecution && (
             <span
               data-testid="execution-blocked-by-proof"
               role="alert"
@@ -234,12 +287,26 @@ export default function PayrollRunDetail({ run: propRun, proofReference }: Payro
             </span>
           )}
         </div>
+
+        {/* Approval expiry badge — visible before execution */}
+        <div className="mt-4 flex flex-wrap items-center gap-2" aria-label="Approval expiry status">
+          <ApprovalExpiryBadge approval={approvalInput} />
+        </div>
       </header>
 
       {/* Run metadata */}
       <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">
         <h3 className="text-sm font-semibold text-gray-900">Run Metadata</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="border rounded-lg p-4">
+            <div className="flex items-center gap-2 text-gray-500 mb-1">
+              <Calendar className="w-4 h-4" />
+              <span className="text-xs font-medium uppercase">Pay Period</span>
+            </div>
+            <p className="text-sm font-medium text-gray-900">
+              {formatPeriodLabel(run)}
+            </p>
+          </div>
           <div className="border rounded-lg p-4">
             <div className="flex items-center gap-2 text-gray-500 mb-1">
               <Calendar className="w-4 h-4" />
@@ -411,6 +478,14 @@ export default function PayrollRunDetail({ run: propRun, proofReference }: Payro
           {employeesInRun.length} employee{employeesInRun.length !== 1 ? "s" : ""} in this run
         </div>
       </div>
+
+      {/* Batch Root Comparison */}
+      <BatchRootComparison
+        expectedRoot={run.proof ?? null}
+        observedRoot={(run.transactionHash ?? run.txHash) ?? null}
+        eventSource="Soroban Executor Contract"
+        eventReference={(run.transactionHash ?? run.txHash) ?? null}
+      />
 
       {/* Approval Audit Trail */}
       <PayrollApprovalAuditTrail payrollRunId={run.id} compact />

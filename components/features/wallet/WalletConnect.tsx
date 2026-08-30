@@ -11,8 +11,9 @@ import {
   Check,
   AlertTriangle,
 } from "lucide-react";
-import { useStellar, EXPECTED_NETWORK } from "@/components/providers/StellarProvider";
+import { useStellar } from "@/components/providers/StellarProvider";
 import { useWalletStore } from "@/stores/walletStore";
+import { useEnvironmentStore } from "@/stores/environment";
 
 // Truncates a Stellar public key for display: GBXT...J29M
 function truncateKey(key: string): string {
@@ -104,8 +105,9 @@ function WalletConnect() {
 
   // ── Stellar Expert URL ──────────────────────────────────────────────────────
   const network = useWalletStore((s) => s.network);
+  const expectedNetwork = useEnvironmentStore((s) => s.getActiveProfileConfig().stellarNetwork);
   const networkStr = typeof network === "string" ? network.toLowerCase() : "testnet";
-  const isWrongNetwork = isConnected && network !== EXPECTED_NETWORK;
+  const isWrongNetwork = isConnected && network !== expectedNetwork;
   const stellarExpertUrl = publicKey
     ? `https://stellar.expert/explorer/${networkStr}/account/${publicKey}`
     : "#";
@@ -238,7 +240,7 @@ function WalletConnect() {
           ? "Connecting wallet"
           : isConnected && publicKey
             ? isWrongNetwork
-              ? `Wallet connected: ${truncateKey(publicKey)}, but on the wrong network. Switch to ${EXPECTED_NETWORK} to continue.`
+              ? `Wallet connected: ${truncateKey(publicKey)}, but on the wrong network. Switch to ${expectedNetwork} to continue.`
               : `Wallet connected: ${truncateKey(publicKey)}`
             : "Wallet disconnected"}
       </span>

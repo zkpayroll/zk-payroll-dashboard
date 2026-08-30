@@ -1080,6 +1080,48 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Failed S
               >
                 Failed
               </span>
+              <span
+                aria-label="Pay period: January 2024"
+                class="inline-flex items-center gap-1.5 border transition-colors px-1.5 py-0.5 text-[11px] bg-indigo-50 text-indigo-700 border-indigo-200 rounded-md font-medium "
+                data-testid="period-label-badge"
+                role="status"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-calendar w-3 h-3 text-indigo-600 shrink-0"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M8 2v4"
+                  />
+                  <path
+                    d="M16 2v4"
+                  />
+                  <rect
+                    height="18"
+                    rx="2"
+                    width="18"
+                    x="3"
+                    y="4"
+                  />
+                  <path
+                    d="M3 10h18"
+                  />
+                </svg>
+                <span
+                  class="truncate"
+                >
+                  January 2024
+                </span>
+              </span>
               <div
                 aria-label="Status: Failed"
                 class="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-red-100 text-red-800 inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium rounded-full border transition-colors"
@@ -1118,6 +1160,84 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Failed S
           </div>
         </div>
       </div>
+      <div
+        aria-label="Approval expiry status"
+        class="mt-4 flex flex-wrap items-center gap-2"
+      >
+        <div
+          aria-label="Approval status: Approval missing"
+          class="inline-flex max-w-xs flex-col gap-1 rounded-lg border px-2.5 py-1.5 bg-gray-100 text-gray-600 border-gray-200"
+          data-testid="approval-expiry-missing"
+          role="status"
+        >
+          <span
+            class="inline-flex items-center gap-1.5 text-xs font-semibold"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-file-warning h-3.5 w-3.5 shrink-0"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"
+              />
+              <path
+                d="M12 9v4"
+              />
+              <path
+                d="M12 17h.01"
+              />
+            </svg>
+            Approval missing
+          </span>
+          <span
+            class="text-xs font-normal leading-snug"
+          >
+            No executive approval is attached. Request approval before executing.
+          </span>
+          <a
+            class="inline-flex items-center gap-1 text-xs font-medium underline underline-offset-2 hover:no-underline"
+            data-testid="approval-renewal-link"
+            href="/payroll/approvals"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-refresh-cw h-3 w-3"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"
+              />
+              <path
+                d="M21 3v5h-5"
+              />
+              <path
+                d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"
+              />
+              <path
+                d="M8 16H3v5"
+              />
+            </svg>
+            Renew approval
+          </a>
+        </div>
+      </div>
     </header>
     <div
       class="bg-white rounded-lg shadow-sm p-6 space-y-6"
@@ -1128,8 +1248,55 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Failed S
         Run Metadata
       </h3>
       <div
-        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
       >
+        <div
+          class="border rounded-lg p-4"
+        >
+          <div
+            class="flex items-center gap-2 text-gray-500 mb-1"
+          >
+            <svg
+              class="lucide lucide-calendar w-4 h-4"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M8 2v4"
+              />
+              <path
+                d="M16 2v4"
+              />
+              <rect
+                height="18"
+                rx="2"
+                width="18"
+                x="3"
+                y="4"
+              />
+              <path
+                d="M3 10h18"
+              />
+            </svg>
+            <span
+              class="text-xs font-medium uppercase"
+            >
+              Pay Period
+            </span>
+          </div>
+          <p
+            class="text-sm font-medium text-gray-900"
+          >
+            January 2024
+          </p>
+        </div>
         <div
           class="border rounded-lg p-4"
         >
@@ -1466,6 +1633,348 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Failed S
       </div>
     </div>
     <section
+      aria-labelledby="batch-root-comparison-heading"
+      class="bg-white rounded-lg shadow-sm overflow-hidden"
+    >
+      <header
+        class="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b bg-gray-50"
+      >
+        <h2
+          class="flex items-center gap-2 text-sm font-semibold text-gray-900"
+          id="batch-root-comparison-heading"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-check-circle2 w-4 h-4 text-indigo-600"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+            />
+            <path
+              d="m9 12 2 2 4-4"
+            />
+          </svg>
+          Batch Root Comparison
+        </h2>
+        <div
+          aria-label="Status: Mismatch"
+          class="rounded-full border text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-red-500 text-gray-50 hover:bg-red-500/80 flex items-center gap-1.5 px-2.5 py-0.5"
+          role="status"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-xcircle w-3.5 h-3.5"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+            />
+            <path
+              d="m15 9-6 6"
+            />
+            <path
+              d="m9 9 6 6"
+            />
+          </svg>
+          Mismatch
+        </div>
+      </header>
+      <div
+        class="p-4 sm:p-6 space-y-6"
+      >
+        <div
+          class="grid grid-cols-1 lg:grid-cols-2 gap-6"
+        >
+          <div
+            class="space-y-2"
+          >
+            <div
+              class="flex items-center justify-between"
+            >
+              <span
+                class="text-xs font-medium text-gray-600 uppercase tracking-wider"
+              >
+                Expected Root
+              </span>
+              <button
+                aria-label="Copy Expected Root"
+                class="inline-flex items-center justify-center whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs gap-1.5"
+                type="button"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-copy w-3.5 h-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    height="14"
+                    rx="2"
+                    ry="2"
+                    width="14"
+                    x="8"
+                    y="8"
+                  />
+                  <path
+                    d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
+                  />
+                </svg>
+                <span
+                  class="text-xs font-medium"
+                >
+                  Copy
+                </span>
+              </button>
+            </div>
+            <div
+              class="font-mono text-xs text-gray-900 bg-gray-50 p-3 rounded-md break-all border border-gray-200 min-h-[2.5rem]"
+            >
+              proof-hash-1
+            </div>
+          </div>
+          <div
+            class="space-y-2"
+          >
+            <div
+              class="flex items-center justify-between"
+            >
+              <span
+                class="text-xs font-medium text-gray-600 uppercase tracking-wider"
+              >
+                Observed Root
+              </span>
+              <button
+                aria-label="Copy Observed Root"
+                class="inline-flex items-center justify-center whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs gap-1.5"
+                type="button"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-copy w-3.5 h-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    height="14"
+                    rx="2"
+                    ry="2"
+                    width="14"
+                    x="8"
+                    y="8"
+                  />
+                  <path
+                    d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
+                  />
+                </svg>
+                <span
+                  class="text-xs font-medium"
+                >
+                  Copy
+                </span>
+              </button>
+            </div>
+            <div
+              class="font-mono text-xs text-gray-900 bg-gray-50 p-3 rounded-md break-all border border-gray-200 min-h-[2.5rem]"
+            >
+              tx-hash-1
+            </div>
+          </div>
+        </div>
+        <div
+          class="space-y-2 pt-4 border-t border-gray-100"
+        >
+          <span
+            class="text-xs font-medium text-gray-600 uppercase tracking-wider"
+          >
+            Event Source
+          </span>
+          <p
+            class="text-sm text-gray-900 font-medium"
+          >
+            Soroban Executor Contract
+          </p>
+        </div>
+        <div
+          class="space-y-2 pt-4 border-t border-gray-100"
+        >
+          <span
+            class="text-xs font-medium text-gray-600 uppercase tracking-wider"
+          >
+            Event Reference
+          </span>
+          <div
+            class="flex items-center gap-3 flex-wrap"
+          >
+            <span
+              class="font-mono text-xs text-gray-900 bg-gray-50 px-3 py-2 rounded-md break-all border border-gray-200"
+            >
+              tx-hash-1
+            </span>
+            <button
+              aria-label="Copy event reference"
+              class="inline-flex items-center justify-center whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs gap-1.5"
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-copy w-3.5 h-3.5"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <rect
+                  height="14"
+                  rx="2"
+                  ry="2"
+                  width="14"
+                  x="8"
+                  y="8"
+                />
+                <path
+                  d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
+                />
+              </svg>
+              <span
+                class="text-xs font-medium"
+              >
+                Copy
+              </span>
+            </button>
+            <a
+              aria-label="View transaction on Stellar Expert explorer (opens in a new tab)"
+              class="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-md transition-colors"
+              href="https://stellar.expert/explorer/testnet/tx/tx-hash-1"
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-external-link w-3 h-3"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M15 3h6v6"
+                />
+                <path
+                  d="M10 14 21 3"
+                />
+                <path
+                  d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
+                />
+              </svg>
+              View on Explorer
+            </a>
+          </div>
+        </div>
+        <div
+          aria-label="Reconciliation mismatch reason"
+          class="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3"
+          role="alert"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-xcircle w-5 h-5 text-amber-600 mt-0.5 shrink-0"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+            />
+            <path
+              d="m15 9-6 6"
+            />
+            <path
+              d="m9 9 6 6"
+            />
+          </svg>
+          <div>
+            <h4
+              class="text-sm font-semibold text-amber-800"
+            >
+              Mismatch Detected
+            </h4>
+            <p
+              class="text-sm text-amber-700 mt-1"
+            >
+              Root length differs — structural mismatch
+            </p>
+            <p
+              class="text-xs text-amber-600 mt-2"
+            >
+              Individual salary data is never exposed. This comparison operates only on batch-level commitment hashes.
+            </p>
+          </div>
+        </div>
+        <div
+          class="pt-4 border-t border-gray-100"
+        >
+          <p
+            class="text-xs text-gray-500"
+          >
+            Privacy notice: This tool compares only batch-level merkle root hashes. Individual employee salaries, commitments, and personal data are never fetched, stored, or displayed.
+          </p>
+        </div>
+      </div>
+    </section>
+    <section
       aria-label="Operator reconciliation diff"
       class="bg-white rounded-lg shadow-sm overflow-hidden"
       data-testid="reconciliation-diff-panel"
@@ -1683,6 +2192,96 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Pending 
         </p>
       </div>
     </div>
+    <div
+      aria-label="Payroll action blocked — proof missing"
+      class="rounded-lg border border-amber-200 bg-amber-50 p-4 flex items-start gap-3 "
+      data-testid="missing-proof-warning"
+      role="alert"
+    >
+      <svg
+        aria-hidden="true"
+        class="lucide lucide-shield-alert w-5 h-5 text-amber-600 mt-0.5 shrink-0"
+        fill="none"
+        height="24"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+        width="24"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"
+        />
+        <path
+          d="M12 8v4"
+        />
+        <path
+          d="M12 16h.01"
+        />
+      </svg>
+      <div
+        class="flex-1 min-w-0"
+      >
+        <p
+          class="text-sm font-semibold text-amber-800"
+        >
+          Proof required — action blocked
+        </p>
+        <p
+          class="text-sm text-amber-700 mt-1"
+        >
+          This payroll action is blocked because no ZK proof data is attached
+           to run run-1
+          . Generate a fresh payroll proof before trying again. No salary values are shown or logged here.
+        </p>
+        <p
+          class="text-xs text-amber-600 mt-1"
+        >
+          Expected: a valid proof reference (
+          <span
+            class="font-mono"
+          >
+            zkp_ref_YYYYMMDD_NNN
+          </span>
+          ) and a verified proof status. If you just created the batch, run proof generation first.
+        </p>
+        <a
+          class="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 transition-colors"
+          data-testid="missing-proof-action"
+          href="/payroll/execute"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-refresh-cw w-3.5 h-3.5"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"
+            />
+            <path
+              d="M21 3v5h-5"
+            />
+            <path
+              d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"
+            />
+            <path
+              d="M8 16H3v5"
+            />
+          </svg>
+          Generate proof
+        </a>
+      </div>
+    </div>
     <header
       class="bg-white rounded-lg shadow-sm p-6"
     >
@@ -1740,6 +2339,48 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Pending 
               >
                 Scheduled
               </span>
+              <span
+                aria-label="Pay period: January 2024"
+                class="inline-flex items-center gap-1.5 border transition-colors px-1.5 py-0.5 text-[11px] bg-indigo-50 text-indigo-700 border-indigo-200 rounded-md font-medium "
+                data-testid="period-label-badge"
+                role="status"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-calendar w-3 h-3 text-indigo-600 shrink-0"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M8 2v4"
+                  />
+                  <path
+                    d="M16 2v4"
+                  />
+                  <rect
+                    height="18"
+                    rx="2"
+                    width="18"
+                    x="3"
+                    y="4"
+                  />
+                  <path
+                    d="M3 10h18"
+                  />
+                </svg>
+                <span
+                  class="truncate"
+                >
+                  January 2024
+                </span>
+              </span>
               <div
                 aria-label="Status: Pending"
                 class="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-yellow-100 text-yellow-800 inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium rounded-full border transition-colors"
@@ -1774,6 +2415,91 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Pending 
             </div>
           </div>
         </div>
+        <span
+          class="inline-flex items-center justify-center px-4 py-2 rounded-md bg-amber-100 text-amber-800 border border-amber-200 text-sm font-medium cursor-not-allowed shrink-0"
+          data-testid="execution-blocked-missing-proof"
+          role="alert"
+        >
+          Execution blocked — proof missing
+        </span>
+      </div>
+      <div
+        aria-label="Approval expiry status"
+        class="mt-4 flex flex-wrap items-center gap-2"
+      >
+        <div
+          aria-label="Approval status: Approval missing"
+          class="inline-flex max-w-xs flex-col gap-1 rounded-lg border px-2.5 py-1.5 bg-gray-100 text-gray-600 border-gray-200"
+          data-testid="approval-expiry-missing"
+          role="status"
+        >
+          <span
+            class="inline-flex items-center gap-1.5 text-xs font-semibold"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-file-warning h-3.5 w-3.5 shrink-0"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"
+              />
+              <path
+                d="M12 9v4"
+              />
+              <path
+                d="M12 17h.01"
+              />
+            </svg>
+            Approval missing
+          </span>
+          <span
+            class="text-xs font-normal leading-snug"
+          >
+            No executive approval is attached. Request approval before executing.
+          </span>
+          <a
+            class="inline-flex items-center gap-1 text-xs font-medium underline underline-offset-2 hover:no-underline"
+            data-testid="approval-renewal-link"
+            href="/payroll/approvals"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-refresh-cw h-3 w-3"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"
+              />
+              <path
+                d="M21 3v5h-5"
+              />
+              <path
+                d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"
+              />
+              <path
+                d="M8 16H3v5"
+              />
+            </svg>
+            Renew approval
+          </a>
+        </div>
       </div>
     </header>
     <div
@@ -1785,8 +2511,55 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Pending 
         Run Metadata
       </h3>
       <div
-        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
       >
+        <div
+          class="border rounded-lg p-4"
+        >
+          <div
+            class="flex items-center gap-2 text-gray-500 mb-1"
+          >
+            <svg
+              class="lucide lucide-calendar w-4 h-4"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M8 2v4"
+              />
+              <path
+                d="M16 2v4"
+              />
+              <rect
+                height="18"
+                rx="2"
+                width="18"
+                x="3"
+                y="4"
+              />
+              <path
+                d="M3 10h18"
+              />
+            </svg>
+            <span
+              class="text-xs font-medium uppercase"
+            >
+              Pay Period
+            </span>
+          </div>
+          <p
+            class="text-sm font-medium text-gray-900"
+          >
+            January 2024
+          </p>
+        </div>
         <div
           class="border rounded-lg p-4"
         >
@@ -2122,6 +2895,348 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Pending 
          in this run
       </div>
     </div>
+    <section
+      aria-labelledby="batch-root-comparison-heading"
+      class="bg-white rounded-lg shadow-sm overflow-hidden"
+    >
+      <header
+        class="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b bg-gray-50"
+      >
+        <h2
+          class="flex items-center gap-2 text-sm font-semibold text-gray-900"
+          id="batch-root-comparison-heading"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-check-circle2 w-4 h-4 text-indigo-600"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+            />
+            <path
+              d="m9 12 2 2 4-4"
+            />
+          </svg>
+          Batch Root Comparison
+        </h2>
+        <div
+          aria-label="Status: Mismatch"
+          class="rounded-full border text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-red-500 text-gray-50 hover:bg-red-500/80 flex items-center gap-1.5 px-2.5 py-0.5"
+          role="status"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-xcircle w-3.5 h-3.5"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+            />
+            <path
+              d="m15 9-6 6"
+            />
+            <path
+              d="m9 9 6 6"
+            />
+          </svg>
+          Mismatch
+        </div>
+      </header>
+      <div
+        class="p-4 sm:p-6 space-y-6"
+      >
+        <div
+          class="grid grid-cols-1 lg:grid-cols-2 gap-6"
+        >
+          <div
+            class="space-y-2"
+          >
+            <div
+              class="flex items-center justify-between"
+            >
+              <span
+                class="text-xs font-medium text-gray-600 uppercase tracking-wider"
+              >
+                Expected Root
+              </span>
+              <button
+                aria-label="Copy Expected Root"
+                class="inline-flex items-center justify-center whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs gap-1.5"
+                type="button"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-copy w-3.5 h-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    height="14"
+                    rx="2"
+                    ry="2"
+                    width="14"
+                    x="8"
+                    y="8"
+                  />
+                  <path
+                    d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
+                  />
+                </svg>
+                <span
+                  class="text-xs font-medium"
+                >
+                  Copy
+                </span>
+              </button>
+            </div>
+            <div
+              class="font-mono text-xs text-gray-900 bg-gray-50 p-3 rounded-md break-all border border-gray-200 min-h-[2.5rem]"
+            >
+              proof-hash-1
+            </div>
+          </div>
+          <div
+            class="space-y-2"
+          >
+            <div
+              class="flex items-center justify-between"
+            >
+              <span
+                class="text-xs font-medium text-gray-600 uppercase tracking-wider"
+              >
+                Observed Root
+              </span>
+              <button
+                aria-label="Copy Observed Root"
+                class="inline-flex items-center justify-center whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs gap-1.5"
+                type="button"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-copy w-3.5 h-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    height="14"
+                    rx="2"
+                    ry="2"
+                    width="14"
+                    x="8"
+                    y="8"
+                  />
+                  <path
+                    d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
+                  />
+                </svg>
+                <span
+                  class="text-xs font-medium"
+                >
+                  Copy
+                </span>
+              </button>
+            </div>
+            <div
+              class="font-mono text-xs text-gray-900 bg-gray-50 p-3 rounded-md break-all border border-gray-200 min-h-[2.5rem]"
+            >
+              tx-hash-1
+            </div>
+          </div>
+        </div>
+        <div
+          class="space-y-2 pt-4 border-t border-gray-100"
+        >
+          <span
+            class="text-xs font-medium text-gray-600 uppercase tracking-wider"
+          >
+            Event Source
+          </span>
+          <p
+            class="text-sm text-gray-900 font-medium"
+          >
+            Soroban Executor Contract
+          </p>
+        </div>
+        <div
+          class="space-y-2 pt-4 border-t border-gray-100"
+        >
+          <span
+            class="text-xs font-medium text-gray-600 uppercase tracking-wider"
+          >
+            Event Reference
+          </span>
+          <div
+            class="flex items-center gap-3 flex-wrap"
+          >
+            <span
+              class="font-mono text-xs text-gray-900 bg-gray-50 px-3 py-2 rounded-md break-all border border-gray-200"
+            >
+              tx-hash-1
+            </span>
+            <button
+              aria-label="Copy event reference"
+              class="inline-flex items-center justify-center whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs gap-1.5"
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-copy w-3.5 h-3.5"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <rect
+                  height="14"
+                  rx="2"
+                  ry="2"
+                  width="14"
+                  x="8"
+                  y="8"
+                />
+                <path
+                  d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
+                />
+              </svg>
+              <span
+                class="text-xs font-medium"
+              >
+                Copy
+              </span>
+            </button>
+            <a
+              aria-label="View transaction on Stellar Expert explorer (opens in a new tab)"
+              class="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-md transition-colors"
+              href="https://stellar.expert/explorer/testnet/tx/tx-hash-1"
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-external-link w-3 h-3"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M15 3h6v6"
+                />
+                <path
+                  d="M10 14 21 3"
+                />
+                <path
+                  d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
+                />
+              </svg>
+              View on Explorer
+            </a>
+          </div>
+        </div>
+        <div
+          aria-label="Reconciliation mismatch reason"
+          class="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3"
+          role="alert"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-xcircle w-5 h-5 text-amber-600 mt-0.5 shrink-0"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+            />
+            <path
+              d="m15 9-6 6"
+            />
+            <path
+              d="m9 9 6 6"
+            />
+          </svg>
+          <div>
+            <h4
+              class="text-sm font-semibold text-amber-800"
+            >
+              Mismatch Detected
+            </h4>
+            <p
+              class="text-sm text-amber-700 mt-1"
+            >
+              Root length differs — structural mismatch
+            </p>
+            <p
+              class="text-xs text-amber-600 mt-2"
+            >
+              Individual salary data is never exposed. This comparison operates only on batch-level commitment hashes.
+            </p>
+          </div>
+        </div>
+        <div
+          class="pt-4 border-t border-gray-100"
+        >
+          <p
+            class="text-xs text-gray-500"
+          >
+            Privacy notice: This tool compares only batch-level merkle root hashes. Individual employee salaries, commitments, and personal data are never fetched, stored, or displayed.
+          </p>
+        </div>
+      </div>
+    </section>
     <section
       aria-label="Operator reconciliation diff"
       class="bg-white rounded-lg shadow-sm overflow-hidden"
@@ -2395,6 +3510,48 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Verified
               >
                 Completed
               </span>
+              <span
+                aria-label="Pay period: January 2024"
+                class="inline-flex items-center gap-1.5 border transition-colors px-1.5 py-0.5 text-[11px] bg-indigo-50 text-indigo-700 border-indigo-200 rounded-md font-medium "
+                data-testid="period-label-badge"
+                role="status"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-calendar w-3 h-3 text-indigo-600 shrink-0"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M8 2v4"
+                  />
+                  <path
+                    d="M16 2v4"
+                  />
+                  <rect
+                    height="18"
+                    rx="2"
+                    width="18"
+                    x="3"
+                    y="4"
+                  />
+                  <path
+                    d="M3 10h18"
+                  />
+                </svg>
+                <span
+                  class="truncate"
+                >
+                  January 2024
+                </span>
+              </span>
               <div
                 aria-label="Status: Verified"
                 class="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-green-100 text-green-800 inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium rounded-full border transition-colors"
@@ -2430,6 +3587,84 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Verified
           </div>
         </div>
       </div>
+      <div
+        aria-label="Approval expiry status"
+        class="mt-4 flex flex-wrap items-center gap-2"
+      >
+        <div
+          aria-label="Approval status: Approval missing"
+          class="inline-flex max-w-xs flex-col gap-1 rounded-lg border px-2.5 py-1.5 bg-gray-100 text-gray-600 border-gray-200"
+          data-testid="approval-expiry-missing"
+          role="status"
+        >
+          <span
+            class="inline-flex items-center gap-1.5 text-xs font-semibold"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-file-warning h-3.5 w-3.5 shrink-0"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"
+              />
+              <path
+                d="M12 9v4"
+              />
+              <path
+                d="M12 17h.01"
+              />
+            </svg>
+            Approval missing
+          </span>
+          <span
+            class="text-xs font-normal leading-snug"
+          >
+            No executive approval is attached. Request approval before executing.
+          </span>
+          <a
+            class="inline-flex items-center gap-1 text-xs font-medium underline underline-offset-2 hover:no-underline"
+            data-testid="approval-renewal-link"
+            href="/payroll/approvals"
+          >
+            <svg
+              aria-hidden="true"
+              class="lucide lucide-refresh-cw h-3 w-3"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"
+              />
+              <path
+                d="M21 3v5h-5"
+              />
+              <path
+                d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"
+              />
+              <path
+                d="M8 16H3v5"
+              />
+            </svg>
+            Renew approval
+          </a>
+        </div>
+      </div>
     </header>
     <div
       class="bg-white rounded-lg shadow-sm p-6 space-y-6"
@@ -2440,8 +3675,55 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Verified
         Run Metadata
       </h3>
       <div
-        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
       >
+        <div
+          class="border rounded-lg p-4"
+        >
+          <div
+            class="flex items-center gap-2 text-gray-500 mb-1"
+          >
+            <svg
+              class="lucide lucide-calendar w-4 h-4"
+              fill="none"
+              height="24"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+              width="24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M8 2v4"
+              />
+              <path
+                d="M16 2v4"
+              />
+              <rect
+                height="18"
+                rx="2"
+                width="18"
+                x="3"
+                y="4"
+              />
+              <path
+                d="M3 10h18"
+              />
+            </svg>
+            <span
+              class="text-xs font-medium uppercase"
+            >
+              Pay Period
+            </span>
+          </div>
+          <p
+            class="text-sm font-medium text-gray-900"
+          >
+            January 2024
+          </p>
+        </div>
         <div
           class="border rounded-lg p-4"
         >
@@ -2777,6 +4059,348 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Verified
          in this run
       </div>
     </div>
+    <section
+      aria-labelledby="batch-root-comparison-heading"
+      class="bg-white rounded-lg shadow-sm overflow-hidden"
+    >
+      <header
+        class="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b bg-gray-50"
+      >
+        <h2
+          class="flex items-center gap-2 text-sm font-semibold text-gray-900"
+          id="batch-root-comparison-heading"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-check-circle2 w-4 h-4 text-indigo-600"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+            />
+            <path
+              d="m9 12 2 2 4-4"
+            />
+          </svg>
+          Batch Root Comparison
+        </h2>
+        <div
+          aria-label="Status: Mismatch"
+          class="rounded-full border text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-red-500 text-gray-50 hover:bg-red-500/80 flex items-center gap-1.5 px-2.5 py-0.5"
+          role="status"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-xcircle w-3.5 h-3.5"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+            />
+            <path
+              d="m15 9-6 6"
+            />
+            <path
+              d="m9 9 6 6"
+            />
+          </svg>
+          Mismatch
+        </div>
+      </header>
+      <div
+        class="p-4 sm:p-6 space-y-6"
+      >
+        <div
+          class="grid grid-cols-1 lg:grid-cols-2 gap-6"
+        >
+          <div
+            class="space-y-2"
+          >
+            <div
+              class="flex items-center justify-between"
+            >
+              <span
+                class="text-xs font-medium text-gray-600 uppercase tracking-wider"
+              >
+                Expected Root
+              </span>
+              <button
+                aria-label="Copy Expected Root"
+                class="inline-flex items-center justify-center whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs gap-1.5"
+                type="button"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-copy w-3.5 h-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    height="14"
+                    rx="2"
+                    ry="2"
+                    width="14"
+                    x="8"
+                    y="8"
+                  />
+                  <path
+                    d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
+                  />
+                </svg>
+                <span
+                  class="text-xs font-medium"
+                >
+                  Copy
+                </span>
+              </button>
+            </div>
+            <div
+              class="font-mono text-xs text-gray-900 bg-gray-50 p-3 rounded-md break-all border border-gray-200 min-h-[2.5rem]"
+            >
+              proof-hash-1
+            </div>
+          </div>
+          <div
+            class="space-y-2"
+          >
+            <div
+              class="flex items-center justify-between"
+            >
+              <span
+                class="text-xs font-medium text-gray-600 uppercase tracking-wider"
+              >
+                Observed Root
+              </span>
+              <button
+                aria-label="Copy Observed Root"
+                class="inline-flex items-center justify-center whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs gap-1.5"
+                type="button"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="lucide lucide-copy w-3.5 h-3.5"
+                  fill="none"
+                  height="24"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  width="24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    height="14"
+                    rx="2"
+                    ry="2"
+                    width="14"
+                    x="8"
+                    y="8"
+                  />
+                  <path
+                    d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
+                  />
+                </svg>
+                <span
+                  class="text-xs font-medium"
+                >
+                  Copy
+                </span>
+              </button>
+            </div>
+            <div
+              class="font-mono text-xs text-gray-900 bg-gray-50 p-3 rounded-md break-all border border-gray-200 min-h-[2.5rem]"
+            >
+              tx-hash-1
+            </div>
+          </div>
+        </div>
+        <div
+          class="space-y-2 pt-4 border-t border-gray-100"
+        >
+          <span
+            class="text-xs font-medium text-gray-600 uppercase tracking-wider"
+          >
+            Event Source
+          </span>
+          <p
+            class="text-sm text-gray-900 font-medium"
+          >
+            Soroban Executor Contract
+          </p>
+        </div>
+        <div
+          class="space-y-2 pt-4 border-t border-gray-100"
+        >
+          <span
+            class="text-xs font-medium text-gray-600 uppercase tracking-wider"
+          >
+            Event Reference
+          </span>
+          <div
+            class="flex items-center gap-3 flex-wrap"
+          >
+            <span
+              class="font-mono text-xs text-gray-900 bg-gray-50 px-3 py-2 rounded-md break-all border border-gray-200"
+            >
+              tx-hash-1
+            </span>
+            <button
+              aria-label="Copy event reference"
+              class="inline-flex items-center justify-center whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs gap-1.5"
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-copy w-3.5 h-3.5"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <rect
+                  height="14"
+                  rx="2"
+                  ry="2"
+                  width="14"
+                  x="8"
+                  y="8"
+                />
+                <path
+                  d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
+                />
+              </svg>
+              <span
+                class="text-xs font-medium"
+              >
+                Copy
+              </span>
+            </button>
+            <a
+              aria-label="View transaction on Stellar Expert explorer (opens in a new tab)"
+              class="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-md transition-colors"
+              href="https://stellar.expert/explorer/testnet/tx/tx-hash-1"
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              <svg
+                aria-hidden="true"
+                class="lucide lucide-external-link w-3 h-3"
+                fill="none"
+                height="24"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                width="24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M15 3h6v6"
+                />
+                <path
+                  d="M10 14 21 3"
+                />
+                <path
+                  d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
+                />
+              </svg>
+              View on Explorer
+            </a>
+          </div>
+        </div>
+        <div
+          aria-label="Reconciliation mismatch reason"
+          class="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3"
+          role="alert"
+        >
+          <svg
+            aria-hidden="true"
+            class="lucide lucide-xcircle w-5 h-5 text-amber-600 mt-0.5 shrink-0"
+            fill="none"
+            height="24"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+            />
+            <path
+              d="m15 9-6 6"
+            />
+            <path
+              d="m9 9 6 6"
+            />
+          </svg>
+          <div>
+            <h4
+              class="text-sm font-semibold text-amber-800"
+            >
+              Mismatch Detected
+            </h4>
+            <p
+              class="text-sm text-amber-700 mt-1"
+            >
+              Root length differs — structural mismatch
+            </p>
+            <p
+              class="text-xs text-amber-600 mt-2"
+            >
+              Individual salary data is never exposed. This comparison operates only on batch-level commitment hashes.
+            </p>
+          </div>
+        </div>
+        <div
+          class="pt-4 border-t border-gray-100"
+        >
+          <p
+            class="text-xs text-gray-500"
+          >
+            Privacy notice: This tool compares only batch-level merkle root hashes. Individual employee salaries, commitments, and personal data are never fetched, stored, or displayed.
+          </p>
+        </div>
+      </div>
+    </section>
     <section
       aria-label="Operator reconciliation diff"
       class="bg-white rounded-lg shadow-sm overflow-hidden"

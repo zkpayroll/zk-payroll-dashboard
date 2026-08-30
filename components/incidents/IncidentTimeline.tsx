@@ -37,6 +37,7 @@ const STAGE_NAMES: Record<PayrollStage, string> = {
   failure: "Run Failure",
   retry: "Transaction Retry",
   reconciliation: "Reconciliation",
+  employer_onboarding: "Employer Onboarding",
 };
 
 export function IncidentTimeline({

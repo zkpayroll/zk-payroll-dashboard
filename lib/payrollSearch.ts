@@ -12,12 +12,11 @@ import type { PayrollTransaction } from "@/types/models";
  * a value the table never displays produces results the user cannot explain.
  */
 
-/** Period label derived from a run's timestamp, e.g. "March 2026". */
+import { formatPeriodLabel } from "@/lib/date/periodLabel";
+
+/** Period label derived from a run's timestamp or period field, e.g. "March 2026". */
 export function formatRunPeriod(tx: Pick<PayrollTransaction, "createdAt" | "timestamp">): string {
-  const raw = tx.createdAt || tx.timestamp;
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  return formatPeriodLabel(tx, { fallback: "" });
 }
 
 /**

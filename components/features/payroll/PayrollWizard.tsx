@@ -23,11 +23,12 @@ import {
   History,
 } from "lucide-react";
 import { toast } from "sonner";
+import type { Employee } from "@/types/models";
+import DuplicateWarningPanel from "@/components/employees/DuplicateWarningPanel";
 import { usePayrollWizardStore } from "@/stores/payrollWizard";
 import { useWalletStore } from "@/stores/walletStore";
 import { useApprovalHistory } from "@/stores/approvalHistory";
 import { useSession } from "@/hooks/useSession";
-import { EXPECTED_NETWORK } from "@/components/providers/StellarProvider";
 import { IncidentBanner } from "@/components/ui/IncidentBanner";
 import { MOCK_COMPANIES, MOCK_EMPLOYEES, MOCK_PAYROLL_RUNS, MOCK_TREASURY_BALANCE } from "@/lib/api/mockData";
 import PayrollReceipt from "./PayrollReceipt";
@@ -36,6 +37,9 @@ import { usePayrollAuditTrailStore } from "@/stores/payrollAuditTrail";
 import ApprovalHistoryDrawer from "./ApprovalHistoryDrawer";
 import { PayrollRiskWarnings } from "./PayrollRiskWarnings";
 import { WalletReconnectRecoveryBanner } from "@/components/features/wallet/WalletReconnectRecoveryBanner";
+import { useEnvironmentStore } from "@/stores/environment";
+import { ContractErrorHelpButton } from "@/components/features/errors/ContractErrorDrawer";
+import { MissingProofWarning } from "@/components/features/proofs/MissingProofWarning";
 import type { PayrollRun, PayrollWizardStep } from "@/types";
 import { trackEvent, mapErrorToType, bucketEmployeeCount } from "@/lib/telemetry";
 
@@ -106,7 +110,8 @@ function PayrollWizard() {
 
   const { sessionState } = useSession();
   const network = useWalletStore((s) => s.network);
-  const isWrongNetwork = network !== EXPECTED_NETWORK;
+  const expectedNetwork = useEnvironmentStore((s) => s.getActiveProfileConfig().stellarNetwork);
+  const isWrongNetwork = network !== expectedNetwork;
   const isSessionExpired = sessionState === "expired";
 
   const selectedEmployees = useMemo(
@@ -150,7 +155,7 @@ function PayrollWizard() {
   const handleGenerateProof = useCallback(async () => {
     if (isWrongNetwork) {
       toast.error("Wrong network", {
-        description: `Switch your wallet to ${EXPECTED_NETWORK} to continue.`,
+        description: `Switch your wallet to ${expectedNetwork} to continue.`,
       });
       return;
     }
@@ -213,12 +218,12 @@ function PayrollWizard() {
         description: "Circuit constraint mismatch.",
       });
     }
-  }, [setProofStatus, setProofError, nextStep, isWrongNetwork, addApprovalEvent, walletPublicKey, payrollRunId, logEvent, selectedEmployees.length, totalAmount]);
+  }, [setProofStatus, setProofError, nextStep, isWrongNetwork, expectedNetwork, addApprovalEvent, walletPublicKey, payrollRunId, logEvent, selectedEmployees.length, totalAmount]);
 
   const handleSubmit = useCallback(async () => {
     if (isWrongNetwork) {
       toast.error("Wrong network", {
-        description: `Switch your wallet to ${EXPECTED_NETWORK} to continue.`,
+        description: `Switch your wallet to ${expectedNetwork} to continue.`,
       });
       return;
     }
@@ -303,7 +308,7 @@ function PayrollWizard() {
           "Network timeout. The transaction may still be processing.",
       });
     }
-  }, [setSubmissionStatus, setSubmissionError, setTransactionHash, nextStep, isWrongNetwork, addApprovalEvent, walletPublicKey, employeeIds, totalAmount, payrollRunId, logEvent, selectedEmployees.length]);
+  }, [setSubmissionStatus, setSubmissionError, setTransactionHash, nextStep, isWrongNetwork, expectedNetwork, addApprovalEvent, walletPublicKey, employeeIds, totalAmount, payrollRunId, logEvent, selectedEmployees.length]);
 
   const handleReviewNext = useCallback(() => {
     if (payrollRunId) {
@@ -353,7 +358,7 @@ function PayrollWizard() {
       {isWrongNetwork && (
         <IncidentBanner
           variant="warning"
-          message={`Wallet network mismatch: your wallet is connected to ${network}, but this app requires ${EXPECTED_NETWORK}. Switch networks in your wallet to resume payroll actions.`}
+          message={`Wallet network mismatch: your wallet is connected to ${network}, but this app requires ${expectedNetwork}. Switch networks in your wallet to resume payroll actions.`}
         />
       )}
 
@@ -518,6 +523,7 @@ function PayrollWizard() {
             onRetry={handleSubmit}
             onReset={handleReset}
             isWrongNetwork={isWrongNetwork}
+            expectedNetwork={expectedNetwork}
           />
         )}
       </div>
@@ -545,7 +551,7 @@ function ReviewStep({
   isWrongNetwork,
 }: {
   employeeIds: string[];
-  selectedEmployees: { id: string; name: string; salary: number }[];
+  selectedEmployees: Employee[];
   totalAmount: number;
   onStart: () => void;
   onNext: () => void;
@@ -577,6 +583,7 @@ function ReviewStep({
         Review the employees and amounts included in this payroll run before
         generating the ZK proof.
       </p>
+      <DuplicateWarningPanel employees={selectedEmployees} />
       <div className="border rounded-lg divide-y">
         {selectedEmployees.map((emp) => (
           <div key={emp.id} className="px-4 py-3 flex justify-between">
@@ -665,14 +672,17 @@ function ProofStep({
         <div className="text-center py-6 space-y-3">
           <AlertCircle className="w-8 h-8 text-red-500 mx-auto" />
           <p className="text-sm text-red-700">{error}</p>
-          <button
-            type="button"
-            onClick={onRetry}
-            className="w-full sm:w-auto px-4 py-2 rounded-md bg-red-50 text-red-700 text-sm font-medium hover:bg-red-100 border border-red-200 transition-colors inline-flex justify-center items-center gap-1"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Retry
-          </button>
+          <div className="flex flex-col sm:flex-row justify-center gap-3">
+            <button
+              type="button"
+              onClick={onRetry}
+              className="w-full sm:w-auto px-4 py-2 rounded-md bg-red-50 text-red-700 text-sm font-medium hover:bg-red-100 border border-red-200 transition-colors inline-flex justify-center items-center gap-1"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Retry
+            </button>
+            <ContractErrorHelpButton error={error} />
+          </div>
         </div>
       )}
 
@@ -927,6 +937,10 @@ function ConfirmStep({
             </ul>
           </div>
         </div>
+      )}
+
+      {store.proofStatus !== "success" && (
+        <MissingProofWarning actionHref="/payroll/execute" actionLabel="Generate proof" />
       )}
 
       {/* Operational Risk Warnings */}
@@ -1246,6 +1260,7 @@ function SubmitStep({
   onRetry,
   onReset,
   isWrongNetwork,
+  expectedNetwork,
 }: {
   status: "idle" | "submitting" | "success" | "error";
   error: string | null;
@@ -1255,6 +1270,7 @@ function SubmitStep({
   onRetry: () => void;
   onReset: () => void;
   isWrongNetwork: boolean;
+  expectedNetwork: string;
 }) {
   return (
     <div className="space-y-4">
@@ -1292,7 +1308,7 @@ function SubmitStep({
               disabled={isWrongNetwork}
               title={
                 isWrongNetwork
-                  ? `Switch to ${EXPECTED_NETWORK} in your wallet`
+                  ? `Switch to ${expectedNetwork} in your wallet`
                   : undefined
               }
               className="px-4 py-2 rounded-md bg-red-50 text-red-700 text-sm font-medium hover:bg-red-100 border border-red-200 transition-colors inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1307,6 +1323,7 @@ function SubmitStep({
             >
               Start Over
             </button>
+            <ContractErrorHelpButton error={error} />
           </div>
         </div>
       )}

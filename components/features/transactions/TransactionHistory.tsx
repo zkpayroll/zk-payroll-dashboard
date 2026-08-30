@@ -9,6 +9,7 @@ import {
   Suspense,
 } from "react";
 import { searchPayrollRuns } from "@/lib/payrollSearch";
+import { formatPeriodLabel } from "@/lib/date/periodLabel";
 import {
   ArrowUpRight,
   ArrowDownLeft,
@@ -813,7 +814,7 @@ function TransactionHistoryInner({
                           )}
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
-                          ${tx.totalAmount.toLocaleString()} ·{" "}
+                          <span className="font-medium text-gray-700">{formatPeriodLabel(tx)}</span> · ${tx.totalAmount.toLocaleString()} ·{" "}
                           {new Date(tx.createdAt).toLocaleDateString()}
                         </p>
                       </div>
@@ -939,7 +940,8 @@ function TransactionHistoryInner({
                         )}
                       </td>
                       <td className="px-6 py-4 text-gray-600">
-                        {new Date(tx.createdAt).toLocaleDateString()}
+                        <div className="font-medium text-gray-900">{formatPeriodLabel(tx)}</div>
+                        <div className="text-xs text-gray-500">{new Date(tx.createdAt).toLocaleDateString()}</div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">

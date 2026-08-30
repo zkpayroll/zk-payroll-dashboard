@@ -16,6 +16,7 @@ const STAGE_LABELS: Record<PayrollStage, string> = {
   failure: "Run Failure",
   retry: "Transaction Retry",
   reconciliation: "Payroll Reconciliation",
+  employer_onboarding: "Employer Onboarding",
 };
 
 /**
@@ -53,6 +54,12 @@ function formatStageSummary(event: PayrollEvent): string {
       return `${stageName}: Attempting retry #${event.payload.retryCount || 1}`;
     case "reconciliation":
       return `${stageName}: Settlement audit completed (${event.status})`;
+    case "employer_onboarding":
+      return event.status === "failed"
+        ? `${stageName}: Onboarding step failed - ${event.payload.errorLabel || event.payload.errorCategory || "Onboarding Error"}`
+        : event.status === "succeeded"
+        ? `${stageName}: Employer onboarding completed (${event.payload.employerName ? String(event.payload.employerName) : "setup verified"})`
+        : `${stageName}: Employer onboarding ${event.status} (${event.payload.stepLabel || "configuration"})`;
     default:
       return `${stageName} [${statusStr}]`;
   }
