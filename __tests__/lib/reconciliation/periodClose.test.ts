@@ -19,10 +19,20 @@ function makeLock(overrides: Partial<PayrollLock> = {}): PayrollLock {
 function makeDispute(overrides: Partial<PayrollDispute> = {}): PayrollDispute {
   return {
     id: "dsp_x",
+    payrollPeriod: "2025-01",
+    payrollBatch: "batch_x",
     payrollRunId: "tx_x",
     raisedBy: "emp_x",
     reason: "Disputed amount",
     isResolved: false,
+    status: "active",
+    resolutionDeadline: "2025-01-31T23:59:59Z",
+    safeReasonCode: "employee_data_changed",
+    safeReasonDescription: "Disputed amount",
+    blockedActions: ["execution"],
+    requiredReviewer: "admin",
+    resolutionAction: "Review",
+    createdAt: "2025-01-01T00:00:00Z",
     ...overrides,
   };
 }

@@ -42,7 +42,7 @@ export function buildPeriodCloseChecklist(inputs: PeriodCloseInputs): PeriodClos
       category: "disputes",
       label: "Disputes",
       isSatisfied: openDisputes.length === 0,
-      blockers: openDisputes.map((d) => ({ category: "disputes", description: d.reason })),
+      blockers: openDisputes.map((d) => ({ category: "disputes", description: d.reason || d.safeReasonDescription || d.id })),
     },
     {
       category: "funding_reservations",
