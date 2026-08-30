@@ -22,6 +22,7 @@ describe('role-aware navigation and route rules', () => {
       'Archived Payrolls',
       'Exports',
       'Compliance',
+      'Attestations',
       'Settings',
     ]);
   });
