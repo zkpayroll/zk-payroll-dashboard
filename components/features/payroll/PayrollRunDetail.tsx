@@ -49,6 +49,22 @@ const STATUS_ICONS: Record<string, LucideIcon> = {
   cancelled: XCircle,
 };
 
+const LAST_UPDATED_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+function getPayrollLastUpdated(run: PayrollRun): Date | null {
+  const withTimestamps = run as PayrollRun & { updatedAt?: string; createdAt?: string };
+  const value = withTimestamps.updatedAt ?? withTimestamps.createdAt ?? run.executedAt;
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export function findPayrollRun(id: string, runs = MOCK_PAYROLL_RUNS): PayrollRun | undefined {
   return runs.find((run) => run.id === id);
 }
@@ -183,6 +199,7 @@ export default function PayrollRunDetail({ run: propRun, proofReference }: Payro
   const txHash = run.transactionHash ?? run.txHash;
   const lockState = getPayrollLockState(run);
   const freshness = evaluateProofFreshness({ reference: proofReference });
+  const lastUpdated = getPayrollLastUpdated(run);
 
   return (
     <section aria-labelledby="payroll-run-detail-heading" className="space-y-6">
@@ -249,6 +266,9 @@ export default function PayrollRunDetail({ run: propRun, proofReference }: Payro
                 Payroll run · {formatPayrollDate(runDate)}
               </h1>
               <p className="text-sm text-gray-500 mt-0.5">Run ID: {run.id}</p>
+              <p data-testid="payroll-last-updated" className="text-xs text-gray-400 mt-0.5">
+                Last updated {lastUpdated ? LAST_UPDATED_FORMATTER.format(lastUpdated) : "Unavailable"}
+              </p>
               <div className="flex items-center gap-2 mt-2">
                 <span
                   className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${kindStyles.badge}`}
