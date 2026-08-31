@@ -1,4 +1,4 @@
-import { Employee, Company, CompanyConfig, PayrollTransaction, PayrollRun, ViewKey, FundingForecast, AuditAccessRequest, MultiAssetPayrollRun, ComplianceEvidenceBundle, PayrollLock, PayrollTemplate, OverduePayrollAlert, ApprovalComment, ProofReference, ComplianceEvidencePointer, ApproverThresholdPolicy, PayrollDispute, FundingReservation } from "@/types/models";
+import { Employee, Company, CompanyConfig, PayrollTransaction, PayrollRun, ViewKey, FundingForecast, AuditAccessRequest, MultiAssetPayrollRun, ComplianceEvidenceBundle, PayrollLock, PayrollTemplate, OverduePayrollAlert, ApprovalComment, ProofReference, ComplianceEvidencePointer, ApproverThresholdPolicy, PayrollRunDispute, FundingReservation } from "@/types/models";
 
 export const MOCK_EMPLOYEES: Employee[] = [
   {
@@ -927,7 +927,7 @@ export const MOCK_APPROVER_THRESHOLD_POLICY: ApproverThresholdPolicy = {
 /** Batches already locked to the current policy version — see PayrollLock/PayrollRun ids. */
 export const MOCK_BATCHES_ON_CURRENT_POLICY: string[] = ["tx_001", "tx_002"];
 
-export const MOCK_PAYROLL_DISPUTES: PayrollDispute[] = [
+export const MOCK_PAYROLL_DISPUTES: PayrollRunDispute[] = [
   {
     id: "dsp_001",
     payrollRunId: "tx_002",

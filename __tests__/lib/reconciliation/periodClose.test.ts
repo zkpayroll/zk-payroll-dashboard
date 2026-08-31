@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildPeriodCloseChecklist } from "@/lib/reconciliation/periodClose";
-import type { PayrollLock, PayrollDispute, FundingReservation } from "@/types/models";
+import type { PayrollLock, PayrollRunDispute, FundingReservation } from "@/types/models";
 
 function makeLock(overrides: Partial<PayrollLock> = {}): PayrollLock {
   return {
@@ -16,7 +16,7 @@ function makeLock(overrides: Partial<PayrollLock> = {}): PayrollLock {
   };
 }
 
-function makeDispute(overrides: Partial<PayrollDispute> = {}): PayrollDispute {
+function makeDispute(overrides: Partial<PayrollRunDispute> = {}): PayrollRunDispute {
   return {
     id: "dsp_x",
     payrollRunId: "tx_x",

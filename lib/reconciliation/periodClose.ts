@@ -1,6 +1,6 @@
 import type {
   PayrollLock,
-  PayrollDispute,
+  PayrollRunDispute,
   FundingReservation,
   PeriodCloseChecklist,
   PeriodCloseChecklistItem,
@@ -9,7 +9,7 @@ import type {
 export interface PeriodCloseInputs {
   payrollRunId: string;
   locks: PayrollLock[];
-  disputes: PayrollDispute[];
+  disputes: PayrollRunDispute[];
   reservations: FundingReservation[];
   /** payrollRunIds that have a generated + exported audit-ready timeline. */
   exportedAuditTimelineRunIds: string[];

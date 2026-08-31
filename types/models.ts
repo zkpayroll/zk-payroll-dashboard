@@ -672,6 +672,7 @@ export interface WalletRotationWarning {
   type: "cooldown_active" | "payroll_blocker" | "pending_approval";
   message: string;
   severity: "info" | "warning" | "critical";
+}
 // ─── Compliance Evidence Pointer Manager (#338) ──────────────────────────────
 
 export type EvidencePointerType = "url" | "ipfs" | "document-hash" | "case-reference";
@@ -751,7 +752,7 @@ export interface ApproverThresholdRotationRequest {
 
 // ─── Period Close Reconciliation Dashboard (#341) ────────────────────────────
 
-export interface PayrollDispute {
+export interface PayrollRunDispute {
   id: string;
   payrollRunId: string;
   raisedBy: string;
