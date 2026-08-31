@@ -23,7 +23,8 @@ import {
   ClipboardList,
   Upload,
   FileDown,
-  Gavel
+  Gavel,
+  Scale
 } from "lucide-react";
 import { getNavigationForRole, ROLE_LABELS } from "@/lib/auth/roles";
 import type { NavigationItem } from "@/lib/auth/roles";
@@ -81,6 +82,7 @@ const NAV_LINKS = [
   { href: "/history/archived", icon: Archive, label: "Archived Payrolls" },
   { href: "/exports", icon: FileDown, label: "Exports" },
   { href: "/treasury", icon: Landmark, label: "Treasury" },
+  { href: "/reconciliation", icon: Scale, label: "Reconciliation" },
   { href: "/compliance", icon: Shield, label: "Compliance" },
   { href: "/setup", icon: Building2, label: "Company Setup" },
   { href: "/incidents", icon: AlertTriangle, label: "Incidents" },
