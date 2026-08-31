@@ -22,6 +22,8 @@ interface PeriodSummaryCardProps {
   periodHref?: string;
   /** Skips the built-in loading delay — pass real async data straight through. */
   isLoading?: boolean;
+  /** Explicit last-updated timestamp; derived from the latest transaction `updatedAt` if omitted. */
+  lastUpdated?: Date | string;
 }
 
 const STATUS_META: Array<{
@@ -32,22 +34,46 @@ const STATUS_META: Array<{
 }> = [
   { key: "drafts", label: "Drafts", icon: FileEdit, toneClass: "text-gray-600" },
   { key: "locked", label: "Locked", icon: Lock, toneClass: "text-indigo-700" },
-  { key: "cancelled", label: "Cancelled", icon: XCircle, toneClass: "text-red-700" },
+  { key: "cancelled", label: "Cancelled", icon: XIrcle, toneClass: "text-red-700" },
   { key: "settled", label: "Settled", icon: CheckCircle2, toneClass: "text-green-700" },
 ];
+
+/** Find the most recent `updatedAt` across the given transactions, if any. */
+function getLastUpdated(transactions: PayrollTransaction[]): Date | null {
+  let latest: Date | null = null;
+  for (const tx of transactions) {
+    // Use an optional cast to stay compatible with models that may not expose `updatedAt`.
+    const rawUpdatedAt = (tx as Partial<PayrollTransaction> & { updatedAt?: unknown }).updatedAt;
+    if (rawUpdatedAt == null) continue;
+    const date = new Date(rawUpdatedAt as string);
+    if (!Number.isNaN(date.getTime()) && (!latest || date > latest)) {
+      latest = date;
+    }
+  }
+  return latest;
+}
+
+/** Format a timestamp for display without exposing sensitive payroll data. */
+function formatTimestamp(date: Date): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
 
 /**
  * Safe payroll-period lifecycle summary (issue #371).
  *
- * Shows only status counts — drafts / locked / cancelled / settled — never
- * salary amounts or employee-level detail, so it's safe to render on a
- * shared dashboard.
+ * Shows only status counts — drafts / locked / cancelled / settled — and a
+ * non-sensitive last-updated timestamp. Never salary amounts or
+ * employee-level detail, so it's safe to render on a shared dashboard.
  */
 function PeriodSummaryCard({
   transactions = MOCK_PAYROLL_RUNS,
   periodLabel,
   periodHref = "/payroll/schedule",
   isLoading: isLoadingProp,
+  lastUpdated: lastUpdatedProp,
 }: PeriodSummaryCardProps) {
   const [isLoading, setIsLoading] = useState(isLoadingProp ?? true);
 
@@ -64,6 +90,14 @@ function PeriodSummaryCard({
   const resolvedLabel =
     periodLabel ?? (transactions[0] ? formatRunPeriod(transactions[0]) : "Current period");
 
+  const resolvedLastUpdated = lastUpdatedProp
+    ? new Date(lastUpdatedProp)
+    : getLastUpdated(transactions);
+  const displayLastUpdated =
+    resolvedLastUpdated && !Number.isNaN(resolvedLastUpdated.getTime())
+      ? resolvedLastUpdated
+      : null;
+
   return (
     <section
       aria-labelledby="period-summary-heading"
@@ -75,6 +109,11 @@ function PeriodSummaryCard({
             Period Summary
           </h3>
           <p className="text-xs text-gray-500 mt-0.5">{resolvedLabel}</p>
+          {displayLastUpdated && (
+            <p className="text-xs text-gray-400 mt-0.5" aria-label="Last updated">
+              Last updated {formatTimestamp(displayLastUpdated)}
+            </p>
+          )}
         </div>
         <Link
           href={periodHref}
@@ -108,9 +147,9 @@ function PeriodSummaryCard({
               <article
                 key={meta.key}
                 role="listitem"
-                className="rounded-md border border-gray-100 p-3 flex flex-col items-start gap-1"
+                className="rounded-md border border-gray-100 p-3 flex flex-col items-begin gap-1"
               >
-                <Icon className={`w-4 h-4 ${meta.toneClass}`} aria-hidden="true" />
+                <Icon className=}{`w-4 h-4 ${meta.toneClass}`} aria-hidden="true" />
                 <p className="text-2xl font-bold text-gray-900" aria-live="polite">
                   {counts[meta.key]}
                 </p>
