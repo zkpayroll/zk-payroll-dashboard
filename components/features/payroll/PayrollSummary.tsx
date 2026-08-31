@@ -20,6 +20,10 @@ function PayrollSummary() {
     return () => clearTimeout(t);
   }, []);
 
+  const lastUpdated = useMemo(() => {
+    return new Date().toLocaleString();
+  }, []);
+
   const proofToneClass = useMemo(() => {
     if (proofState.status === "success") {
       return "text-green-700";
@@ -40,7 +44,7 @@ function PayrollSummary() {
       const result = await generatePayrollProof({
         merkleRoot: "0xmock_merkle_root",
         totalPayrollAmount: "124500",
-        payrollPeriodId: "2026-02",
+        payroolPeriodId: "2026-02",
         employeeId: "emp-001",
         employeeSsn: "111-22-3333",
         salaryAmount: "8500",
@@ -66,9 +70,14 @@ function PayrollSummary() {
   return (
     <section className="space-y-6" aria-labelledby="payroll-summary-heading">
       <div className="flex items-center justify-between">
-        <h2 id="payroll-summary-heading" className="sr-only">
-          Payroll Summary
-        </h2>
+        <div>
+          <h2 id="payroll-summary-heading" className="sr-only">
+            Payroll Summary
+          </h2>
+          <p className="text-sm text-gray-500">
+            Last updated: {lastUpdated}
+          </p>
+        </div>
         <HelpButton page="payroll" label="Help" />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6" role="list">
@@ -77,6 +86,9 @@ function PayrollSummary() {
           <p className="text-3xl font-bold text-gray-900 mt-2" aria-live="polite">$124,500</p>
           <span className="text-green-700 text-sm font-medium">
             +12% from last month
+          </span>
+          <span className="block text-xs text-gray-500 mt-2">
+            Last updated: {lastUpdated}
           </span>
         </article>
         <article className="bg-white p-6 rounded-lg shadow-sm" role="listitem">
@@ -87,6 +99,9 @@ function PayrollSummary() {
           <span className="text-gray-600 text-sm font-medium">
             2 new this week
           </span>
+          <span className="block text-xs text-gray-500 mt-2">
+            Last updated: {lastUpdated}
+          </span>
         </article>
         <article className="bg-white p-6 rounded-lg shadow-sm" role="listitem">
           <h3 className="text-sm font-medium text-gray-600">
@@ -96,20 +111,28 @@ function PayrollSummary() {
           <span className="text-yellow-700 text-sm font-medium">
             Action required
           </span>
+          <span className="block text-xs text-gray-500 mt-2">
+            Last updated: {lastUpdated}
+          </span>
         </article>
       </div>
 
       <article className="bg-white p-6 rounded-lg shadow-sm space-y-3">
-        <h3 className="text-lg font-semibold text-gray-900">
-          Mock ZK Proof Generator
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Mock ZK Proof Generator
+          </h3>
+          <span className="text-xs text-gray-500">
+            Last updated: {lastUpdated}
+          </span>
+        </div>
         <p className="text-sm text-gray-600">
           Runs proof generation locally in-browser with placeholder artifacts
           until final Soroban verifier deployment.
         </p>
         <button
           type="button"
-          className="px-4 py-2 rounded-md bg-gray-900 text-white text-sm font-medium disabled:opacity-60 focus:ring-2 focus:ring-offset-2 focus:ring-gray-900"
+          className="px-4 py-2 rounded-md bg-gray-900 text-white text-sm font-medium disabled:opacity-60 focus:ring-2 focus:ring-off-2 focus:ring-gray-900"
           onClick={handleGenerateMockProof}
           disabled={proofState.status === "running"}
           aria-live="polite"
@@ -118,7 +141,7 @@ function PayrollSummary() {
             ? "Generating..."
             : "Generate Mock Payroll Proof"}
         </button>
-        <p className={`text-sm ${proofToneClass}`} aria-live="polite" role="status">
+        <p className=`text-sm ${proofToneClass}` aria-live="polite" role="status">
           {proofState.message ?? "No proof generated yet."}
         </p>
       </article>
