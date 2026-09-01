@@ -15,6 +15,9 @@ import {
   ClipboardCheck,
   Shield,
   Upload,
+  Coins,
+  Settings,
+  AlertTriangle,
 } from "lucide-react";
 
 // ─── Screen-specific empty-state definitions ─────────────────────
@@ -37,7 +40,10 @@ export type EmptyStateScreen =
   | "first-payroll"
   | "onboarding-incomplete"
   | "first-audit"
-  | "import-review-empty";
+  | "import-review-empty"
+  | "supported-assets-empty"
+  | "treasury-assets-empty"
+  | "settings-assets-empty";
 
 export interface EmptyStateDefinition {
   icon: LucideIcon;
@@ -149,6 +155,27 @@ export const EMPTY_STATE_COPY: Record<EmptyStateScreen, EmptyStateDefinition> =
       title: "No imported records awaiting review",
       description:
         "When you import employee records in bulk, they will appear here for validation before being added to the directory. Use the bulk import flow to get started.",
+    },
+    "supported-assets-empty": {
+      icon: Coins,
+      title: "No supported payroll assets configured",
+      description:
+        "Payroll creation is blocked until a supported asset (USDC, XLM, EURC) is configured. Add an asset in Settings → Assets to enable payroll batches.",
+      actionLabel: "Configure assets",
+    },
+    "treasury-assets-empty": {
+      icon: Landmark,
+      title: "No treasury assets configured",
+      description:
+        "No supported payroll assets are configured for this treasury. Fund or configure an asset (USDC, XLM, EURC) to enable payroll creation and disbursement.",
+      actionLabel: "Configure treasury assets",
+    },
+    "settings-assets-empty": {
+      icon: Settings,
+      title: "No payroll assets configured",
+      description:
+        "No supported assets are configured yet. Payroll batches cannot be created until at least one supported asset is added. Choose from USDC, XLM, or EURC.",
+      actionLabel: "Add supported asset",
     },
   };
 

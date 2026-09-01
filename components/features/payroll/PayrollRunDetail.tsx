@@ -23,6 +23,8 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import ProofFreshnessBadge from "@/components/features/proofs/ProofFreshnessBadge";
 import { evaluateProofFreshness } from "@/lib/formatting/proofFreshness";
 import PayrollApprovalAuditTrail from "./PayrollApprovalAuditTrail";
+import { PeriodLabelBadge } from "@/components/features/payroll/PeriodLabelBadge";
+import { formatPeriodLabel } from "@/lib/date/periodLabel";
 import {
   classifyRun,
   formatPayrollDate,
@@ -33,8 +35,8 @@ import ReconciliationDiffPanel from "@/components/features/payroll/Reconciliatio
 import CancelPayrollDialog from "./CancelPayrollDialog";
 
 
-import type { LucideIcon } from "lucide-react";
 
+import type { LucideIcon } from "lucide-react";
 const STATUS_ICONS: Record<string, LucideIcon> = {
   verified: CheckCircle,
   pending: Clock,
@@ -95,6 +97,31 @@ export default function PayrollRunDetail({ run: propRun, proofReference }: Payro
     return MOCK_EMPLOYEES.filter((e) => run.employeeIds.includes(e.id));
   }, [run]);
 
+  // Derive approval expiry input from run approval history/status — must be before early returns to satisfy hooks rules
+  const approvalInput = useMemo(() => {
+    if (!run) return { hasApproval: false as const };
+    const latest = run.approvalHistory?.[run.approvalHistory.length - 1];
+    const hasApproval = Boolean(run.approvalHistory && run.approvalHistory.length > 0) || Boolean(run.approvalStatus);
+    const approvedAt = latest?.approvedAt ?? null;
+    let expiresAt: string | null = null;
+    if (latest?.approvedAt && run.approvalStatus === "approved") {
+      const d = new Date(latest.approvedAt);
+      d.setDate(d.getDate() + 7);
+      expiresAt = d.toISOString();
+    } else if (latest?.approvedAt && (run.approvalStatus as string) === "expired") {
+      const d = new Date(latest.approvedAt);
+      d.setDate(d.getDate() - 1);
+      expiresAt = d.toISOString();
+    }
+    if (!hasApproval) return { hasApproval: false as const };
+    return {
+      approvedAt,
+      expiresAt,
+      approvalStatus: run.approvalStatus ?? null,
+      hasApproval: true as const,
+    };
+  }, [run]);
+
   if (isLoading) {
     return (
       <section aria-label="Loading payroll run details" className="space-y-6">
@@ -153,33 +180,6 @@ export default function PayrollRunDetail({ run: propRun, proofReference }: Payro
   const lockState = getPayrollLockState(run);
   const freshness = evaluateProofFreshness({ reference: proofReference });
 
-  // Derive approval expiry input from run approval history/status
-  const approvalInput = useMemo(() => {
-    const latest = run.approvalHistory?.[run.approvalHistory.length - 1];
-    const hasApproval = Boolean(run.approvalHistory && run.approvalHistory.length > 0) || Boolean(run.approvalStatus);
-    // If no explicit expiry, simulate a 7-day window from approvedAt for active approvals
-    const approvedAt = latest?.approvedAt ?? null;
-    let expiresAt: string | null = null;
-    if (latest?.approvedAt && run.approvalStatus === "approved") {
-      const d = new Date(latest.approvedAt);
-      d.setDate(d.getDate() + 7);
-      expiresAt = d.toISOString();
-    } else if (latest?.approvedAt && (run.approvalStatus as string) === "expired") {
-      // already expired — set expiresAt in past
-      const d = new Date(latest.approvedAt);
-      d.setDate(d.getDate() - 1);
-      expiresAt = d.toISOString();
-    }
-    // If status indicates missing
-    if (!hasApproval) return { hasApproval: false as const };
-    return {
-      approvedAt,
-      expiresAt,
-      approvalStatus: run.approvalStatus ?? null,
-      hasApproval: true as const,
-    };
-  }, [run.approvalHistory, run.approvalStatus]);
-
   return (
     <section aria-labelledby="payroll-run-detail-heading" className="space-y-6">
       <div>
@@ -221,6 +221,14 @@ export default function PayrollRunDetail({ run: propRun, proofReference }: Payro
       {/* Cancellation detail panel — only for cancelled batches */}
       {run.status === "cancelled" && <PayrollCancellationPanel run={run} />}
 
+      {/* Proof blocker warnings — actionable guidance when payroll cannot proceed */}
+      {kind === "scheduled" && freshness.state === "missing" && (
+        <MissingProofWarning runId={run.id} actionHref="/payroll/execute" />
+      )}
+      {kind === "scheduled" && freshness.state === "expired" && (
+        <ExpiredProofWarning actionHref="/payroll/execute" />
+      )}
+
       <header className="bg-white rounded-lg shadow-sm p-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex items-start gap-3">
@@ -243,6 +251,7 @@ export default function PayrollRunDetail({ run: propRun, proofReference }: Payro
                 >
                   {kindStyles.label}
                 </span>
+                <PeriodLabelBadge period={run} size="xs" variant="badge" />
                 <StatusBadge status={run.status} />
               </div>
             </div>
@@ -298,7 +307,16 @@ export default function PayrollRunDetail({ run: propRun, proofReference }: Payro
       {/* Run metadata */}
       <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">
         <h3 className="text-sm font-semibold text-gray-900">Run Metadata</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="border rounded-lg p-4">
+            <div className="flex items-center gap-2 text-gray-500 mb-1">
+              <Calendar className="w-4 h-4" />
+              <span className="text-xs font-medium uppercase">Pay Period</span>
+            </div>
+            <p className="text-sm font-medium text-gray-900">
+              {formatPeriodLabel(run)}
+            </p>
+          </div>
           <div className="border rounded-lg p-4">
             <div className="flex items-center gap-2 text-gray-500 mb-1">
               <Calendar className="w-4 h-4" />
@@ -470,6 +488,14 @@ export default function PayrollRunDetail({ run: propRun, proofReference }: Payro
           {employeesInRun.length} employee{employeesInRun.length !== 1 ? "s" : ""} in this run
         </div>
       </div>
+
+      {/* Batch Root Comparison */}
+      <BatchRootComparison
+        expectedRoot={run.proof ?? null}
+        observedRoot={(run.transactionHash ?? run.txHash) ?? null}
+        eventSource="Soroban Executor Contract"
+        eventReference={(run.transactionHash ?? run.txHash) ?? null}
+      />
 
       {/* Approval Audit Trail */}
       <PayrollApprovalAuditTrail payrollRunId={run.id} compact />

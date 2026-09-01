@@ -9,6 +9,7 @@ import WalletConnect from "@/components/features/wallet/WalletConnect";
 import PayrollSummary from "@/components/features/payroll/PayrollSummary";
 import PeriodSummaryCard from "@/components/features/payroll/PeriodSummaryCard";
 import SystemStatus from "@/components/features/dashboard/SystemStatus";
+import TreasuryBalanceSummaryCard from "@/components/features/dashboard/TreasuryBalanceSummaryCard";
 import QuickActions from "@/components/features/dashboard/QuickActions";
 import OnboardingChecklistPanel from "@/components/features/dashboard/OnboardingChecklistPanel";
 import OnboardingReadinessTracker from "@/components/features/employees/OnboardingReadinessTracker";
@@ -140,6 +141,9 @@ function DashboardHome() {
       </ErrorBoundary>
       <ErrorBoundary>
         <OnboardingReadinessTracker />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <TreasuryBalanceSummaryCard />
       </ErrorBoundary>
       <ErrorBoundary>
         <SystemStatus />

@@ -19,15 +19,16 @@ import {
 import * as StellarSdk from '@stellar/stellar-sdk';
 import { Api as RpcApi, assembleTransaction, Server as SorobanServer } from '@stellar/stellar-sdk/rpc';
 import { useWalletStore, NETWORK_PASSPHRASES, StellarNetwork } from '@/stores/walletStore';
+import { useEnvironmentStore } from '@/stores/environment';
 import { WalletErrorOverlay } from './WalletErrorOverlay';
 import { createLogger } from '@/lib/logger';
 import { startPerformanceMark, endPerformanceMark } from '@/lib/monitoring';
 import { categorizeSigningError } from '@/lib/wallet/signingErrors';
 import { useSigningFailuresStore, type RecoverableSigningCategory } from '@/stores/signingFailures';
 
-// ─── Network Configuration ────────────────────────────────────────────────────
+const log = createLogger('StellarProvider');
 
-const NETWORK_CONFIG: Record<
+const FALLBACK_NETWORK_CONFIG: Record<
     StellarNetwork,
     { horizonUrl: string; sorobanRpcUrl: string }
 > = {
@@ -45,35 +46,6 @@ const NETWORK_CONFIG: Record<
     },
 };
 
-const CONFIGURABLE_NETWORKS: StellarNetwork[] = ['TESTNET', 'PUBLIC'];
-const DEFAULT_NETWORK: StellarNetwork = 'TESTNET';
-
-const log = createLogger('StellarProvider');
-
-// Resolves the network this app is configured to run against from
-// NEXT_PUBLIC_STELLAR_NETWORK. Falls back to TESTNET when the variable is
-// unset or holds an unsupported value, so a misconfigured deployment degrades
-// to the safest default instead of crashing the client bundle.
-function resolveExpectedNetwork(): StellarNetwork {
-    const configured = process.env.NEXT_PUBLIC_STELLAR_NETWORK;
-
-    if (configured && CONFIGURABLE_NETWORKS.includes(configured as StellarNetwork)) {
-        return configured as StellarNetwork;
-    }
-
-    if (configured) {
-        log.warn('NEXT_PUBLIC_STELLAR_NETWORK has an unsupported value; defaulting to TESTNET', {
-            value: configured,
-        });
-    }
-
-    return DEFAULT_NETWORK;
-}
-
-export const EXPECTED_NETWORK: StellarNetwork = resolveExpectedNetwork();
-
-// ─── Context Types ────────────────────────────────────────────────────────────
-
 interface InvokeContractParams {
     contractId: string;
     method: string;
@@ -88,13 +60,11 @@ interface StellarContextValue {
     horizonUrl: string;
     sorobanRpcUrl: string;
     isFreighterInstalled: boolean;
+    expectedNetwork: StellarNetwork;
+    isWrongNetwork: boolean;
 }
 
-// ─── Context ─────────────────────────────────────────────────────────────────
-
 const StellarContext = createContext<StellarContextValue | null>(null);
-
-// ─── Provider ─────────────────────────────────────────────────────────────────
 
 export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
     children,
@@ -111,6 +81,11 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
         reset,
     } = useWalletStore();
 
+    const {
+        getActiveProfileConfig,
+        setConnectionStatus,
+    } = useEnvironmentStore();
+
     const [isFreighterInstalled, setIsFreighterInstalled] = useState(false);
     const [overlayState, setOverlayState] = useState<{
         show: boolean;
@@ -124,18 +99,22 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
         currentNetwork?: string;
         message?: string;
     }>({ show: false, type: 'generic' });
-    // The Retry button on the wallet overlay calls back with no arguments —
-    // it closes over the original XDR via signTxRef below so that retrying
-    // re-attempts the same envelope. Type the state as a no-arg callback
-    // to keep the WalletErrorOverlay `onRetry?: () => void` contract clean.
     const [signRetry, setSignRetry] = useState<null | (() => Promise<string | null>)>(null);
+    const [expectedNetwork, setExpectedNetwork] = useState<StellarNetwork>('TESTNET');
+    const [networkConfig, setNetworkConfig] = useState({ horizonUrl: '', sorobanRpcUrl: '' });
 
     const initializingRef = useRef(false);
 
-    const networkConfig = NETWORK_CONFIG[network] ?? NETWORK_CONFIG['TESTNET'];
-    const isWrongNetwork = network !== EXPECTED_NETWORK;
+    const isWrongNetwork = network !== expectedNetwork;
 
-    // ── Helpers ─────────────────────────────────────────────────────────────
+    useEffect(() => {
+        const profile = getActiveProfileConfig();
+        setExpectedNetwork(profile.stellarNetwork);
+        setNetworkConfig({
+            horizonUrl: profile.horizonUrl,
+            sorobanRpcUrl: profile.sorobanRpcUrl,
+        });
+    }, [getActiveProfileConfig]);
 
     const showOverlay = useCallback(
         (
@@ -173,15 +152,17 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
 
             setNetwork(freighterNetwork, passphrase);
 
-            if (freighterNetwork !== EXPECTED_NETWORK) {
+            if (freighterNetwork !== expectedNetwork) {
                 showOverlay('wrong-network', {
                     currentNetwork: freighterNetwork,
                 });
+            } else {
+                dismissOverlay();
             }
         } catch {
             // Non-fatal — proceed silently
         }
-    }, [setNetwork, showOverlay]);
+    }, [setNetwork, showOverlay, dismissOverlay, expectedNetwork]);
 
     useEffect(() => {
         const initialize = async () => {
@@ -247,7 +228,7 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
                     const newNetwork = netObj.network as StellarNetwork;
                     if (newNetwork !== network) {
                         setNetwork(newNetwork, netObj.networkPassphrase);
-                        if (newNetwork !== EXPECTED_NETWORK) {
+                        if (newNetwork !== expectedNetwork) {
                             showOverlay('wrong-network', { currentNetwork: newNetwork });
                         } else {
                             dismissOverlay();
@@ -265,6 +246,7 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
         isFreighterInstalled,
         publicKey,
         network,
+        expectedNetwork,
         setPublicKey,
         setConnected,
         setNetwork,
@@ -272,7 +254,23 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
         dismissOverlay,
     ]);
 
-    // ── connect() ────────────────────────────────────────────────────────────
+    const checkRpcConnection = useCallback(async () => {
+        try {
+            const response = await fetch(`${networkConfig.sorobanRpcUrl}/health`, {
+                method: 'GET',
+                signal: AbortSignal.timeout(5000),
+            }).catch(() => null);
+            setConnectionStatus(response?.ok ? 'connected' : 'disconnected');
+        } catch {
+            setConnectionStatus('disconnected');
+        }
+    }, [networkConfig.sorobanRpcUrl, setConnectionStatus]);
+
+    useEffect(() => {
+        checkRpcConnection();
+        const interval = setInterval(checkRpcConnection, 30000);
+        return () => clearInterval(interval);
+    }, [checkRpcConnection]);
 
     const connect = useCallback(async () => {
         const connectionResult = await isConnected();
@@ -316,12 +314,6 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
         reset();
     }, [reset]);
 
-    // ── signTx ──────────────────────────────────────────────────────────
-    //
-    // Signs an XDR envelope with Freighter. On failure, the error message is
-    // categorized via `categorizeSigningError` so we can surface the right
-    // overlay type (rejected, session-expired, malformed-tx) with matching
-    // recovery steps — see WalletErrorOverlay and WALLET_SIGNING_RECOVERY_GUIDE.
     const signTx = useCallback(
         async (xdr: string): Promise<string | null> => {
             const connectionResult = await isConnected();
@@ -338,8 +330,6 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
                 return null;
             }
 
-            // Stable retry fn bound to this xdr so Retry from the overlay
-            // re-attempts the *same* envelope instead of losing context.
             const retry = async () => signTxRef.current(xdr);
             const routeOverlay = (
                 category: ReturnType<typeof categorizeSigningError>['category'],
@@ -404,22 +394,13 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
                 setLoading(false);
             }
         },
-        // signTxRef.current is kept in sync below, so no need to list `retry`
-        // (which closes over signTxRef) here. Listed everything else used.
         [storeConnected, publicKey, network, isWrongNetwork, showOverlay, setLoading, setError]
     );
 
-    // Keep signTxRef pointing at the latest signTx so the retry callback
-    // closure inside signTx can re-enter without a stale identity.
     const signTxRef = useRef(signTx);
     useEffect(() => {
         signTxRef.current = signTx;
     }, [signTx]);
-    // Note: the `useRef` / `useEffect` pair intentionally lives below signTx
-    // so it can reference signTx; the helper above uses signTxRef.current to
-    // avoid the chicken-and-egg closure.
-
-    // ── invokeContract() ─────────────────────────────────────────────────────
 
     const invokeContract = useCallback(
         async ({ contractId, method, args = [] }: InvokeContractParams): Promise<string | null> => {
@@ -477,8 +458,6 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
         [storeConnected, publicKey, network, isWrongNetwork, networkConfig, signTx, showOverlay, setLoading, setError]
     );
 
-    // ── Context value ────────────────────────────────────────────────────────
-
     const value: StellarContextValue = {
         connect,
         disconnect,
@@ -487,6 +466,8 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
         horizonUrl: networkConfig.horizonUrl,
         sorobanRpcUrl: networkConfig.sorobanRpcUrl,
         isFreighterInstalled,
+        expectedNetwork,
+        isWrongNetwork,
     };
 
     return (
@@ -496,7 +477,7 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
                 <WalletErrorOverlay
                     type={overlayState.type}
                     currentNetwork={overlayState.currentNetwork}
-                    expectedNetwork={EXPECTED_NETWORK}
+                    expectedNetwork={expectedNetwork}
                     message={overlayState.message}
                     onDismiss={dismissOverlay}
                     onRetry={signRetry ?? undefined}
@@ -505,8 +486,6 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
         </StellarContext.Provider>
     );
 };
-
-// ─── Custom Hook ──────────────────────────────────────────────────────────────
 
 export const useStellar = (): StellarContextValue => {
     const context = useContext(StellarContext);

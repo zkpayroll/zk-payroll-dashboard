@@ -410,6 +410,36 @@ export interface ApprovalComment {
   createdAt: string;
   attachmentUrl?: string | null;
 }
+// ─── Payroll Dispute Resolution Queue (#317) ──────────────────────────────────
+
+export type DisputeStatus = "active" | "overdue" | "resolved" | "escalated";
+
+export type DisputeResolutionAction = "resolve" | "escalate" | "dismiss";
+
+export type DisputeBlockedAction =
+  | "finalization"
+  | "approval"
+  | "execution"
+  | "reconciliation"
+  | "audit_export";
+
+export interface PayrollDispute {
+  id: string;
+  payrollPeriod: string;
+  payrollBatch: string;
+  status: DisputeStatus;
+  resolutionDeadline: string;
+  safeReasonCode: PayrollLockReasonType;
+  safeReasonDescription: string;
+  blockedActions: DisputeBlockedAction[];
+  requiredReviewer: UserRole;
+  resolutionAction: string;
+  createdAt: string;
+  resolvedAt?: string | null;
+  resolvedBy?: string | null;
+  resolutionNote?: string;
+}
+
 // ── Compliance Evidence Bundle ───────────────────────────────────────────────
 
 export interface AuditSafeReceipt {
@@ -578,6 +608,70 @@ export interface AuditReadyTimeline {
   exported: boolean;
 }
 
+// ─── Wallet Rotation Approval Timeline (#262) ────────────────────────────────
+
+export type WalletRotationEventType =
+  | "rotation_requested"
+  | "approval_granted"
+  | "approval_rejected"
+  | "cooldown_activated"
+  | "cooldown_expired"
+  | "emergency_override"
+  | "rotation_completed"
+  | "rotation_failed";
+
+export type WalletRotationReasonCode =
+  | "key_compromise"
+  | "device_loss"
+  | "scheduled_rotation"
+  | "compliance_requirement"
+  | "emergency";
+
+export interface WalletRotationEvent {
+  id: string;
+  employeeId: string;
+  type: WalletRotationEventType;
+  timestamp: string;
+  actor: string;
+  reasonCode: WalletRotationReasonCode;
+  previousWallet: string;
+  newWallet?: string;
+  /** Human-readable description — wallet addresses are masked by default */
+  summary: string;
+  metadata?: Record<string, string>;
+}
+
+export interface WalletRotationRequest {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  previousWallet: string;
+  newWallet: string;
+  reasonCode: WalletRotationReasonCode;
+  requestedBy: string;
+  requestedAt: string;
+  status: "pending" | "approved" | "rejected" | "cooldown" | "completed" | "failed";
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
+  cooldownEndsAt?: string;
+  isEmergency?: boolean;
+  events: WalletRotationEvent[];
+  metadata?: Record<string, string>;
+}
+
+export interface WalletRotationCooldown {
+  employeeId: string;
+  rotationId: string;
+  activatedAt: string;
+  expiresAt: string;
+  isActive: boolean;
+}
+
+export interface WalletRotationWarning {
+  type: "cooldown_active" | "payroll_blocker" | "pending_approval";
+  message: string;
+  severity: "info" | "warning" | "critical";
 // ─── Compliance Evidence Pointer Manager (#338) ──────────────────────────────
 
 export type EvidencePointerType = "url" | "ipfs" | "document-hash" | "case-reference";

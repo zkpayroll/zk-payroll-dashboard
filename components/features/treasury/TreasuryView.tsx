@@ -11,9 +11,17 @@ import TreasuryDrainWarning from "./TreasuryDrainWarning";
 import FundingImbalanceDashboard from "./FundingImbalanceDashboard";
 import ReservationToastListener from "./ReservationToastListener";
 import { createFundingReservation } from "@/lib/events/reservationEvents";
+import SupportedAssetsEmptyState from "@/components/features/assets/SupportedAssetsEmptyState";
+import { hasSupportedPayrollAssets } from "@/lib/assets/supportedAssets";
 
-function TreasuryView() {
+function TreasuryView({ configuredAssets }: { configuredAssets?: Array<{ code: string; issuer?: string }> } = {}) {
   const [toastVisible, setToastVisible] = useState(false);
+
+  // Demo wiring: if no assets passed, treat treasury address presence as "configured"
+  // When MOCK_COMPANIES has treasury but assets list is empty, show empty state for QA.
+  // Pass configuredAssets explicitly to hide the empty state.
+  const effectiveAssets = configuredAssets ?? (MOCK_COMPANIES[0]?.treasury ? [{ code: "USDC" }, { code: "XLM" }] : []);
+  const assetsMissing = !hasSupportedPayrollAssets(effectiveAssets);
 
   const handleReserveFunds = () => {
     createFundingReservation();
@@ -37,6 +45,10 @@ function TreasuryView() {
       <h2 id="treasury-heading" className="text-lg font-semibold text-gray-900">
         Treasury
       </h2>
+
+      {assetsMissing && (
+        <SupportedAssetsEmptyState configuredAssets={effectiveAssets} variant="treasury" compact={false} />
+      )}
 
       {isLowBalance && (
         <div

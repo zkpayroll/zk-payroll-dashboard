@@ -22,7 +22,8 @@ import {
   AlertTriangle,
   ClipboardList,
   Upload,
-  FileDown
+  FileDown,
+  Gavel
 } from "lucide-react";
 import { getNavigationForRole, ROLE_LABELS } from "@/lib/auth/roles";
 import type { NavigationItem } from "@/lib/auth/roles";
@@ -47,6 +48,7 @@ const icons: Record<NavigationItem["icon"], React.ComponentType<{ className?: st
   clipboard: ClipboardList,
   upload: Upload,
   download: FileDown,
+  gavel: Gavel,
 };
 
 const BADGE_HREF_MAP: Partial<Record<keyof SidebarBadges, string>> = {

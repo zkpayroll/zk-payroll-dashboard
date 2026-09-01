@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import StatusBadge from "@/components/ui/StatusBadge";
+import PeriodLabelBadge from "@/components/features/payroll/PeriodLabelBadge";
+import { formatPeriodLabel } from "@/lib/date/periodLabel";
 import {
   classifyRun,
   formatPayrollDate,
@@ -99,6 +101,7 @@ export default function PayrollDetailSheet({
                 >
                   {kindStyles.label}
                 </span>
+                <PeriodLabelBadge period={run} size="xs" variant="badge" />
                 <StatusBadge status={run.status} />
               </div>
             </div>
@@ -112,6 +115,15 @@ export default function PayrollDetailSheet({
                 Run Metadata
               </h4>
               <div className="grid grid-cols-2 gap-3">
+                <div className="border rounded-lg p-3">
+                  <div className="flex items-center gap-1.5 text-gray-500 mb-1">
+                    <Calendar className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span className="text-xs font-medium uppercase">Pay Period</span>
+                  </div>
+                  <p className="text-sm font-medium text-gray-900">
+                    {formatPeriodLabel(run)}
+                  </p>
+                </div>
                 <div className="border rounded-lg p-3">
                   <div className="flex items-center gap-1.5 text-gray-500 mb-1">
                     <Calendar className="w-3.5 h-3.5" aria-hidden="true" />

@@ -35,7 +35,6 @@ export function PayrollCancellationPanel({ run, className = "" }: PayrollCancell
     <section
       data-testid="payroll-cancellation-panel"
       aria-labelledby="cancellation-panel-heading"
-      role="region"
       className={`rounded-xl border border-red-200 bg-red-50/40 overflow-hidden ${className}`}
     >
       <div className="bg-white border-b border-red-100 px-5 py-4 flex items-start gap-3">
