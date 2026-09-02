@@ -161,12 +161,58 @@ export const MOCK_TRANSACTIONS: PayrollTransaction[] = [
   },
 ];
 
-export const MOCK_PAYROLL_RUNS: PayrollRun[] = MOCK_TRANSACTIONS.map(tx => ({
-  ...tx,
-  employeeIds: ["emp_001", "emp_002"],
-  executedAt: tx.status === "verified" ? tx.timestamp : null,
-  transactionHash: tx.txHash || null,
-}));
+export const MOCK_PAYROLL_RUNS: PayrollRun[] = [
+  {
+    ...MOCK_TRANSACTIONS[0],
+    employeeIds: ["emp_001", "emp_002"],
+    executedAt: MOCK_TRANSACTIONS[0].timestamp,
+    transactionHash: MOCK_TRANSACTIONS[0].txHash || null,
+    reconciliationStatus: "complete",
+    reconciliationDetails: {
+      processedCount: 2,
+      totalCount: 2,
+      discrepancies: [],
+      lastReconciliedAt: "2025-03-01T10:00:00Z",
+    },
+  },
+  {
+    ...MOCK_TRANSACTIONS[1],
+    employeeIds: ["emp_001", "emp_002"],
+    executedAt: MOCK_TRANSACTIONS[1].timestamp,
+    transactionHash: MOCK_TRANSACTIONS[1].txHash || null,
+    reconciliationStatus: "partial",
+    reconciliationDetails: {
+      processedCount: 1,
+      totalCount: 2,
+      discrepancies: ["Employee emp_002 (Kwame Asante) payment not confirmed on-chain"],
+      lastReconciliedAt: "2025-02-02T09:30:00Z",
+    },
+  },
+  {
+    ...MOCK_TRANSACTIONS[2],
+    employeeIds: ["emp_001", "emp_002"],
+    executedAt: null,
+    transactionHash: null,
+    reconciliationStatus: "pending",
+    reconciliationDetails: {
+      processedCount: 0,
+      totalCount: 2,
+    },
+  },
+  {
+    ...MOCK_TRANSACTIONS[3],
+    employeeIds: ["emp_001"],
+    executedAt: null,
+    transactionHash: null,
+    reconciliationStatus: "failed",
+    reconciliationDetails: {
+      processedCount: 0,
+      totalCount: 1,
+      discrepancies: ["Transaction cancelled before settlement"],
+      lastReconciliedAt: "2025-05-01T08:00:00Z",
+    },
+  },
+];
 
 export const MOCK_PAYROLL_RUNS_EMPTY: PayrollRun[] = [];
 

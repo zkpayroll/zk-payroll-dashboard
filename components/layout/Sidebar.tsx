@@ -80,6 +80,7 @@ const NAV_LINKS = [
   { href: "/compliance", icon: Shield, label: "Compliance" },
   { href: "/setup", icon: Building2, label: "Company Setup" },
   { href: "/incidents", icon: AlertTriangle, label: "Incidents" },
+  { href: "/reconciliation", icon: ClipboardList, label: "Reconciliation" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ];
 
