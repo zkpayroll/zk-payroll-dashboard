@@ -116,9 +116,11 @@ describe("PayrollWizard UI & Receipt Flow", () => {
 
     // Expect error message and retry button
     expect(toast.error).toHaveBeenCalledWith("Proof generation failed", expect.any(Object));
+    // The failure message shows in the proof step and is echoed in the approval
+    // audit trail, so it legitimately appears more than once.
     expect(
-      screen.getByText("Proof generation failed: circuit constraint mismatch. Please retry.")
-    ).toBeInTheDocument();
+      screen.getAllByText("Proof generation failed: circuit constraint mismatch. Please retry.").length
+    ).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
 
     randomSpy.mockRestore();

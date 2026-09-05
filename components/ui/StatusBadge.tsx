@@ -1,5 +1,5 @@
 import * as React from "react";
-import { CheckCircle2, Clock, XCircle, HelpCircle, AlertCircle } from "lucide-react";
+import { CheckCircle2, Clock, XCircle, HelpCircle, AlertCircle, MessageSquareWarning } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export type StatusType =
@@ -11,6 +11,7 @@ export type StatusType =
   | "inactive"
   | "approved"
   | "rejected"
+  | "correction_requested"
   | "completed"
   | "in_progress"
   | "not_started"
@@ -70,6 +71,11 @@ const statusConfigs: Record<string, StatusConfig> = {
     label: "Rejected",
     variant: "destructive",
     icon: XCircle,
+  },
+  correction_requested: {
+    label: "Correction Requested",
+    variant: "warning",
+    icon: MessageSquareWarning,
   },
 
   // Onboarding statuses

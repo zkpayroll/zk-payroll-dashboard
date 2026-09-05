@@ -108,7 +108,10 @@ describe("PayrollHistory", () => {
     expect(screen.getByText(/1 filter active/i)).toBeInTheDocument();
   });
 
-  it("displays the empty state when no runs match the applied filters", () => {
+  it("displays the filtered-empty state (not the never-had-any-runs state) when no runs match the applied filters", () => {
+    // #365 — this used to fall through to PayrollCalendar's "No payroll
+    // runs yet" copy, which is misleading when the account has runs and
+    // only the current filter excludes all of them.
     render(<PayrollHistory runs={MOCK_PAYROLL_RUNS} />);
 
     const searchInput = screen.getByPlaceholderText(
@@ -116,7 +119,11 @@ describe("PayrollHistory", () => {
     );
     fireEvent.change(searchInput, { target: { value: "nonexistent_run_id_xyz" } });
 
-    expect(screen.getByText("No payroll runs yet")).toBeInTheDocument();
+    expect(
+      screen.getByText("No transactions match the current filters"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("No payroll runs yet")).not.toBeInTheDocument();
+    expect(screen.getByText("Clear filters")).toBeInTheDocument();
   });
 
   it("renders the PayrollCalendar and its content inside the history view", () => {

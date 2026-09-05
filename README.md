@@ -1,5 +1,5 @@
-![CI Status](https://github.com/zk-payroll/zk-payroll-dashboard/actions/workflows/ci.yml/badge.svg)
-![CD Status](https://github.com/zk-payroll/zk-payroll-dashboard/actions/workflows/deploy.yml/badge.svg)
+![CI Status](https://github.com/zkpayroll/zk-payroll-dashboard/actions/workflows/ci.yml/badge.svg)
+![CD Status](https://github.com/zkpayroll/zk-payroll-dashboard/actions/workflows/deploy.yml/badge.svg)
 
 # ZK Payroll Dashboard
 
@@ -89,9 +89,12 @@ zk-payroll-dashboard/
 │       ├── badge.tsx 🆕
 │       ├── sheet.tsx 🆕
 │       └── scroll-area.tsx 🆕
-├── docs/                 # Documentation 🆕
+├── docs/                 # Documentation
+│   ├── TERMINOLOGY.md
 │   ├── TRANSACTION_DETAIL_FEATURE.md
-│   └── TRANSACTION_DETAIL_USAGE.md
+│   ├── TRANSACTION_DETAIL_USAGE.md
+│   ├── CONTENT_STYLE_GUIDE.md
+│   └── SETUP_GUIDE.md
 ├── lib/                  # Utilities and helper functions
 ├── public/               # Static assets
 └── package.json
@@ -130,6 +133,7 @@ For detailed usage instructions, see [Transaction Detail Usage Guide](docs/TRANS
 - [Admin recovery guide](docs/ADMIN_RECOVERY_GUIDE.md)
 - [Wallet signing failure recovery guide](docs/WALLET_SIGNING_RECOVERY_GUIDE.md) 🆕
 - [Content style guide](docs/CONTENT_STYLE_GUIDE.md)
+- [Shared terminology guide](docs/TERMINOLOGY.md)
 
 ## 🤝 Contributing
 

@@ -4,34 +4,69 @@ import { useState } from "react";
 import { useApprovalQueueStore, type ApprovalDraft } from "@/stores/approvalQueue";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, XCircle, AlertTriangle, ShieldCheck, FileText, ArrowRight } from "lucide-react";
+import {
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  ShieldCheck,
+  FileText,
+  ArrowRight,
+  MessageSquareWarning,
+  RotateCcw,
+} from "lucide-react";
 import Link from "next/link";
 
 export function ExecutiveApprovalQueue() {
-  const { drafts, approveDraft, rejectDraft } = useApprovalQueueStore();
-  const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
+  const { drafts, approveDraft, rejectDraft, requestCorrection, resubmitDraft } =
+    useApprovalQueueStore();
+  const [filter, setFilter] = useState<
+    "pending" | "corrections" | "approved" | "rejected" | "all"
+  >("pending");
   const [selectedDraft, setSelectedDraft] = useState<ApprovalDraft | null>(null);
   const [comment, setComment] = useState("");
+  const [correctionErrorId, setCorrectionErrorId] = useState<string | null>(null);
 
   const filteredDrafts = drafts.filter((d) => {
     if (filter === "pending") return d.approvalStatus === "pending_executive_approval";
+    if (filter === "corrections") return d.approvalStatus === "correction_requested";
     if (filter === "approved") return d.approvalStatus === "approved";
     if (filter === "rejected") return d.approvalStatus === "rejected";
     return true;
   });
 
   const pendingCount = drafts.filter((d) => d.approvalStatus === "pending_executive_approval").length;
+  const correctionsCount = drafts.filter((d) => d.approvalStatus === "correction_requested").length;
+
+  const currentComment = (draft: ApprovalDraft) => (selectedDraft?.id === draft.id ? comment : "");
 
   const handleApprove = (draft: ApprovalDraft) => {
     approveDraft(draft.id, "Executive Admin", "Admin", comment || "Approved for execution");
     setSelectedDraft(null);
     setComment("");
+    setCorrectionErrorId(null);
   };
 
   const handleReject = (draft: ApprovalDraft) => {
     rejectDraft(draft.id, "Executive Admin", "Admin", comment || "Rejected during executive review");
     setSelectedDraft(null);
     setComment("");
+    setCorrectionErrorId(null);
+  };
+
+  const handleRequestCorrection = (draft: ApprovalDraft) => {
+    const trimmed = currentComment(draft).trim();
+    if (!trimmed) {
+      setCorrectionErrorId(draft.id);
+      return;
+    }
+    requestCorrection(draft.id, "Executive Admin", "Admin", trimmed);
+    setSelectedDraft(null);
+    setComment("");
+    setCorrectionErrorId(null);
+  };
+
+  const handleResubmit = (draft: ApprovalDraft) => {
+    resubmitDraft(draft.id, "Payroll Drafter", "Operator");
   };
 
   return (
@@ -62,6 +97,16 @@ export function ExecutiveApprovalQueue() {
           }`}
         >
           Pending Review ({pendingCount})
+        </button>
+        <button
+          onClick={() => setFilter("corrections")}
+          className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+            filter === "corrections"
+              ? "bg-amber-600 text-white"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Corrections Requested ({correctionsCount})
         </button>
         <button
           onClick={() => setFilter("approved")}
@@ -120,6 +165,8 @@ export function ExecutiveApprovalQueue() {
                           ? "verified"
                           : draft.approvalStatus === "rejected"
                           ? "failed"
+                          : draft.approvalStatus === "correction_requested"
+                          ? "correction_requested"
                           : "pending"
                       }
                     />
@@ -128,6 +175,8 @@ export function ExecutiveApprovalQueue() {
                         ? "Executive Review Required"
                         : draft.approvalStatus === "approved"
                         ? "Approved for Signing"
+                        : draft.approvalStatus === "correction_requested"
+                        ? "Awaiting Corrections from Drafter"
                         : "Rejected"}
                     </span>
                   </div>
@@ -161,7 +210,14 @@ export function ExecutiveApprovalQueue() {
                   {draft.approvalHistory.map((hist, idx) => (
                     <div key={idx} className="text-xs text-gray-600 flex justify-between">
                       <span>
-                        <strong>{hist.approvedBy}</strong> ({hist.role}): {hist.comment}
+                        <strong>{hist.approvedBy}</strong> ({hist.role})
+                        {hist.action === "correction_requested" && (
+                          <span className="text-amber-700 font-medium"> requested corrections</span>
+                        )}
+                        {hist.action === "resubmitted" && (
+                          <span className="text-indigo-700 font-medium"> resubmitted</span>
+                        )}
+                        : {hist.comment}
                       </span>
                       <span className="text-gray-400">{new Date(hist.approvedAt).toLocaleTimeString()}</span>
                     </div>
@@ -170,36 +226,77 @@ export function ExecutiveApprovalQueue() {
               )}
 
               {draft.approvalStatus === "pending_executive_approval" && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t pt-3">
-                  <input
-                    type="text"
-                    placeholder="Add executive review notes/comment (optional)..."
-                    value={selectedDraft?.id === draft.id ? comment : ""}
-                    onChange={(e) => {
-                      setSelectedDraft(draft);
-                      setComment(e.target.value);
-                    }}
-                    className="w-full sm:w-2/3 px-3 py-1.5 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-red-600 border-red-200 hover:bg-red-50 text-xs"
-                      onClick={() => handleReject(draft)}
-                    >
-                      <XCircle className="h-4 w-4 mr-1" />
-                      Reject Draft
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
-                      onClick={() => handleApprove(draft)}
-                    >
-                      <CheckCircle2 className="h-4 w-4 mr-1" />
-                      Approve & Queue for Signing
-                    </Button>
+                <div className="flex flex-col gap-2 border-t pt-3">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <input
+                      type="text"
+                      placeholder="Add executive review notes/comment (required for corrections)..."
+                      value={currentComment(draft)}
+                      onChange={(e) => {
+                        setSelectedDraft(draft);
+                        setComment(e.target.value);
+                        if (correctionErrorId === draft.id) setCorrectionErrorId(null);
+                      }}
+                      aria-describedby={
+                        correctionErrorId === draft.id ? `correction-error-${draft.id}` : undefined
+                      }
+                      className="w-full sm:w-2/3 px-3 py-1.5 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-red-600 border-red-200 hover:bg-red-50 text-xs"
+                        onClick={() => handleReject(draft)}
+                      >
+                        <XCircle className="h-4 w-4 mr-1" />
+                        Reject Draft
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-amber-700 border-amber-200 hover:bg-amber-50 text-xs"
+                        onClick={() => handleRequestCorrection(draft)}
+                      >
+                        <MessageSquareWarning className="h-4 w-4 mr-1" />
+                        Request Correction
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+                        onClick={() => handleApprove(draft)}
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-1" />
+                        Approve & Queue for Signing
+                      </Button>
+                    </div>
                   </div>
+                  {correctionErrorId === draft.id && (
+                    <p
+                      id={`correction-error-${draft.id}`}
+                      role="alert"
+                      className="text-xs text-red-600"
+                    >
+                      Add a comment describing what needs to change before requesting corrections.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {draft.approvalStatus === "correction_requested" && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t pt-3 bg-amber-50 -mx-5 -mb-5 px-5 py-3 rounded-b-xl">
+                  <p className="text-xs text-amber-800">
+                    Corrections requested. The drafter should address the feedback above and
+                    resubmit for another review.
+                  </p>
+                  <Button
+                    size="sm"
+                    className="bg-amber-600 hover:bg-amber-700 text-white text-xs shrink-0"
+                    onClick={() => handleResubmit(draft)}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-1" />
+                    Resubmit for Review
+                  </Button>
                 </div>
               )}
 

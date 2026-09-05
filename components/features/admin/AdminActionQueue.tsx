@@ -138,7 +138,8 @@ export default function AdminActionQueue() {
     });
 
     return items;
-  }, [isConnected, network, walletSynced]);
+  }, [isConnected, network, walletSynced, EXPECTED_NETWORK]);
+
 
   const getSeverityIcon = (severity: string) => {
     switch (severity) {
