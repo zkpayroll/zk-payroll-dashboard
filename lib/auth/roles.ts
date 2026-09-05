@@ -83,6 +83,12 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     roles: ['admin', 'auditor'],
   },
   {
+    label: 'Attestations',
+    href: '/audit',
+    icon: 'file-search',
+    roles: ['admin', 'auditor'],
+  },
+  {
     label: 'Company Setup',
     href: '/setup',
     icon: 'building',
@@ -138,6 +144,7 @@ export const ROUTE_ROLE_RULES: Array<{ prefix: string; roles: UserRole[] }> = [
   { prefix: '/settings', roles: ['admin', 'operator', 'auditor'] },
   { prefix: '/dashboard', roles: ['admin', 'operator', 'auditor'] },
   { prefix: '/incidents', roles: ['admin', 'operator', 'auditor'] },
+  { prefix: '/audit', roles: ['admin', 'auditor'] },
   { prefix: '/admin', roles: ['admin'] },
 ];
 
