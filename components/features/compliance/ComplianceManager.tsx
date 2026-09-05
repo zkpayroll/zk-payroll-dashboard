@@ -25,7 +25,8 @@ import AuditActivityFeed from "./AuditActivityFeed";
 import type { ViewKey } from "@/types";
 import AuditExportRequest from "./AuditExportRequest";
 import ComplianceEvidenceBundleView from "./ComplianceEvidenceBundleView";
-import { AuditReadyTimeline } from "@/components/features/payroll/AuditReadyTimeline";
+import AuditorAccessExpiryBadge from "./AuditorAccessExpiryBadge";
+import AuditReadyTimeline from "@/components/features/payroll/AuditReadyTimeline";
 import type { AuditAccessRequest } from "@/types/models";
 
 function generateKeyId(): string {
@@ -614,7 +615,7 @@ function ComplianceManager() {
             <div className="pt-6">
               <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                 <XCircle className="w-3.5 h-3.5 text-gray-400" />
-                Revoked Keys ({inactiveKeys.length})
+                Inactive Keys ({inactiveKeys.length})
               </h4>
               <div className="bg-white rounded-lg border divide-y opacity-75">
                 {inactiveKeys.map((key) => (
@@ -800,6 +801,7 @@ function ViewKeyRow({
             <Clock className="w-3 h-3" />
             Expires {new Date(viewKey.expiresAt).toLocaleDateString()}
           </span>
+          <AuditorAccessExpiryBadge viewKey={viewKey} />
           {viewKey.revokedAt && (
             <span className="text-xs text-red-500">
               Revoked {new Date(viewKey.revokedAt).toLocaleDateString()}
