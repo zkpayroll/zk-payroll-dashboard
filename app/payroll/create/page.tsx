@@ -6,6 +6,8 @@ import { AssetSymbolInput } from "@/components/features/assets/AssetSymbolInput"
 import BatchReferenceInput from "@/components/features/payroll/BatchReferenceInput";
 import { normalizeAssetSymbol } from "@/lib/assets/normalizeAssetSymbol";
 import { validateBatchReferenceWithDuplicateCheck } from "@/lib/validation/batchReference";
+import DraftDescriptionInput from "@/components/payroll/DraftDescriptionInput";
+import { validateDraftDescription } from "@/lib/validation/draftDescription";
 import { MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import { Coins, Shield } from "lucide-react";
 import Link from "next/link";
@@ -16,7 +18,8 @@ const KNOWN_BATCH_REFERENCES = [...MOCK_PAYROLL_RUNS.map((r) => r.id), "BATCH-20
 export default function PayrollCreatePage() {
   const [assetRaw, setAssetRaw] = useState("");
   const [batchRef, setBatchRef] = useState("");
-  const [submitted, setSubmitted] = useState<{ asset: string; batchRef: string } | null>(null);
+  const [description, setDescription] = useState("");
+  const [submitted, setSubmitted] = useState<{ asset: string; batchRef: string; description: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -33,15 +36,25 @@ export default function PayrollCreatePage() {
       setSubmitted(null);
       return;
     }
+    const descriptionResult = validateDraftDescription(description);
+    if (!descriptionResult.isValid) {
+      setError(descriptionResult.message);
+      setSubmitted(null);
+      return;
+    }
     setError(null);
     // Privacy-safe: only normalized asset + batch reference (opaque ID) — no amounts
-    setSubmitted({ asset: assetResult.normalized, batchRef: batchResult.normalized });
+    setSubmitted({ asset: assetResult.normalized, batchRef: batchResult.normalized, description: description });
   };
 
   const result = normalizeAssetSymbol(assetRaw);
   const batchValidation = useMemo(
     () => validateBatchReferenceWithDuplicateCheck(batchRef, KNOWN_BATCH_REFERENCES),
     [batchRef],
+  );
+  const descriptionValidation = useMemo(
+    () => validateDraftDescription(description),
+    [description],
   );
 
   return (
@@ -70,12 +83,18 @@ export default function PayrollCreatePage() {
             placeholder="e.g. BATCH-2025-001"
           />
 
+          <DraftDescriptionInput
+            value={description}
+            onChange={setDescription}
+          />
+
           <div className="rounded-lg bg-gray-50 border p-3 text-xs text-gray-600">
             <p className="font-medium text-gray-700 mb-1 flex items-center gap-1">
               <Shield className="w-3.5 h-3.5" /> Privacy & validation
             </p>
             <p>Asset raw: <span className="font-mono">{assetRaw || "—"}</span> → <span className="font-mono font-medium">{result.normalized || "—"}</span> {result.isValid ? "✓" : `✗ ${result.validationError}`} {result.wasNormalized && <span className="text-amber-700">(trimmed/uppercased)</span>}</p>
             <p>Batch ref: <span className="font-mono">{batchRef || "—"}</span> → <span className="font-mono font-medium">{batchValidation.normalized || "—"}</span> {batchValidation.isValid ? "✓ valid" : `✗ ${batchValidation.message}`}</p>
+            <p>Description: <span className="font-mono">{description || "—"}</span> {descriptionValidation.isValid ? "✓ valid" : `✗ ${descriptionValidation.message}`}</p>
             <p className="text-gray-500 mt-1">Helper copy is shown under each field. Duplicates like <span className="font-mono">BATCH-2025-001</span> or <span className="font-mono">tx_001</span> are flagged before submission.</p>
             {result.wasNormalized && <p className="text-amber-700 mt-1">Asset warning shown: symbol will be normalized before submission.</p>}
           </div>
@@ -122,6 +141,9 @@ export default function PayrollCreatePage() {
               <li>Batch ref failure (malformed): entering &quot;!!&quot; or &quot;a&quot; shows &quot;at least 3 characters&quot; / &quot;Invalid batch reference&quot;.</li>
               <li>Batch ref failure (duplicate): entering &quot;BATCH-2025-001&quot; or &quot;tx_001&quot; shows &quot;already in use&quot; — duplicate guidance.</li>
               <li>Batch ref edge: pasting &quot; BATCH 2025 001 &quot; trims whitespace before validation; lowercase &quot;batch-2025-001&quot; flagged as duplicate of existing uppercase variant.</li>
+              <li>Description success: entering a valid string doesn't show any error.</li>
+              <li>Description failure (PII): entering &quot;$5000&quot; shows warning about financial figures.</li>
+              <li>Description failure (length): entering more than 255 chars shows length error.</li>
               <li>Privacy: no salary or amount is logged or displayed here — only asset codes and reference IDs.</li>
             </ul>
           </div>

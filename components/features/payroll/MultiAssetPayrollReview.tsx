@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import type { AssetGroup, MultiAssetPayrollRun } from "@/types/models";
 import { assetLabel, formatAssetAmount, groupRiskLabel } from "@/lib/payroll/multiAsset";
+import { ProofStatusCard } from "@/components/features/proofs/ProofStatusCard";
+import type { ProofLifecycleState } from "@/stores/proofStatus";
 
 // ── Status helpers ────────────────────────────────────────────────────────────
 
@@ -156,12 +158,14 @@ interface MultiAssetPayrollReviewProps {
   run: MultiAssetPayrollRun;
   onSubmit?: () => void;
   onRetryGroup?: (assetCode: string) => void;
+  onRegenerateProof?: () => void;
 }
 
 export default function MultiAssetPayrollReview({
   run,
   onSubmit,
   onRetryGroup,
+  onRegenerateProof,
 }: MultiAssetPayrollReviewProps) {
   const statusCfg = STATUS_CONFIG[run.status];
   const hasFundingIssue = run.assetGroups.some((g) => g.status === "underfunded");
@@ -172,6 +176,16 @@ export default function MultiAssetPayrollReview({
     assetCode: g.asset.code,
     total: g.totalAmount,
   }));
+
+  // Map run.proofStatus to 7-state lifecycle for card
+  const mappedProofState: ProofLifecycleState =
+    run.proofStatus === "ready"
+      ? "ready"
+      : run.proofStatus === "generating"
+      ? "generating"
+      : run.proofStatus === "expired"
+      ? "expired"
+      : "queued";
 
   return (
     <div className="space-y-6">
@@ -256,32 +270,12 @@ export default function MultiAssetPayrollReview({
         ))}
       </div>
 
-      {/* Proof status */}
-      <div className="flex items-center gap-2 text-sm rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-        <ShieldAlert className="w-4 h-4 text-indigo-500" />
-        <span className="text-gray-700">
-          ZK proof:{" "}
-          <span
-            className={`font-semibold ${
-              run.proofStatus === "ready"
-                ? "text-green-700"
-                : run.proofStatus === "generating"
-                ? "text-blue-600"
-                : run.proofStatus === "expired"
-                ? "text-red-600"
-                : "text-gray-500"
-            }`}
-          >
-            {run.proofStatus === "ready"
-              ? "Ready"
-              : run.proofStatus === "generating"
-              ? "Generating…"
-              : run.proofStatus === "expired"
-              ? "Expired — regenerate before submission"
-              : "Not generated"}
-          </span>
-        </span>
-      </div>
+      {/* Proof status card integration */}
+      <ProofStatusCard
+        statusOverride={mappedProofState}
+        onRegenerateProof={onRegenerateProof}
+        onSubmitTransaction={onSubmit}
+      />
 
       {/* Actions */}
       <div className="flex items-center justify-between pt-2">

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+
 import {
   successResponse,
   createdResponse,
@@ -26,14 +27,20 @@ export async function GET(request: NextRequest) {
     });
 
     const start = (page - 1) * limit;
-    const paginated = MOCK_PAYROLL_RUNS.slice(start, start + limit);
+    const paginated = MOCK_PAYROLL_RUNS.slice(start, start + limit).map(
+      (payroll) => ({
+        ...payroll,
+        lastUpdated:
+          payroll.lastUpdated ?? payroll.updatedAt ?? payroll.createdAt,
+      }),
+    );
 
     return withCors(
       successResponse(paginated, {
         page,
         limit,
-        total: MOCK_PAYROLL_RUNS.length,
-        totalPages: Math.ceil(MOCK_PAYROLL_RUNS.length / limit),
+        total: MOCK_PAYKROLL_RUNS.length,
+        totalPages: Math.ceil(MOCK_PAYKROLL_RUNS.length / limit),
       }),
       request,
     );
@@ -54,6 +61,7 @@ export async function POST(request: NextRequest) {
       return withCors(validationErrorResponse(parsed.errors), request);
     }
 
+    const now = new Date().toISOString();
     const newPayroll = {
       id: `pay_${Date.now()}`,
       ...parsed.data,
@@ -62,7 +70,8 @@ export async function POST(request: NextRequest) {
       transactionHash: null,
       totalAmount: 0,
       employeeCount: parsed.data.employeeIds.length,
-      createdAt: new Date().toISOString(),
+      createdAt: now,
+      lastUpdated: now,
     };
 
     return withCors(createdResponse(newPayroll), request);

@@ -1,4 +1,4 @@
-import { Employee, Company, CompanyConfig, PayrollTransaction, PayrollRun, ViewKey, FundingForecast, AuditAccessRequest, MultiAssetPayrollRun, ComplianceEvidenceBundle, PayrollLock, PayrollTemplate, OverduePayrollAlert, ApprovalComment, ProofReference, ComplianceEvidencePointer, ApproverThresholdPolicy, PayrollRunDispute, FundingReservation } from "@/types/models";
+import { Employee, Company, CompanyConfig, PayrollTransaction, PayrollRun, ViewKey, FundingForecast, AuditAccessRequest, MultiAssetPayrollRun, ComplianceEvidenceBundle, PayrollLock, PayrollTemplate, OverduePayrollAlert, ApprovalComment, ProofReference, ComplianceEvidencePointer, ApproverThresholdPolicy, PayrollDispute, FundingReservation } from "@/types/models";
 
 export const MOCK_EMPLOYEES: Employee[] = [
   {
@@ -927,23 +927,43 @@ export const MOCK_APPROVER_THRESHOLD_POLICY: ApproverThresholdPolicy = {
 /** Batches already locked to the current policy version — see PayrollLock/PayrollRun ids. */
 export const MOCK_BATCHES_ON_CURRENT_POLICY: string[] = ["tx_001", "tx_002"];
 
-export const MOCK_PAYROLL_DISPUTES: PayrollRunDispute[] = [
+export const MOCK_PAYROLL_DISPUTES: PayrollDispute[] = [
   {
     id: "dsp_001",
+    payrollPeriod: "2025-03",
+    payrollBatch: "batch_002",
     payrollRunId: "tx_002",
     raisedBy: "emp_002",
     reason: "Reported amount does not match agreed contract rate for March.",
     isResolved: false,
+    status: "active",
+    resolutionDeadline: "2025-03-31T23:59:59Z",
+    safeReasonCode: "employee_data_changed",
+    safeReasonDescription: "Reported rate mismatch on March batch",
+    blockedActions: ["approval", "execution"],
+    requiredReviewer: "operator",
+    resolutionAction: "Verify employment contract and rate adjustment.",
+    createdAt: "2025-03-20T10:00:00Z",
   },
   {
     id: "dsp_002",
+    payrollPeriod: "2025-04",
+    payrollBatch: "batch_004",
     payrollRunId: "tx_004",
     raisedBy: "emp_004",
     reason: "Missing overtime hours for the last week of the period.",
     isResolved: true,
     resolvedAt: "2025-04-05T12:00:00Z",
+    status: "resolved",
+    resolutionDeadline: "2025-04-10T23:59:59Z",
+    safeReasonCode: "employee_data_changed",
+    safeReasonDescription: "Missing overtime reported and reconciled",
+    blockedActions: [],
+    requiredReviewer: "admin",
+    resolutionAction: "Reconciled with supervisor timesheet.",
+    createdAt: "2025-04-01T10:00:00Z",
   },
-];
+] as PayrollDispute[];
 
 export const MOCK_FUNDING_RESERVATIONS: FundingReservation[] = [
   {

@@ -39,6 +39,12 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     roles: ['admin', 'operator'],
   },
   {
+    label: 'Obligation Snapshots',
+    href: '/payroll/snapshots',
+    icon: 'file-search',
+    roles: ['admin', 'operator'],
+  },
+  {
     label: 'Execute Payroll',
     href: '/payroll/execute',
     icon: 'play',
@@ -118,6 +124,7 @@ export const ROUTE_ROLE_RULES: Array<{ prefix: string; roles: UserRole[] }> = [
   { prefix: '/employees/add', roles: ['admin'] },
   { prefix: '/employees', roles: ['admin', 'operator'] },
   { prefix: '/payroll/approvals', roles: ['admin', 'operator'] },
+  { prefix: '/payroll/snapshots', roles: ['admin', 'operator'] },
   { prefix: '/payroll/execute', roles: ['admin', 'operator'] },
   { prefix: '/payroll/verify', roles: ['admin', 'operator', 'auditor'] },
   { prefix: '/payroll/run', roles: ['admin'] },

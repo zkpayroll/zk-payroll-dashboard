@@ -15,8 +15,10 @@ import StatusBadge from "@/components/ui/StatusBadge";
 type StatusFilter = "all" | "active" | "inactive" | "pending";
 
 function deriveStatus(e: Employee): "active" | "inactive" | "pending" {
-  if (e.status) return e.status;
-  if (!e.isActive) return "inactive";
+  // `isActive` determines payroll eligibility. Prefer it over a potentially
+  // stale display status so an ineligible employee is never shown as active.
+  if (!e.isActive || e.status === "inactive") return "inactive";
+  if (e.status === "pending") return "pending";
   if (!e.lastPayment) return "pending";
   return "active";
 }

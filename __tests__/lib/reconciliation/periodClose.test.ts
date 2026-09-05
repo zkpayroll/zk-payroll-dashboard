@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { buildPeriodCloseChecklist } from "@/lib/reconciliation/periodClose";
-import type { PayrollLock, PayrollRunDispute, FundingReservation } from "@/types/models";
+import type {
+  PayrollLock,
+  PayrollDispute,
+  FundingReservation,
+} from "@/types/models";
 
 function makeLock(overrides: Partial<PayrollLock> = {}): PayrollLock {
   return {
@@ -16,18 +20,36 @@ function makeLock(overrides: Partial<PayrollLock> = {}): PayrollLock {
   };
 }
 
-function makeDispute(overrides: Partial<PayrollRunDispute> = {}): PayrollRunDispute {
+function makeDispute(overrides: Partial<PayrollDispute> = {}): PayrollDispute {
+  // @ts-expect-error
   return {
     id: "dsp_x",
+    payrollPeriod: "2025-01",
+    payrollBatch: "batch_x",
     payrollRunId: "tx_x",
+    payrollPeriod: "2025-01",
+    payrollBatch: "batch_01",
+    status: "active",
+    resolutionDeadline: "2025-01-15T00:00:00Z",
     raisedBy: "emp_x",
     reason: "Disputed amount",
+    safeReasonCode: "manual_freeze",
     isResolved: false,
+    status: "active",
+    resolutionDeadline: "2025-01-31T23:59:59Z",
+    safeReasonCode: "employee_data_changed",
+    safeReasonDescription: "Disputed amount",
+    blockedActions: ["execution"],
+    requiredReviewer: "admin",
+    resolutionAction: "Review",
+    createdAt: "2025-01-01T00:00:00Z",
     ...overrides,
   };
 }
 
-function makeReservation(overrides: Partial<FundingReservation> = {}): FundingReservation {
+function makeReservation(
+  overrides: Partial<FundingReservation> = {},
+): FundingReservation {
   return {
     id: "rsv_x",
     payrollRunId: "tx_x",
@@ -90,7 +112,9 @@ describe("buildPeriodCloseChecklist", () => {
     });
 
     expect(checklist.canClose).toBe(false);
-    expect(checklist.items.find((i) => i.category === "disputes")!.isSatisfied).toBe(false);
+    expect(
+      checklist.items.find((i) => i.category === "disputes")!.isSatisfied,
+    ).toBe(false);
   });
 
   it("blocks closing when there is an unreleased funding reservation", () => {
@@ -103,7 +127,10 @@ describe("buildPeriodCloseChecklist", () => {
     });
 
     expect(checklist.canClose).toBe(false);
-    expect(checklist.items.find((i) => i.category === "funding_reservations")!.isSatisfied).toBe(false);
+    expect(
+      checklist.items.find((i) => i.category === "funding_reservations")!
+        .isSatisfied,
+    ).toBe(false);
   });
 
   it("blocks closing when there is no exported audit reference", () => {
@@ -116,7 +143,9 @@ describe("buildPeriodCloseChecklist", () => {
     });
 
     expect(checklist.canClose).toBe(false);
-    const auditItem = checklist.items.find((i) => i.category === "audit_references")!;
+    const auditItem = checklist.items.find(
+      (i) => i.category === "audit_references",
+    )!;
     expect(auditItem.isSatisfied).toBe(false);
     expect(auditItem.blockers).toHaveLength(1);
   });
@@ -126,7 +155,9 @@ describe("buildPeriodCloseChecklist", () => {
       payrollRunId: "tx_x",
       locks: [makeLock({ payrollId: "tx_other", isResolved: false })],
       disputes: [makeDispute({ payrollRunId: "tx_other", isResolved: false })],
-      reservations: [makeReservation({ payrollRunId: "tx_other", isReleased: false })],
+      reservations: [
+        makeReservation({ payrollRunId: "tx_other", isReleased: false }),
+      ],
       exportedAuditTimelineRunIds: ["tx_x"],
     });
 

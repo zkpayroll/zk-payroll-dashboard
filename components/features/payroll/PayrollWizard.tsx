@@ -36,6 +36,7 @@ import PayrollApprovalAuditTrail from "./PayrollApprovalAuditTrail";
 import { usePayrollAuditTrailStore } from "@/stores/payrollAuditTrail";
 import ApprovalHistoryDrawer from "./ApprovalHistoryDrawer";
 import { PayrollRiskWarnings } from "./PayrollRiskWarnings";
+import { NoteHashPreview } from "@/components/payroll/NoteHashPreview";
 import { WalletReconnectRecoveryBanner } from "@/components/features/wallet/WalletReconnectRecoveryBanner";
 import { useEnvironmentStore } from "@/stores/environment";
 import { ContractErrorHelpButton } from "@/components/features/errors/ContractErrorDrawer";
@@ -848,6 +849,33 @@ function ConfirmStep({
     return "ready";
   }, [blockers, warnings]);
 
+  const reviewChecklist = [
+    {
+      label: "Employee records reviewed",
+      detail: `${selectedEmployees.length} employee${selectedEmployees.length === 1 ? "" : "s"} included in this run`,
+      status: selectedEmployees.length > 0 && !blockers.some((block) => block.includes("inactive or invalid"))
+        ? "complete"
+        : "blocked",
+    },
+    {
+      label: "Treasury balance verified",
+      detail: `$${treasuryBalance.toLocaleString()} available for a $${totalAmount.toLocaleString()} run`,
+      status: treasuryBalance >= totalAmount ? "complete" : "blocked",
+    },
+    {
+      label: "ZK proof verified",
+      detail: store.proofStatus === "success" ? "Proof commitment is ready for signing" : "Generate and verify a proof before submitting",
+      status: store.proofStatus === "success" ? "complete" : "blocked",
+    },
+    {
+      label: "Payroll conflicts checked",
+      detail: conflictingRuns.length > 0
+        ? `${conflictingRuns.length} overlapping draft${conflictingRuns.length === 1 ? "" : "s"} require attention`
+        : "No overlapping payroll drafts found",
+      status: conflictingRuns.length > 0 ? "blocked" : "complete",
+    },
+  ] as const;
+
   return (
     <div className="space-y-6">
       {/* Header and status */}
@@ -882,6 +910,57 @@ function ConfirmStep({
           )}
         </div>
       </div>
+
+      <section
+        aria-labelledby="payroll-review-checklist-heading"
+        className="rounded-lg border border-gray-200 bg-gray-50/60 p-4 sm:p-5"
+      >
+        <div className="mb-3">
+          <h4
+            id="payroll-review-checklist-heading"
+            className="text-sm font-semibold text-gray-900"
+          >
+            Final review checklist
+          </h4>
+          <p className="mt-1 text-xs text-gray-600">
+            Confirm each item before you sign this payroll transaction.
+          </p>
+        </div>
+        <ul className="space-y-2" aria-label="Final payroll review checklist">
+          {reviewChecklist.map((item) => {
+            const isBlocked = item.status === "blocked";
+            return (
+              <li
+                key={item.label}
+                className={`flex items-start gap-3 rounded-md border bg-white p-3 ${
+                  isBlocked ? "border-red-200" : "border-green-200"
+                }`}
+              >
+                {isBlocked ? (
+                  <ShieldAlert
+                    className="mt-0.5 h-5 w-5 shrink-0 text-red-600"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <CheckCircle
+                    className="mt-0.5 h-5 w-5 shrink-0 text-green-600"
+                    aria-hidden="true"
+                  />
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900">{item.label}</p>
+                  <p className={`mt-0.5 break-words text-xs ${isBlocked ? "text-red-700" : "text-gray-600"}`}>
+                    {item.detail}
+                  </p>
+                </div>
+                <span className={`ml-auto shrink-0 text-xs font-semibold ${isBlocked ? "text-red-700" : "text-green-700"}`}>
+                  {isBlocked ? "Needs attention" : "Ready"}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
 
       {/* Dynamic Alerts */}
       {state === "ready" && (
@@ -1179,6 +1258,11 @@ function ConfirmStep({
           </div>
         </div>
       </div>
+
+      {/* Optional Note Hash Attachment */}
+      <NoteHashPreview
+        label="Attach Payroll Note Hash (Optional)"
+      />
 
       {/* Explicit Confirmation Checkbox */}
       <div className="bg-indigo-50/50 border border-indigo-150 rounded-lg p-4">

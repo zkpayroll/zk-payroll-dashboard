@@ -154,14 +154,14 @@ function ComplianceManager() {
 
     addActivity({
       id: `aud_act_${Date.now()}`,
-      action: "key_granted",
+      action: "auditor_assigned",
       actor: "Current Admin",
       actorOrg: "ZK Payroll Inc.",
       targetName: form.auditorName,
       targetOrg: form.auditorOrg,
       scope: form.scope,
       timestamp: new Date().toISOString(),
-      summary: `View key generated manually for ${form.auditorName} (${form.auditorOrg}).`,
+      summary: `Auditor assigned: access granted to ${form.auditorName} (${form.auditorOrg}).`,
     });
 
     setForm({ auditorName: "", auditorOrg: "", scope: "read-only" });
@@ -178,14 +178,14 @@ function ComplianceManager() {
     if (key) {
       addActivity({
         id: `aud_act_${Date.now()}`,
-        action: "key_revoked",
+        action: "auditor_removed",
         actor: "Current Admin",
         actorOrg: "ZK Payroll Inc.",
         targetName: key.auditorName,
         targetOrg: key.auditorOrg,
         scope: key.scope,
         timestamp: new Date().toISOString(),
-        summary: `View key for ${key.auditorName} (${key.auditorOrg}) revoked. Access immediately invalidated.`,
+        summary: `Auditor removed: access for ${key.auditorName} (${key.auditorOrg}) was immediately revoked.`,
       });
     }
     toast.success("View key revoked", {

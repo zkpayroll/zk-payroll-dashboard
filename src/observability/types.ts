@@ -1,5 +1,6 @@
 export type PayrollStage =
   | "draft"
+  | "draft_updated"
   | "validation"
   | "proof_setup"
   | "wallet_signing"

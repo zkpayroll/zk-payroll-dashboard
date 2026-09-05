@@ -5,6 +5,7 @@ import { MonitoringProvider } from '@/components/providers/MonitoringProvider';
 import { Toaster } from "@/components/ui/sonner";
 import { HelpDrawer } from "@/components/ui/HelpDrawer";
 import { RetryToastCenter } from "@/components/features/network/RetryToastCenter";
+import { PauseStatusBanner } from "@/components/status/PauseStatusBanner";
 import { ContractErrorDrawer } from "@/components/features/errors/ContractErrorDrawer";
 import "./globals.css";
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export default function RootLayout({
       <body>
         <StellarProvider>
           <MonitoringProvider />
+          <PauseStatusBanner />
           {children}
           <HelpDrawer />
           <RetryToastCenter />

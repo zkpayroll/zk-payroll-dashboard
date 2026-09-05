@@ -115,10 +115,13 @@ describe("ReservationExpiryWarning", () => {
     useReservationsStore.getState().reset();
   });
 
-  it("shows a reassuring empty state when there are no reservations", () => {
+  it("explains how to proceed when no reservation can be found", () => {
     render(<ReservationExpiryWarning />);
     expect(
-      screen.getByText("No funding reservations require attention"),
+      screen.getByText("No funding reservations found"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/create a new reservation from the payroll workflow/i),
     ).toBeInTheDocument();
   });
 

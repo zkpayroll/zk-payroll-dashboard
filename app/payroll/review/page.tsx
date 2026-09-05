@@ -1,6 +1,8 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { PayloadInspector } from "@/components/signing/PayloadInspector";
+import { RemovedEmployeesReview } from "@/components/payroll/RemovedEmployeesReview";
 import { MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
+import { MOCK_DRAFT_REMOVED_EMPLOYEES } from "@/lib/payroll/removedEmployees";
 
 export default function PayrollReviewPage() {
   const pendingRun = MOCK_PAYROLL_RUNS.find(
@@ -28,6 +30,10 @@ export default function PayrollReviewPage() {
           payload={payload}
           heading={`Review: ${String(payload.id ?? "Payroll Run")}`}
           allowReveal={false}
+        />
+
+        <RemovedEmployeesReview
+          removedEmployees={MOCK_DRAFT_REMOVED_EMPLOYEES}
         />
       </div>
     </DashboardLayout>

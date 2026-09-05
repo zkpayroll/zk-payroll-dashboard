@@ -45,7 +45,6 @@ export function PayrollVerificationForm() {
           value={reference}
           onChange={setReference}
           onValidityChange={setIsValid}
-          autoFocus // eslint-disable-line jsx-a11y/no-autofocus
         />
 
         <button

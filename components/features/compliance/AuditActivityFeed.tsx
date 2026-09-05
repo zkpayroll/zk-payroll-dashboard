@@ -25,6 +25,8 @@ const ACTION_CONFIG: Record<
 > = {
   key_granted: { icon: Key, color: "text-green-600 bg-green-50", label: "Key Granted" },
   key_revoked: { icon: KeyRound, color: "text-red-600 bg-red-50", label: "Key Revoked" },
+  auditor_assigned: { icon: UserCheck, color: "text-green-600 bg-green-50", label: "Auditor Assigned" },
+  auditor_removed: { icon: UserX, color: "text-red-600 bg-red-50", label: "Auditor Removed" },
   request_approved: { icon: CheckCircle, color: "text-green-600 bg-green-50", label: "Request Approved" },
   request_rejected: { icon: XCircle, color: "text-red-600 bg-red-50", label: "Request Rejected" },
   export_prepared: { icon: Shield, color: "text-indigo-600 bg-indigo-50", label: "Export Prepared" },

@@ -4,10 +4,12 @@ import { useState } from "react";
 import { AlertTriangle, CheckCircle, ArrowDownLeft, Plus, Lock } from "lucide-react";
 import { MOCK_TREASURY_BALANCE, MOCK_TRANSACTIONS, MOCK_COMPANIES } from "@/lib/api/mockData";
 import FundingForecast from "./FundingForecast";
+import ReservationTimeline from "./ReservationTimeline";
 import StatusBadge from "@/components/ui/StatusBadge";
 import TreasuryReadinessChecklist from "./TreasuryReadinessChecklist";
 import TreasuryDrainWarning from "./TreasuryDrainWarning";
 import FundingImbalanceDashboard from "./FundingImbalanceDashboard";
+import ReservationExpiryWarning from "./ReservationExpiryWarning";
 import ReservationToastListener from "./ReservationToastListener";
 import { createFundingReservation } from "@/lib/events/reservationEvents";
 import SupportedAssetsEmptyState from "@/components/features/assets/SupportedAssetsEmptyState";
@@ -115,7 +117,11 @@ function TreasuryView({ configuredAssets }: { configuredAssets?: Array<{ code: s
 
       <TreasuryReadinessChecklist />
 
+      <ReservationExpiryWarning />
+
       <FundingForecast />
+
+      <ReservationTimeline />
 
       {company && (
         <div className="bg-white rounded-lg shadow-sm p-6">

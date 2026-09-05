@@ -8,6 +8,7 @@ import { getEventsByCorrelationId } from "./emitter";
 
 const STAGE_LABELS: Record<PayrollStage, string> = {
   draft: "Draft Creation",
+  draft_updated: "Payroll Draft Updated",
   validation: "Payroll Validation",
   proof_setup: "ZK Proof Generation",
   wallet_signing: "Wallet Signing",
@@ -30,6 +31,8 @@ function formatStageSummary(event: PayrollEvent): string {
   switch (event.stage) {
     case "draft":
       return `${stageName}: Created initial payroll draft (${event.status})`;
+    case "draft_updated":
+      return `${stageName}: Draft details updated (${event.status})`;
     case "validation":
       return event.status === "failed"
         ? `${stageName}: Validation failed - ${event.payload.errorLabel || event.payload.errorCategory || "Validation Error"}`

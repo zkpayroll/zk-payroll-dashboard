@@ -19,6 +19,21 @@ export function emitDraftCreated(options?: EmitEventOptions): PayrollEvent {
   });
 }
 
+/**
+ * Record a payroll draft update for timeline replay. Payloads are redacted by
+ * the central observability emitter before they are stored or displayed.
+ */
+export function emitDraftUpdated(options?: EmitEventOptions): PayrollEvent {
+  const correlationId = options?.correlationId || getActiveCorrelationId();
+  return emitPayrollEvent({
+    correlationId,
+    stage: "draft_updated",
+    status: "succeeded",
+    payload: options?.payload,
+    timestamp: options?.timestamp,
+  });
+}
+
 export function emitValidationStarted(options?: EmitEventOptions): PayrollEvent {
   const correlationId = options?.correlationId || getActiveCorrelationId();
   return emitPayrollEvent({

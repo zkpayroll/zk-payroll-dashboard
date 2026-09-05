@@ -1,6 +1,6 @@
 import type {
   PayrollLock,
-  PayrollRunDispute,
+  PayrollDispute,
   FundingReservation,
   PeriodCloseChecklist,
   PeriodCloseChecklistItem,
@@ -9,7 +9,7 @@ import type {
 export interface PeriodCloseInputs {
   payrollRunId: string;
   locks: PayrollLock[];
-  disputes: PayrollRunDispute[];
+  disputes: PayrollDispute[];
   reservations: FundingReservation[];
   /** payrollRunIds that have a generated + exported audit-ready timeline. */
   exportedAuditTimelineRunIds: string[];
@@ -42,7 +42,7 @@ export function buildPeriodCloseChecklist(inputs: PeriodCloseInputs): PeriodClos
       category: "disputes",
       label: "Disputes",
       isSatisfied: openDisputes.length === 0,
-      blockers: openDisputes.map((d) => ({ category: "disputes", description: d.reason })),
+      blockers: openDisputes.map((d) => ({ category: "disputes", description: d.reason || d.safeReasonDescription || d.id })),
     },
     {
       category: "funding_reservations",

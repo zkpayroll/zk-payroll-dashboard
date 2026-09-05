@@ -8,7 +8,11 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-const currentSession: { publicKey: string; role: "admin" | "operator" | "auditor"; expiresAt: number } = {
+const currentSession: {
+  publicKey: string;
+  role: "admin" | "operator" | "auditor";
+  expiresAt: number;
+} = {
   publicKey: "GADMIN1234567890abcdef1234567890abcdef1234567890abcdef1234",
   role: "admin",
   expiresAt: Date.now() + 86_400_000,
@@ -26,9 +30,13 @@ vi.mock("@/hooks/useSession", () => ({
 
 const ACTIVE_DISPUTE: PayrollDispute = {
   id: "disp_test_active",
+  payrollRunId: "run_test_001",
   payrollPeriod: "2026-Q3-July",
   payrollBatch: "batch_test_001",
   status: "active",
+  raisedBy: "system",
+  reason: "Compliance review required.",
+  isResolved: false,
   resolutionDeadline: "2026-09-30T23:59:59Z",
   safeReasonCode: "compliance_hold",
   safeReasonDescription: "Compliance review required.",
@@ -40,9 +48,13 @@ const ACTIVE_DISPUTE: PayrollDispute = {
 
 const OVERDUE_DISPUTE: PayrollDispute = {
   id: "disp_test_overdue",
+  payrollRunId: "run_test_002",
   payrollPeriod: "2026-Q3-August",
   payrollBatch: "batch_test_002",
   status: "overdue",
+  raisedBy: "system",
+  reason: "Awaiting executive approval.",
+  isResolved: false,
   resolutionDeadline: "2026-08-20T23:59:59Z",
   safeReasonCode: "pending_approval",
   safeReasonDescription: "Awaiting executive approval.",
@@ -54,9 +66,13 @@ const OVERDUE_DISPUTE: PayrollDispute = {
 
 const RESOLVED_DISPUTE: PayrollDispute = {
   id: "disp_test_resolved",
+  payrollRunId: "run_test_003",
   payrollPeriod: "2026-Q2-June",
   payrollBatch: "batch_test_003",
   status: "resolved",
+  raisedBy: "system",
+  reason: "ZK proof verification failed.",
+  isResolved: true,
   resolutionDeadline: "2026-07-15T23:59:59Z",
   safeReasonCode: "zk_proof_failed",
   safeReasonDescription: "ZK proof verification failed.",
@@ -71,9 +87,13 @@ const RESOLVED_DISPUTE: PayrollDispute = {
 
 const BLOCKED_FINALIZATION_DISPUTE: PayrollDispute = {
   id: "disp_test_blocked_fin",
+  payrollRunId: "run_test_004",
   payrollPeriod: "2026-Q3-August",
   payrollBatch: "batch_test_004",
   status: "active",
+  raisedBy: "system",
+  reason: "Treasury balance insufficient.",
+  isResolved: false,
   resolutionDeadline: "2026-09-05T23:59:59Z",
   safeReasonCode: "insufficient_treasury",
   safeReasonDescription: "Treasury balance insufficient.",
@@ -128,7 +148,9 @@ describe("Dispute Resolution Queue (Issue #317)", () => {
     setDisputes([ACTIVE_DISPUTE]);
     render(<DisputeResolutionQueue />);
     expect(screen.getByText(/Blocked Lifecycle Actions/)).toBeInTheDocument();
-    expect(screen.getAllByText(/Finalization/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Finalization/).length).toBeGreaterThanOrEqual(
+      1,
+    );
     expect(screen.getByText(/Reconciliation is blocked/)).toBeInTheDocument();
     expect(screen.getByText(/cannot be finalized/)).toBeInTheDocument();
   });
@@ -137,7 +159,9 @@ describe("Dispute Resolution Queue (Issue #317)", () => {
     setDisputes([ACTIVE_DISPUTE]);
     render(<DisputeResolutionQueue />);
     expect(screen.getByText("Dispute Resolution Queue")).toBeInTheDocument();
-    expect(screen.getByText("Review and resolve blocked payroll disputes")).toBeInTheDocument();
+    expect(
+      screen.getByText("Review and resolve blocked payroll disputes"),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Required Reviewer/)).toBeInTheDocument();
     expect(screen.getByText("Admin")).toBeInTheDocument();
   });
@@ -145,15 +169,23 @@ describe("Dispute Resolution Queue (Issue #317)", () => {
   it("shows resolve and escalate buttons for authorized admin users", () => {
     setDisputes([ACTIVE_DISPUTE]);
     render(<DisputeResolutionQueue />);
-    expect(screen.getByRole("button", { name: /Resolve dispute/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Escalate dispute/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Resolve dispute/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Escalate dispute/ }),
+    ).toBeInTheDocument();
   });
 
   it("does not show resolve/escalate for resolved disputes", () => {
     setDisputes([RESOLVED_DISPUTE]);
     render(<DisputeResolutionQueue />);
-    expect(screen.queryByRole("button", { name: /Resolve dispute/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Escalate dispute/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Resolve dispute/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Escalate dispute/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("filters to active disputes only", () => {
@@ -184,9 +216,16 @@ describe("Dispute Resolution Queue (Issue #317)", () => {
   });
 
   it("filters to blocked finalization disputes only", () => {
-    setDisputes([ACTIVE_DISPUTE, OVERDUE_DISPUTE, BLOCKED_FINALIZATION_DISPUTE, RESOLVED_DISPUTE]);
+    setDisputes([
+      ACTIVE_DISPUTE,
+      OVERDUE_DISPUTE,
+      BLOCKED_FINALIZATION_DISPUTE,
+      RESOLVED_DISPUTE,
+    ]);
     render(<DisputeResolutionQueue />);
-    const blockedTab = screen.getByRole("tab", { name: /Blocked Finalization/ });
+    const blockedTab = screen.getByRole("tab", {
+      name: /Blocked Finalization/,
+    });
     fireEvent.click(blockedTab);
     expect(screen.getByText("2026-Q3-August")).toBeInTheDocument();
     expect(screen.queryByText("2026-Q2-June")).not.toBeInTheDocument();
@@ -199,17 +238,23 @@ describe("Dispute Resolution Queue (Issue #317)", () => {
     fireEvent.click(resolveBtn);
     const dialogTitles = screen.getAllByText("Resolve Dispute");
     expect(dialogTitles.length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/Resolve the dispute for payroll period/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Resolve the dispute for payroll period/),
+    ).toBeInTheDocument();
   });
 
   it("escalates a dispute via the confirmation dialog", () => {
     setDisputes([ACTIVE_DISPUTE]);
     render(<DisputeResolutionQueue />);
-    const escalateBtn = screen.getByRole("button", { name: /Escalate dispute/ });
+    const escalateBtn = screen.getByRole("button", {
+      name: /Escalate dispute/,
+    });
     fireEvent.click(escalateBtn);
     const dialogTitles = screen.getAllByText("Escalate Dispute");
     expect(dialogTitles.length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/Escalate the dispute for payroll period/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Escalate the dispute for payroll period/),
+    ).toBeInTheDocument();
   });
 
   it("shows role restriction for unauthorized users", () => {
@@ -217,8 +262,12 @@ describe("Dispute Resolution Queue (Issue #317)", () => {
     setDisputes([ACTIVE_DISPUTE]);
     render(<DisputeResolutionQueue />);
     expect(screen.getByText(/Requires Admin role/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Resolve dispute/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Escalate dispute/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Resolve dispute/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Escalate dispute/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("allows operator to resolve operator-required disputes", () => {
@@ -230,7 +279,9 @@ describe("Dispute Resolution Queue (Issue #317)", () => {
     currentSession.role = "operator";
     setDisputes([operatorDispute]);
     render(<DisputeResolutionQueue />);
-    expect(screen.getByRole("button", { name: /Resolve dispute/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Resolve dispute/ }),
+    ).toBeInTheDocument();
   });
 
   it("prevents operator from resolving admin-required disputes", () => {
@@ -238,17 +289,34 @@ describe("Dispute Resolution Queue (Issue #317)", () => {
     setDisputes([ACTIVE_DISPUTE]);
     render(<DisputeResolutionQueue />);
     expect(screen.getByText(/Requires Admin role/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Resolve dispute/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Resolve dispute/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows filter counts correctly", () => {
-    setDisputes([ACTIVE_DISPUTE, OVERDUE_DISPUTE, RESOLVED_DISPUTE, BLOCKED_FINALIZATION_DISPUTE]);
+    setDisputes([
+      ACTIVE_DISPUTE,
+      OVERDUE_DISPUTE,
+      RESOLVED_DISPUTE,
+      BLOCKED_FINALIZATION_DISPUTE,
+    ]);
     render(<DisputeResolutionQueue />);
-    expect(screen.getByRole("tab", { name: /All Disputes \(4\)/ })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /Active \(2\)/ })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /Overdue \(1\)/ })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /Resolved \(1\)/ })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /Blocked Finalization \(2\)/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: /All Disputes \(4\)/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: /Active \(2\)/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: /Overdue \(1\)/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: /Resolved \(1\)/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: /Blocked Finalization \(2\)/ }),
+    ).toBeInTheDocument();
   });
 
   it("shows empty state when filter has no matches", () => {

@@ -104,9 +104,15 @@ export function ReservationExpiryWarning({
             className="w-5 h-5 text-emerald-600 shrink-0"
             aria-hidden="true"
           />
-          <p className="text-sm font-medium text-emerald-800">
-            No funding reservations require attention
-          </p>
+          <div>
+            <p className="text-sm font-medium text-emerald-800">
+              No funding reservations found
+            </p>
+            <p className="mt-1 text-sm text-emerald-700">
+              There is no active reservation to review. Create a new reservation
+              from the payroll workflow before executing a run.
+            </p>
+          </div>
         </div>
       </div>
     );

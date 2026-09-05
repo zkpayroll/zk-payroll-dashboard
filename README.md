@@ -21,6 +21,7 @@ The **ZK Payroll Dashboard** is a privacy-first web application designed for man
 - **Cancellation Panel**: 🆕 Payroll detail panel explaining why a batch was cancelled and what actions remain available, without exposing salary values.
 - **Approval Expiry Badge**: 🆕 Badge showing whether payroll approvals are active, expiring soon, expired, or missing before execution.
 - **Asset Symbol Normalization Warning**: 🆕 Small UI warning when an entered asset symbol is normalized (trimmed/uppercased) before validation or submission.
+- **Obligation Snapshot Review**: 🆕 Maintainer workspace at `/payroll/snapshots` to review snapshot metadata, obligation diffs, and approve lock readiness without exposing raw salary values.
 
 ## 🛠 Tech Stack
 
@@ -128,6 +129,24 @@ Click any transaction row or the "Details" button to open a comprehensive detail
 
 For detailed usage instructions, see [Transaction Detail Usage Guide](docs/TRANSACTION_DETAIL_USAGE.md).
 
+### 5. Obligation snapshot review 🆕
+
+Navigate to **Obligation Snapshots** (`/payroll/snapshots`) to review payroll obligation snapshots before execution lock:
+
+1. **List** — pending, stale, blocked, and locked snapshots with merkle roots and employee counts only.
+2. **Detail** — metadata diff plus row-level obligation changes (commitment hashes redacted, salary amounts never shown).
+3. **Lock approval** — confirm lock readiness when the SDK reports `canApproveLock`; stale or blocked diffs disable the action with actionable next steps.
+
+**Manual QA checklist:**
+
+| Path | Expected |
+| ---- | -------- |
+| `/payroll/snapshots/snap_valid_001` | Review diff → approve lock succeeds |
+| `/payroll/snapshots/snap_stale_001/approval` | Lock blocked with stale reason |
+| `/payroll/snapshots/snap_blocked_001` | Blocked rows shown; lock disabled |
+
+Run automated coverage: `npm test -- __tests__/snapshots.test.tsx`
+
 ## 📚 Operator & Contributor docs
 
 - [Contributor setup (env vars, run commands, install fixes)](docs/setup.md) 🆕
@@ -172,3 +191,4 @@ Before opening a PR, please review our [Contributor Issue Validation Checklist](
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+

@@ -39,6 +39,12 @@ const STATUS_ICONS: Record<string, LucideIcon> = {
   cancelled: XCircle,
 };
 
+function formatLastUpdated(value?: string | number | Date | null): string {
+  if (value == null || value === "") return "Not available";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Not available" : date.toLocaleString("en-US");
+}
+
 interface PayrollDetailSheetProps {
   run: PayrollRun | null;
   open: boolean;
@@ -95,6 +101,9 @@ export default function PayrollDetailSheet({
                 Payroll run &middot; {formatPayrollDate(runDate)}
               </SheetTitle>
               <SheetDescription>Run ID: {run.id}</SheetDescription>
+              <SheetDescription>
+                Last updated: {formatLastUpdated(run.updatedAt)}
+              </SheetDescription>
               <div className="flex items-center gap-2 mt-1">
                 <span
                   className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${kindStyles.badge}`}

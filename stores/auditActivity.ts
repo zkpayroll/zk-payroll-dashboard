@@ -4,6 +4,8 @@ import { persist } from "zustand/middleware";
 export type AuditActionType =
   | "key_granted"
   | "key_revoked"
+  | "auditor_assigned"
+  | "auditor_removed"
   | "request_approved"
   | "request_rejected"
   | "export_prepared"

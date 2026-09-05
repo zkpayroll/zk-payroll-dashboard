@@ -435,6 +435,10 @@ export interface PayrollDispute {
   requiredReviewer: UserRole;
   resolutionAction: string;
   createdAt: string;
+  payrollRunId?: string;
+  raisedBy?: string;
+  reason?: string;
+  isResolved?: boolean;
   resolvedAt?: string | null;
   resolvedBy?: string | null;
   resolutionNote?: string;
@@ -673,6 +677,7 @@ export interface WalletRotationWarning {
   message: string;
   severity: "info" | "warning" | "critical";
 }
+
 // ─── Compliance Evidence Pointer Manager (#338) ──────────────────────────────
 
 export type EvidencePointerType = "url" | "ipfs" | "document-hash" | "case-reference";
@@ -752,14 +757,6 @@ export interface ApproverThresholdRotationRequest {
 
 // ─── Period Close Reconciliation Dashboard (#341) ────────────────────────────
 
-export interface PayrollRunDispute {
-  id: string;
-  payrollRunId: string;
-  raisedBy: string;
-  reason: string;
-  isResolved: boolean;
-  resolvedAt?: string | null;
-}
 
 export interface FundingReservation {
   id: string;
@@ -789,4 +786,51 @@ export interface PeriodCloseChecklist {
   items: PeriodCloseChecklistItem[];
   canClose: boolean;
 }
+
+// ── Exception Triage Dashboard Types (Issue #262) ───────────────────────────
+
+export type ExceptionSeverity = "blocking" | "warning" | "info";
+export type ExceptionCategory =
+  | "zk_proof"
+  | "compliance"
+  | "treasury"
+  | "employee_data"
+  | "network"
+  | "reconciliation";
+
+export type ExceptionSource =
+  | "circuit_verifier"
+  | "wallet_router"
+  | "compliance_check"
+  | "treasury_guard"
+  | "batch_parser"
+  | "oracle_bridge";
+
+export type ExceptionStatus = "open" | "investigating" | "resolved" | "dismissed";
+
+export interface PayrollTriageException {
+  id: string;
+  runId: string;
+  category: ExceptionCategory;
+  severity: ExceptionSeverity;
+  status: ExceptionStatus;
+  title: string;
+  description: string;
+  source: ExceptionSource;
+  employeeCount: number;
+  affectedEmployees?: Array<{
+    id: string;
+    name: string;
+    department?: string;
+    /** Redacted salary commitment for privacy */
+    salaryCommitmentHash: string;
+  }>;
+  suggestedAction: string;
+  nextStepUrl?: string;
+  createdAt: string;
+  resolvedAt?: string | null;
+  /** Encrypted or redacted token for proof debugging */
+  redactedProofDigest?: string;
+}
+
 

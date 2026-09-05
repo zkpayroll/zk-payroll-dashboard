@@ -1,10 +1,10 @@
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import PayrollDraftRecovery from "@/components/features/drafts/PayrollDraftRecovery";
+import DashboardLayout from "/@components/layout/DashboardLayout";
+import PayrollDraftRecovery from "/@components/features/drafts/PayrollDraftRecovery";
 
 function PayrollDraftsPage() {
   return (
     <DashboardLayout>
-      <PayrollDraftRecovery />
+      <PayrollDraftRecovery showLastUpdated />
     </DashboardLayout>
   );
 }
