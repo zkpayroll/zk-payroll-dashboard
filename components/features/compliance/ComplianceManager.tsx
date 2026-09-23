@@ -27,6 +27,7 @@ import AuditExportRequest from "./AuditExportRequest";
 import ComplianceEvidenceBundleView from "./ComplianceEvidenceBundleView";
 import AuditorAccessExpiryBadge from "./AuditorAccessExpiryBadge";
 import AuditReadyTimeline from "@/components/features/payroll/AuditReadyTimeline";
+import ComplianceHoldDialog from "./ComplianceHoldDialog";
 import type { AuditAccessRequest } from "@/types/models";
 
 function generateKeyId(): string {
@@ -41,7 +42,7 @@ function generateKeyId(): string {
 function ComplianceManager() {
   const { viewKeys, addViewKey, revokeViewKey, setViewKeys } =
     useViewKeyStore();
-  const [activeTab, setActiveTab] = useState<"access" | "exports" | "bundles" | "timeline">("access");
+  const [activeTab, setActiveTab] = useState<"access" | "exports" | "bundles" | "timeline" | "holds">("access");
   const {
     requests,
     setRequests,
@@ -62,6 +63,12 @@ function ComplianceManager() {
   });
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [preparingId, setPreparingId] = useState<string | null>(null);
+
+  // Compliance holds state
+  const [holds, setHolds] = useState<
+    Array<{ id: string; targetLabel: string; reasonCode: string; notes: string; placedAt: string }>
+  >([]);
+  const [holdDialogOpen, setHoldDialogOpen] = useState(false);
 
   useEffect(() => {
     if (viewKeys.length === 0) setViewKeys(MOCK_VIEW_KEYS);
@@ -190,6 +197,38 @@ function ComplianceManager() {
     }
     toast.success("View key revoked", {
       description: "Auditor access has been immediately revoked.",
+    });
+  };
+
+  const handlePlaceHold = async ({
+    reasonCode,
+    notes,
+  }: {
+    reasonCode: string;
+    notes: string;
+  }) => {
+    const hold = {
+      id: `hold_${Date.now()}`,
+      targetLabel: "Current Compliance Period",
+      reasonCode,
+      notes,
+      placedAt: new Date().toISOString(),
+    };
+    setHolds((prev) => [hold, ...prev]);
+    addActivity({
+      id: `aud_act_${Date.now()}`,
+      action: "export_prepared", // closest available action type
+      actor: "Current Admin",
+      actorOrg: "ZK Payroll Inc.",
+      targetName: "Compliance Hold",
+      targetOrg: "—",
+      scope: "read-only",
+      timestamp: hold.placedAt,
+      summary: `Compliance hold placed: ${reasonCode}${notes ? ` — ${notes}` : ""}`,
+    });
+    setHoldDialogOpen(false);
+    toast.success("Hold placed", {
+      description: `Compliance hold recorded with reason: ${reasonCode}.`,
     });
   };
 
@@ -404,6 +443,20 @@ function ComplianceManager() {
         >
           Audit Timeline
           {activeTab === "timeline" && (
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 animate-in fade-in slide-in-from-bottom-1" />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("holds")}
+          className={`px-6 py-3 text-sm font-medium transition-colors relative ${
+            activeTab === "holds"
+              ? "text-indigo-600 font-semibold"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Holds
+          {activeTab === "holds" && (
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 animate-in fade-in slide-in-from-bottom-1" />
           )}
         </button>
@@ -723,6 +776,64 @@ function ComplianceManager() {
         <AuditExportRequest />
       ) : activeTab === "timeline" ? (
         <AuditReadyTimeline />
+      ) : activeTab === "holds" ? (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">
+                Compliance Holds
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Structured hold reasons are attached to each hold action to support
+                auditability. Salary amounts and employee identifiers are never recorded here.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setHoldDialogOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+            >
+              Place Hold
+            </button>
+          </div>
+
+          {holds.length === 0 ? (
+            <div className="bg-white rounded-lg border p-8 text-center">
+              <p className="text-sm text-gray-500">No compliance holds have been placed.</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Use the &quot;Place Hold&quot; button to record a structured hold with a reason code.
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg border divide-y">
+              {holds.map((hold) => (
+                <div key={hold.id} className="px-6 py-4 flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium bg-amber-100 text-amber-800 border border-amber-200">
+                        {hold.reasonCode}
+                      </span>
+                      <span className="text-sm font-medium text-gray-900">{hold.targetLabel}</span>
+                    </div>
+                    {hold.notes && (
+                      <p className="text-xs text-gray-600 mt-1">{hold.notes}</p>
+                    )}
+                    <p className="text-xs text-gray-400 mt-1">
+                      Placed {new Date(hold.placedAt).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <ComplianceHoldDialog
+            isOpen={holdDialogOpen}
+            targetLabel="Current Compliance Period"
+            onClose={() => setHoldDialogOpen(false)}
+            onSubmit={handlePlaceHold}
+          />
+        </div>
       ) : (
         <ComplianceEvidenceBundleView />
       )}
