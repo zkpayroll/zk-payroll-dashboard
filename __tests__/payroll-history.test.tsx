@@ -202,10 +202,12 @@ describe("PayrollHistory", () => {
     });
 
     expect(
-      screen.getByText("No transactions match the current filters"),
+      screen.getByText("No payroll runs match your search"),
     ).toBeInTheDocument();
     expect(screen.queryByText("No payroll runs yet")).not.toBeInTheDocument();
-    expect(screen.getByText("Clear filters")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^clear all filters$/i }),
+    ).toBeInTheDocument();
   });
 
   it("renders the PayrollCalendar and its content inside the history view", () => {

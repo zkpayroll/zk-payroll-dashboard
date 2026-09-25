@@ -12,7 +12,9 @@ import { resolveReconciliationStatus } from "@/lib/reconciliation/status";
 
 type StatusFilter = "all" | "pending" | "verified" | "failed" | "cancelled";
 type OutcomeFilter = "all" | ReconciliationOutcome;
-import EmptyState from "@/components/ui/EmptyState";
+import PayrollFilterEmptyState from "@/components/filters/PayrollFilterEmptyState";
+import type { ActivePayrollFilter } from "@/src/payroll/emptyState";
+import { RECONCILIATION_STATUS_LABELS } from "@/lib/reconciliation/status";
 import { useHelpDrawer, HELP_CONTENT } from "@/stores/helpDrawer";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import {
@@ -59,6 +61,46 @@ const initialFilters: Filters = {
   dateTo: "",
   outcome: "all",
 };
+
+/**
+ * #464: active panel filters as removable, label-only constraints for the
+ * filtered empty state. Search is passed separately.
+ */
+function describeActiveFilters(filters: Filters): ActivePayrollFilter[] {
+  const active: ActivePayrollFilter[] = [];
+  if (filters.status !== "all") {
+    active.push({
+      key: "status",
+      label: `Status: ${filters.status.charAt(0).toUpperCase()}${filters.status.slice(1)}`,
+    });
+  }
+  if (filters.outcome !== "all") {
+    active.push({
+      key: "outcome",
+      label: `Outcome: ${
+        RECONCILIATION_STATUS_LABELS[
+          filters.outcome as keyof typeof RECONCILIATION_STATUS_LABELS
+        ] ?? filters.outcome
+      }`,
+    });
+  }
+  if (filters.dateFrom) {
+    active.push({ key: "dateFrom", label: `From: ${filters.dateFrom}` });
+  }
+  if (filters.dateTo) {
+    active.push({ key: "dateTo", label: `To: ${filters.dateTo}` });
+  }
+  return active;
+}
+
+/** Reset the single constraint identified by `key` (`"search"` included). */
+function removeFilter(filters: Filters, key: string): Filters {
+  if (key === "status" || key === "outcome") return { ...filters, [key]: "all" };
+  if (key === "search" || key === "dateFrom" || key === "dateTo") {
+    return { ...filters, [key]: "" };
+  }
+  return filters;
+}
 
 function generateViewId(): string {
   if (
@@ -593,17 +635,26 @@ function PayrollHistory({ runs = MOCK_PAYROLL_RUNS }: PayrollHistoryProps) {
           filter combination excludes all of them. */}
       {runs.length > 0 && activeFilterCount > 0 && filteredRuns.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm">
-          <EmptyState
-            screen="history-filtered"
-            action={{ label: "Clear filters", onClick: clearFilters }}
-            secondaryAction={{
-              label: "View payroll guide",
-              onClick: () => {
+          {/* #464: say which search/filters hid every run and let the user
+              drop them one at a time or all at once. */}
+          <PayrollFilterEmptyState
+            poolSize={runs.length}
+            search={filters.search}
+            filters={describeActiveFilters(filters)}
+            onRemoveFilter={(key) => setFilters((f) => removeFilter(f, key))}
+            onClearAll={clearFilters}
+          >
+            <button
+              type="button"
+              onClick={() => {
                 const content = HELP_CONTENT.payroll;
                 if (content) openHelp("payroll", content);
-              },
-            }}
-          />
+              }}
+              className="px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:underline transition-colors"
+            >
+              View payroll guide
+            </button>
+          </PayrollFilterEmptyState>
         </div>
       ) : (
         <>

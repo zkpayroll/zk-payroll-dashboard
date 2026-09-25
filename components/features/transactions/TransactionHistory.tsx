@@ -18,6 +18,14 @@ import {
 } from "@/src/payroll/quickFilters";
 import type { QuickFilterSelection } from "@/src/payroll/quickFilters";
 import PayrollQuickFilters from "@/components/filters/PayrollQuickFilters";
+import PayrollFilterEmptyState from "@/components/filters/PayrollFilterEmptyState";
+import {
+  SEARCH_CONSTRAINT_KEY,
+  formatSearchEcho,
+  quickFilterConstraints,
+  type ActivePayrollFilter,
+} from "@/src/payroll/emptyState";
+import type { QuickFilterGroup } from "@/src/payroll/quickFilters";
 import {
   ArrowUpRight,
   ArrowDownLeft,
@@ -104,6 +112,55 @@ const initialFilters: Filters = {
 
 function normalizeFilters(filters: Partial<Filters>): Filters {
   return { ...initialFilters, ...filters };
+}
+
+/**
+ * #464: active panel + quick filters as removable, label-only constraints for
+ * the filtered empty state. The employee name is deliberately not echoed back.
+ */
+function describeActiveFilters(filters: Filters): ActivePayrollFilter[] {
+  const active: ActivePayrollFilter[] = [];
+  if (filters.status !== "all") {
+    active.push({ key: "status", label: `Status: ${filters.status.charAt(0).toUpperCase()}${filters.status.slice(1)}` });
+  }
+  if (filters.reconciliation !== "all") {
+    active.push({
+      key: "reconciliation",
+      label: `Reconciliation: ${RECONCILIATION_STATUS_LABELS[filters.reconciliation]}`,
+    });
+  }
+  if (filters.employee.trim()) {
+    active.push({ key: "employee", label: "Employee filter" });
+  }
+  if (filters.dateFrom) {
+    active.push({ key: "dateFrom", label: `From: ${filters.dateFrom}` });
+  }
+  if (filters.dateTo) {
+    active.push({ key: "dateTo", label: `To: ${filters.dateTo}` });
+  }
+  if (filters.payrollRun.trim()) {
+    active.push({
+      key: "payrollRun",
+      label: `Run ID: ${formatSearchEcho(filters.payrollRun)}`,
+    });
+  }
+  return [...active, ...quickFilterConstraints(filters.quick)];
+}
+
+/** Reset the single constraint identified by `key`. */
+function removeFilter(filters: Filters, key: string): Filters {
+  if (key === SEARCH_CONSTRAINT_KEY) return { ...filters, search: "" };
+  if (key.startsWith("quick:")) {
+    const group = key.slice("quick:".length) as QuickFilterGroup;
+    return { ...filters, quick: { ...filters.quick, [group]: "all" } };
+  }
+  if (key === "status" || key === "reconciliation") {
+    return { ...filters, [key]: "all" };
+  }
+  if (key in initialFilters) {
+    return { ...filters, [key]: "" };
+  }
+  return filters;
 }
 
 function generateViewId(): string {
@@ -336,6 +393,8 @@ function TransactionHistoryInner({
   );
 
   const clearFilters = () => setFilters(initialFilters);
+
+  const activeFilters = useMemo(() => describeActiveFilters(filters), [filters]);
 
   // ── Saved views handlers ────────────────────────────────────
 
@@ -890,22 +949,36 @@ function TransactionHistoryInner({
               </tbody>
             </table>
           </div>
+        ) : filtered.length === 0 ? (
+          <>
+            {/* #464: one empty state for both layouts that says why nothing
+                is listed and how to get runs back. */}
+            <PayrollFilterEmptyState
+              poolSize={poolSize}
+              search={filters.search}
+              filters={activeFilters}
+              noun={mode === "archived" ? "archived payrolls" : "transactions"}
+              noDataDescription={
+                mode === "archived"
+                  ? "No archived payroll runs found. Payroll runs are archived after they are completed and superseded."
+                  : "No transactions yet. Process a payroll run to populate the transaction history."
+              }
+              onRemoveFilter={(key) => setFilters((f) => removeFilter(f, key))}
+              onClearAll={clearFilters}
+            />
+            <div className="px-4 sm:px-6 py-3 border-t text-xs text-gray-500">
+              {`Showing 0 of ${poolSize} ${
+                mode === "archived" ? "archived payrolls" : "transactions"
+              }`}
+            </div>
+          </>
         ) : (
           <>
             <ul
               className="md:hidden divide-y divide-gray-100"
               aria-label="Payroll transactions"
             >
-              {filtered.length === 0 ? (
-                <li className="px-4 py-8 text-center text-sm text-gray-500">
-                  {hasFiltersApplied
-                    ? "No transactions match the current filters. Try broadening your filter criteria."
-                    : mode === "archived"
-                      ? "No archived payroll runs found. Payroll runs are archived after they are completed and superseded."
-                      : "No transactions yet. Process a payroll run to populate the transaction history."}
-                </li>
-              ) : (
-                filtered.map((tx) => (
+              {filtered.map((tx) => (
                   <li key={tx.id} className="px-4 py-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -965,8 +1038,7 @@ function TransactionHistoryInner({
                       </button>
                     </div>
                   </li>
-                ))
-              )}
+              ))}
             </ul>
             <table className="hidden md:table w-full text-left">
               <caption className="sr-only">
@@ -1020,21 +1092,7 @@ function TransactionHistoryInner({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200" aria-live="polite">
-                {filtered.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={7}
-                      className="px-6 py-8 text-center text-sm text-gray-500"
-                    >
-                      {hasFiltersApplied
-                        ? "No transactions match the current filters. Try broadening your filter criteria."
-                        : mode === "archived"
-                          ? "No archived payroll runs found. Payroll runs are archived after they are completed and superseded."
-                          : "No transactions yet. Process a payroll run to populate the transaction history."}
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((tx) => (
+                {filtered.map((tx) => (
                     <tr key={tx.id}>
                       <td className="px-6 py-4 flex items-center">
                         {tx.totalAmount > 0 ? (
@@ -1109,8 +1167,7 @@ function TransactionHistoryInner({
                         </div>
                       </td>
                     </tr>
-                  ))
-                )}
+                ))}
               </tbody>
             </table>
 
