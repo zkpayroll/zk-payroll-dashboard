@@ -407,6 +407,25 @@ step warning operators of immutability and downstream impacts.
 
 ---
 
+## #464 — Empty States for Payroll Search and Filters
+
+When search or filters hide every run, payroll lists render
+`PayrollFilterEmptyState` (`components/filters/PayrollFilterEmptyState.tsx`)
+instead of a generic "no data" message.
+
+- **Why it's empty:** `describePayrollEmptyState` (`src/payroll/emptyState.ts`)
+  tells apart *no data yet*, *search miss*, *filter miss*, and
+  *search + filters*. Each case gets its own title and a "0 of N" explanation.
+- **How to recover:** each active constraint appears as a chip with its own
+  remove button. A single **Clear all filters** button resets search and every
+  filter.
+- **Privacy:** only filter labels appear. The search echo is cut to 32
+  characters, the employee filter shows as "Employee filter" without the name,
+  and run records (amounts, wallets, hashes) are never passed to the
+  component.
+- **Integrated in:** `PayrollHistory`, `TransactionHistory` (history and
+  archived modes).
+
 ## Test coverage summary
 
 | Issue | Test file | Happy path | Edge case |
