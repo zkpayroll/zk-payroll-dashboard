@@ -565,3 +565,69 @@ export interface AuditReadyTimeline {
   /** Whether this timeline has been exported for audit */
   exported: boolean;
 }
+
+// ─── Wallet Rotation Approval Timeline (#262) ────────────────────────────────
+
+export type WalletRotationEventType =
+  | "rotation_requested"
+  | "approval_granted"
+  | "approval_rejected"
+  | "cooldown_activated"
+  | "cooldown_expired"
+  | "emergency_override"
+  | "rotation_completed"
+  | "rotation_failed";
+
+export type WalletRotationReasonCode =
+  | "key_compromise"
+  | "device_loss"
+  | "scheduled_rotation"
+  | "compliance_requirement"
+  | "emergency";
+
+export interface WalletRotationEvent {
+  id: string;
+  employeeId: string;
+  type: WalletRotationEventType;
+  timestamp: string;
+  actor: string;
+  reasonCode: WalletRotationReasonCode;
+  previousWallet: string;
+  newWallet?: string;
+  /** Human-readable description — wallet addresses are masked by default */
+  summary: string;
+  metadata?: Record<string, string>;
+}
+
+export interface WalletRotationRequest {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  previousWallet: string;
+  newWallet: string;
+  reasonCode: WalletRotationReasonCode;
+  requestedBy: string;
+  requestedAt: string;
+  status: "pending" | "approved" | "rejected" | "cooldown" | "completed" | "failed";
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
+  cooldownEndsAt?: string;
+  isEmergency?: boolean;
+  events: WalletRotationEvent[];
+  metadata?: Record<string, string>;
+}
+
+export interface WalletRotationCooldown {
+  employeeId: string;
+  rotationId: string;
+  activatedAt: string;
+  expiresAt: string;
+  isActive: boolean;
+}
+
+export interface WalletRotationWarning {
+  type: "cooldown_active" | "payroll_blocker" | "pending_approval";
+  message: string;
+  severity: "info" | "warning" | "critical";
+}
