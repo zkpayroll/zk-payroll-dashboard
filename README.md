@@ -15,6 +15,7 @@ The **ZK Payroll Dashboard** is a privacy-first web application designed for man
 - **Privacy-Preserving Payroll**: Execute batch payroll transactions where salary amounts are hidden using ZK commitments.
 - **Employee Management**: Register and manage employees with encrypted metadata.
 - **Transaction History**: Verifiable history of all payroll events.
+- **Payroll Saved Views**: Save named payroll history filters and sort settings locally for repeat review; saved views contain no payroll amounts or row data.
 - **Transaction Detail View**: 🆕 Comprehensive transaction inspection with verification metadata, timestamps, and blockchain details.
 - **Compliance View**: Optional view-key generation for auditing purposes.
 - **Employer Onboarding Timeline**: 🆕 Activity timeline item for employer onboarding events with privacy-safe employer identifiers and setup progress.
@@ -139,11 +140,11 @@ Navigate to **Obligation Snapshots** (`/payroll/snapshots`) to review payroll ob
 
 **Manual QA checklist:**
 
-| Path | Expected |
-| ---- | -------- |
-| `/payroll/snapshots/snap_valid_001` | Review diff → approve lock succeeds |
-| `/payroll/snapshots/snap_stale_001/approval` | Lock blocked with stale reason |
-| `/payroll/snapshots/snap_blocked_001` | Blocked rows shown; lock disabled |
+| Path                                         | Expected                            |
+| -------------------------------------------- | ----------------------------------- |
+| `/payroll/snapshots/snap_valid_001`          | Review diff → approve lock succeeds |
+| `/payroll/snapshots/snap_stale_001/approval` | Lock blocked with stale reason      |
+| `/payroll/snapshots/snap_blocked_001`        | Blocked rows shown; lock disabled   |
 
 Run automated coverage: `npm test -- __tests__/snapshots.test.tsx`
 
@@ -161,13 +162,13 @@ Full copy-paste reference: **[docs/setup.md](docs/setup.md)**. Short version:
 
 **Env vars** (`cp .env.example .env.local` then edit):
 
-| Variable | Example | Notes |
-| ---------- | --------- | ------- |
-| `NEXT_PUBLIC_STELLAR_NETWORK` | `TESTNET` | Network selector |
-| `NEXT_PUBLIC_HORIZON_URL` | `https://horizon-testnet.stellar.org` | Must match network |
-| `NEXT_PUBLIC_SOROBAN_RPC_URL` | `https://soroban-testnet.stellar.org` | Soroban RPC matching network |
-| `SESSION_SECRET` | 32+ random chars (`openssl rand -base64 32`) | ≥32 chars or boot throws (`lib/env.ts`) |
-| `ADMIN_PUBLIC_KEY` | `G...` (56 chars) | Your testnet public key (Freighter → Copy Address) |
+| Variable                      | Example                                      | Notes                                              |
+| ----------------------------- | -------------------------------------------- | -------------------------------------------------- |
+| `NEXT_PUBLIC_STELLAR_NETWORK` | `TESTNET`                                    | Network selector                                   |
+| `NEXT_PUBLIC_HORIZON_URL`     | `https://horizon-testnet.stellar.org`        | Must match network                                 |
+| `NEXT_PUBLIC_SOROBAN_RPC_URL` | `https://soroban-testnet.stellar.org`        | Soroban RPC matching network                       |
+| `SESSION_SECRET`              | 32+ random chars (`openssl rand -base64 32`) | ≥32 chars or boot throws (`lib/env.ts`)            |
+| `ADMIN_PUBLIC_KEY`            | `G...` (56 chars)                            | Your testnet public key (Freighter → Copy Address) |
 
 **Commands** (prefer `npm` — repo uses `package-lock.json`; `pnpm` also works):
 
@@ -191,4 +192,3 @@ Before opening a PR, please review our [Contributor Issue Validation Checklist](
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
