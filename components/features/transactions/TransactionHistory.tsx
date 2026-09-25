@@ -9,6 +9,15 @@ import {
   Suspense,
 } from "react";
 import { searchPayrollRuns } from "@/lib/payrollSearch";
+import { formatPeriodLabel } from "@/lib/date/periodLabel";
+import {
+  EMPTY_QUICK_FILTERS,
+  applyQuickFilters,
+  computeQuickFilterCounts,
+  countActiveQuickFilters,
+} from "@/src/payroll/quickFilters";
+import type { QuickFilterSelection } from "@/src/payroll/quickFilters";
+import PayrollQuickFilters from "@/components/filters/PayrollQuickFilters";
 import {
   ArrowUpRight,
   ArrowDownLeft,
@@ -27,6 +36,7 @@ import {
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { MOCK_TRANSACTIONS, MOCK_EMPLOYEES } from "@/lib/api/mockData";
 import type { PayrollTransaction, ReconciliationOutcome } from "@/types";
+import type { PayrollTransaction, PayrollRun } from "@/types";
 import TransactionDetailDrawer from "./TransactionDetailDrawer";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -36,6 +46,7 @@ import {
   RECONCILIATION_STATUS_LABELS,
   resolveReconciliationStatus,
 } from "@/lib/reconciliation/status";
+import { SubmissionProgressCell } from "@/components/stepper/SubmissionProgressCell";
 
 type StatusFilter = "all" | "verified" | "pending" | "failed" | "cancelled";
 type ReconciliationFilter = "all" | ReconciliationOutcome;
@@ -69,6 +80,8 @@ interface Filters {
   dateFrom: string;
   dateTo: string;
   payrollRun: string;
+  /** #284 one-click quick filters, applied after the fields above. */
+  quick: QuickFilterSelection;
 }
 
 interface SavedView {
@@ -86,6 +99,7 @@ const initialFilters: Filters = {
   dateFrom: "",
   dateTo: "",
   payrollRun: "",
+  quick: { ...EMPTY_QUICK_FILTERS },
 };
 
 function normalizeFilters(filters: Partial<Filters>): Filters {
@@ -230,7 +244,7 @@ function TransactionHistoryInner({
   const [editingViewId, setEditingViewId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
-  const filtered = useMemo(() => {
+  const filteredBase = useMemo(() => {
     let results = MOCK_TRANSACTIONS.filter((t) =>
       mode === "archived" ? t.isArchived : !t.isArchived,
     );
@@ -285,12 +299,41 @@ function TransactionHistoryInner({
     !!filters.dateTo,
     !!filters.payrollRun,
   ].filter(Boolean).length;
+  // #284: quick filters apply on top of the search/panel result so their
+  // faceted counts describe the list the user is actually looking at.
+  const filtered = useMemo(
+    () => applyQuickFilters(filteredBase, filters.quick),
+    [filteredBase, filters.quick],
+  );
+
+  const activeFilterCount =
+    [
+      !!filters.search.trim(),
+      filters.status !== "all",
+      !!filters.employee,
+      !!filters.dateFrom,
+      !!filters.dateTo,
+      !!filters.payrollRun,
+    ].filter(Boolean).length + countActiveQuickFilters(filters.quick);
 
   const handleExport = () => {
     const csv = exportToCsv(filtered);
     const date = new Date().toISOString().slice(0, 10);
     downloadCsv(csv, `payroll-history-${date}.csv`);
   };
+
+  const poolSize = useMemo(
+    () =>
+      MOCK_TRANSACTIONS.filter((t) =>
+        mode === "archived" ? t.isArchived : !t.isArchived,
+      ).length,
+    [mode],
+  );
+
+  const quickFilterCounts = useMemo(
+    () => computeQuickFilterCounts(filteredBase, filters.quick),
+    [filteredBase, filters.quick],
+  );
 
   const clearFilters = () => setFilters(initialFilters);
 
@@ -311,6 +354,13 @@ function TransactionHistoryInner({
 
   const handleApplyView = useCallback((view: SavedView) => {
     setFilters(normalizeFilters(view.filters));
+    setFilters((prev) => ({
+      ...initialFilters,
+      ...view.filters,
+      // Views saved before #284 have no quick-filter selection — treat as
+      // "no quick filters" instead of letting undefined crash the toolbar.
+      quick: view.filters.quick ?? { ...EMPTY_QUICK_FILTERS, ...prev.quick },
+    }));
     setShowSavedViews(false);
   }, []);
 
@@ -675,6 +725,15 @@ function TransactionHistoryInner({
           </div>
         )}
 
+        {/* ── #284 Quick filters toolbar ──────────────────────────── */}
+        <PayrollQuickFilters
+          selection={filters.quick}
+          counts={quickFilterCounts}
+          totalCount={poolSize}
+          filteredCount={filtered.length}
+          onChange={(quick) => setFilters((f) => ({ ...f, quick }))}
+        />
+
         {/* ── Active filter bar with save button ──────────────────── */}
         {hasFiltersApplied && (
           <div className="px-6 py-2 bg-indigo-50 border-b flex items-center justify-between">
@@ -785,6 +844,7 @@ function TransactionHistoryInner({
                     className="px-6 py-3 text-xs font-medium text-gray-400 uppercase"
                   >
                     Reconciliation
+                    Progress
                   </th>
                   <th
                     scope="col"
@@ -817,6 +877,7 @@ function TransactionHistoryInner({
                     </td>
                     <td className="px-6 py-4">
                       <div className="h-6 bg-gray-200 rounded-full w-24"></div>
+                      <div className="h-2 bg-gray-200 rounded-full w-16"></div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="h-4 bg-gray-200 rounded w-24"></div>
@@ -870,7 +931,7 @@ function TransactionHistoryInner({
                           )}
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
-                          ${tx.totalAmount.toLocaleString()} ·{" "}
+                          <span className="font-medium text-gray-700">{formatPeriodLabel(tx)}</span> · ${tx.totalAmount.toLocaleString()} ·{" "}
                           {new Date(tx.createdAt).toLocaleDateString()}
                         </p>
                       </div>
@@ -942,6 +1003,7 @@ function TransactionHistoryInner({
                     className="px-6 py-3 text-xs font-medium text-gray-600 uppercase"
                   >
                     Reconciliation
+                    Progress
                   </th>
                   <th
                     scope="col"
@@ -1009,10 +1071,16 @@ function TransactionHistoryInner({
                       <td className="px-6 py-4">
                         <ReconciliationStatusBadge
                           status={resolveReconciliationStatus(tx)}
+                      {/* Issue #295: compact lifecycle progress — state only,
+                          no amounts, proofs, or hashes rendered here. */}
+                      <td className="px-6 py-4">
+                        <SubmissionProgressCell
+                          input={{ source: "run", run: tx as PayrollRun }}
                         />
                       </td>
                       <td className="px-6 py-4 text-gray-600">
-                        {new Date(tx.createdAt).toLocaleDateString()}
+                        <div className="font-medium text-gray-900">{formatPeriodLabel(tx)}</div>
+                        <div className="text-xs text-gray-500">{new Date(tx.createdAt).toLocaleDateString()}</div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
@@ -1045,14 +1113,9 @@ function TransactionHistoryInner({
             </table>
 
             <div className="px-4 sm:px-6 py-3 border-t text-xs text-gray-500">
-              {(() => {
-                const poolSize = MOCK_TRANSACTIONS.filter((t) =>
-                  mode === "archived" ? t.isArchived : !t.isArchived,
-                ).length;
-                return `Showing ${filtered.length} of ${poolSize} ${
-                  mode === "archived" ? "archived payrolls" : "transactions"
-                }`;
-              })()}
+              {`Showing ${filtered.length} of ${poolSize} ${
+                mode === "archived" ? "archived payrolls" : "transactions"
+              }`}
             </div>
           </>
         )}

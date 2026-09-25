@@ -106,6 +106,7 @@ export function getCalendarMonthDays(year: number, month: number): (Date | null)
   return days;
 }
 
+
 export const RUN_KIND_STYLES: Record<
   RunScheduleKind,
   { badge: string; dot: string; label: string; heatBg: string[] }

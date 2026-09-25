@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 
-import { Users, Loader2, UserPlus, Upload, RotateCcw } from "lucide-react"
+import { Users, Loader2, UserPlus, Upload, RotateCcw, UserCheck } from "lucide-react"
 import { useEmployeeStore } from "@/stores/employees";
 import { MOCK_EMPLOYEES } from "@/lib/api/mockData";
 import type { Employee } from "@/types";
@@ -15,8 +15,10 @@ import StatusBadge from "@/components/ui/StatusBadge";
 type StatusFilter = "all" | "active" | "inactive" | "pending";
 
 function deriveStatus(e: Employee): "active" | "inactive" | "pending" {
-  if (e.status) return e.status;
-  if (!e.isActive) return "inactive";
+  // `isActive` determines payroll eligibility. Prefer it over a potentially
+  // stale display status so an ineligible employee is never shown as active.
+  if (!e.isActive || e.status === "inactive") return "inactive";
+  if (e.status === "pending") return "pending";
   if (!e.lastPayment) return "pending";
   return "active";
 }
@@ -104,6 +106,13 @@ function EmployeeDirectory() {
               <UserPlus className="w-3.5 h-3.5" aria-hidden="true" />
               Add Employee
             </button>
+            <a
+              href="/employees/lifecycle"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-100 text-gray-700 text-xs font-medium hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+            >
+              <UserCheck className="w-3.5 h-3.5" aria-hidden="true" />
+              Lifecycle
+            </a>
             <a
               href="/employees/import"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-100 text-gray-700 text-xs font-medium hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"

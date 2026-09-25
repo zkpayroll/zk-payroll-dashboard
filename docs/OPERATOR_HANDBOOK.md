@@ -205,6 +205,37 @@ The system will automatically:
 3. Review payroll run detail page
 4. Verify status shows "Verified"
 
+### Submission Progress Stepper
+
+A progress stepper above the payroll wizard shows the six lifecycle stages of
+a payroll submission:
+
+1. **Validation** — run data, treasury, and proof checks
+2. **Approval** — executive sign-off on the run
+3. **Signing** — wallet signature on the batch transaction
+4. **Submission** — transaction broadcast to the network
+5. **Confirmation** — on-chain inclusion verified
+6. **Reconciliation** — payouts matched against the run
+
+Each stage is one of: **In progress** (spinning marker), **Complete** (green
+check), **Pending** (hollow marker), **Failed** (red marker), or **Skipped**
+(gray marker, cancelled runs only).
+
+**Reading the stepper:**
+
+- The active stage tells you where the run currently is. If a stage shows
+  **Failed**, fix the underlying issue and use the retry action on that step;
+  later stages stay pending until the failed stage succeeds.
+- A **Skipped** stage means the run was cancelled at that point (for example,
+  a treasury shortfall skips at Validation; an approval rejection skips at
+  Approval). The run detail page shows the cancellation reason.
+- The same stepper appears on the payroll run detail page for historical and
+  in-flight runs, so you can answer "where is this payroll?" without opening
+  the wizard.
+
+**Privacy note:** The stepper displays lifecycle state only. It never shows
+amounts, employee data, wallet addresses, proofs, or transaction hashes.
+
 ---
 
 ## Employee Management
@@ -269,11 +300,20 @@ After bulk import:
 4. Add reason for change
 5. Confirm update
 
-**Use Cases:**
+#### Employee Lifecycle Management Screen
 
-- Offboarding multiple employees
-- Seasonal workforce changes
-- Department reorganizations
+For dedicated administrative control over employee lifecycle transitions:
+
+1. Navigate to **Employees** → **Lifecycle** (`/employees/lifecycle`)
+2. Review current employee statuses (Active, Suspended, Offboarded)
+3. Filter by lifecycle status or search by name, department, or email
+4. Perform state transitions with full confirmation:
+   - **Suspend**: Temporarily exclude an active employee from payroll (e.g., sabbatical, compliance hold). Can be reactivated later.
+   - **Activate**: Reactivate a suspended employee when ready to resume payroll disbursements.
+   - **Offboard**: Permanently offboard an employee (terminal state; cannot be reactivated directly).
+5. All actions include an optional administrative note and append to the privacy-safe audit trail.
+
+See [Employee Lifecycle Management Guide](EMPLOYEE_LIFECYCLE.md) for full details.
 
 ---
 
@@ -283,10 +323,20 @@ After bulk import:
 
 1. Go to **History** page
 2. Review list of past payroll runs
-3. Use filters to narrow results:
+3. Read the **Progress** column to see where each run is in the submission lifecycle — six state dots (validation, approval, signing, submission, confirmation, reconciliation) with a hover tooltip summarizing the current stage (state labels only; no amounts or identifiers)
+4. Use the **quick filters** toolbar above the table for one-click narrowing:
+   - Status (verified / pending / failed / cancelled)
+   - Approval state (draft, awaiting approval, approved, rejected, correction requested)
+   - Risk state (clear / caution / warning / block)
+   - Treasury readiness (funded / underfunded / not yet verified)
+   - Reconciliation outcome (complete / partial / pending / failed)
+5. For finer control, open the **Filters** panel:
    - Date range
    - Status
    - Employee count
+6. Click **Clear quick filters** in the toolbar (or **Clear all** in the filter panel) to reset.
+
+Quick-filter chips show a count of matching runs and update as other filters narrow the list. They describe lifecycle state only — amounts, employee identities, wallet addresses, and proofs are never displayed in the toolbar.
 
 ### Payroll Run Details
 

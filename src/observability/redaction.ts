@@ -51,6 +51,7 @@ export const ALLOWED_METADATA_KEYS = new Set([
   "errorCategory",
   "errorCode",
   "errorLabel",
+  "errorMessage",
   "retryCount",
   "maxRetries",
   "network",
@@ -67,6 +68,13 @@ export const ALLOWED_METADATA_KEYS = new Set([
   "status",
   "sequence",
   "correlationId",
+  // Employer onboarding — safe non-private company identifiers
+  "employerId",
+  "employerName",
+  "companyId",
+  "companyName",
+  "step",
+  "stepLabel",
 ]);
 
 const DEFAULT_SALT = "zk_payroll_obs_salt_v1_2026";
@@ -125,21 +133,23 @@ export function redactPayload(payload: Record<string, unknown>): PayrollEventPay
   const redacted: PayrollEventPayload = {};
 
   for (const [key, value] of Object.entries(payload)) {
+    // Allowlist takes precedence for explicitly safe employer onboarding keys
+    if (ALLOWED_METADATA_KEYS.has(key)) {
+      if (key === "errorMessage" && typeof value === "string") {
+        redacted[key] = sanitizeErrorMessage(value);
+      } else {
+        redacted[key] = value;
+      }
+      continue;
+    }
+
     if (isSensitiveKey(key)) {
       redacted[key] = "[REDACTED]";
       continue;
     }
 
-    if (!ALLOWED_METADATA_KEYS.has(key)) {
-      redacted[key] = "[REDACTED_UNCLASSIFIED]";
-      continue;
-    }
-
-    if (key === "errorMessage" && typeof value === "string") {
-      redacted[key] = sanitizeErrorMessage(value);
-    } else {
-      redacted[key] = value;
-    }
+    // Fail-safe: unknown keys are redacted
+    redacted[key] = "[REDACTED_UNCLASSIFIED]";
   }
 
   return redacted;

@@ -104,6 +104,16 @@ export default function CommandPalette({ isOpen, onClose }: { isOpen: boolean; o
       route: "/incidents/runbook",
     },
     {
+      id: "nav-payroll-policy",
+      title: "Go to Payroll Policy Editor",
+      description: "Configure settlement windows, reserve rules, approval requirements, and capacity limits.",
+      category: "Navigation",
+      icon: Settings,
+      route: "/settings/payroll-policy",
+      adminOnly: true,
+    },
+
+    {
       id: "create-payroll",
       title: "Create New Payroll Run",
       description: "Generate proofs, approve, and execute on-chain batch payments.",

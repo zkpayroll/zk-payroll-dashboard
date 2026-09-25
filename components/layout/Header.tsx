@@ -1,4 +1,5 @@
 import { Bell, Search, User } from 'lucide-react';
+import EnvironmentSwitcher from '@/components/features/network/EnvironmentSwitcher';
 
 function Header() {
   const triggerPalette = () => {
@@ -22,6 +23,7 @@ function Header() {
       </button>
 
       <div className="flex items-center space-x-4">
+        <EnvironmentSwitcher />
         <button
           className="text-gray-600 hover:text-gray-800 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none focus-visible:rounded"
           aria-label="Notifications"

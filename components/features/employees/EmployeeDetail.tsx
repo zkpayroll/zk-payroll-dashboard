@@ -27,6 +27,7 @@ import { MOCK_EMPLOYEES, MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import type { Employee } from "@/types";
 import OnboardingBadge from "./OnboardingBadge";
 import EmptyState from "@/components/ui/EmptyState";
+import WalletChangeReviewCard from "@/components/review/WalletChangeReviewCard";
 
 export interface EmployeeDetailDrawerProps {
   employee: Employee | null;
@@ -99,6 +100,7 @@ export function EmployeeDetailDrawer({ employee, isOpen, onClose }: EmployeeDeta
           </div>
 
           <div className="space-y-8">
+            <WalletChangeReviewCard employeeId={employee.id} employeeName={employee.name} />
             {/* Professional Info */}
             <section>
               <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Professional Information</h4>
