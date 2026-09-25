@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Clickable table rows for quick access
   - Dedicated "Details" button in actions column
 
+- **Reconciliation status history**:
+  - Added namespaced badges for `Matched`, `Pending`, `Mismatched`, `Failed`, and `Manually reviewed` outcomes
+  - Added reconciliation-aware filtering, search, CSV labels, and legacy `complete`/`partial` normalization
+  - Added privacy-safe status resolution that does not render private payroll values
+
 - **UI Components**:
   - `Sheet`: Slide-out drawer component based on Radix UI Dialog
   - `Badge`: Status indicator component with multiple variants
@@ -30,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Testing**:
   - Comprehensive test suite for TransactionDetailDrawer component
   - Tests for status display, proof masking, clipboard operations, and null handling
+  - Reconciliation resolver, badge, filtering, legacy mapping, privacy, and edge-case coverage
 
 - **Documentation**:
   - Detailed feature documentation in `docs/TRANSACTION_DETAIL_FEATURE.md`

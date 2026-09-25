@@ -1,4 +1,8 @@
 import type { PayrollTransaction } from "@/types/models";
+import {
+  RECONCILIATION_STATUS_LABELS,
+  resolveReconciliationStatus,
+} from "@/lib/reconciliation/status";
 
 /**
  * Free-text search across payroll runs (issue #167).
@@ -30,11 +34,14 @@ export function matchesPayrollSearch(tx: PayrollTransaction, query: string): boo
   const needle = query.trim().toLowerCase();
   if (!needle) return true;
 
+  const reconciliationStatus = resolveReconciliationStatus(tx);
   const haystacks = [
     tx.id,
     tx.status,
     tx.txHash ?? "",
     formatRunPeriod(tx),
+    RECONCILIATION_STATUS_LABELS[reconciliationStatus],
+    reconciliationStatus,
     // ISO date too, so "2026-03" works as well as "March 2026" — users paste
     // both, and supporting only one makes the box feel broken.
     (tx.createdAt || tx.timestamp || "").slice(0, 10),

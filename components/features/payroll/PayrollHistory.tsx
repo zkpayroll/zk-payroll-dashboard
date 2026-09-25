@@ -1,14 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Filter, Search, X } from "lucide-react";
+import { Filter, X } from "lucide-react";
 import PayrollCalendar from "./PayrollCalendar";
 import { MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
-import type { PayrollRun } from "@/types/models";
+import type { PayrollRun, ReconciliationOutcome } from "@/types/models";
 import { searchPayrollRuns } from "@/lib/payrollSearch";
+import { resolveReconciliationStatus } from "@/lib/reconciliation/status";
 
 type StatusFilter = "all" | "pending" | "verified" | "failed" | "cancelled";
-type OutcomeFilter = "all" | "pending" | "partial" | "complete" | "failed";
+type OutcomeFilter = "all" | ReconciliationOutcome;
 
 interface Filters {
   search: string;
@@ -52,7 +53,9 @@ function PayrollHistory({ runs = MOCK_PAYROLL_RUNS }: PayrollHistoryProps) {
     }
 
     if (filters.outcome !== "all") {
-      results = results.filter((r) => r.reconciliationStatus === filters.outcome);
+      results = results.filter(
+        (r) => resolveReconciliationStatus(r) === filters.outcome,
+      );
     }
 
     return results;
@@ -82,7 +85,7 @@ function PayrollHistory({ runs = MOCK_PAYROLL_RUNS }: PayrollHistoryProps) {
             onChange={(e) =>
               setFilters((prev) => ({ ...prev, search: e.target.value }))
             }
-            placeholder="Search run id, period, tx hash, status..."
+            placeholder="Search run id, period, tx hash, status, reconciliation..."
             className="w-full pl-3 pr-8 py-1.5 rounded-md border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
           />
           {filters.search && (
@@ -163,10 +166,11 @@ function PayrollHistory({ runs = MOCK_PAYROLL_RUNS }: PayrollHistoryProps) {
               className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             >
               <option value="all">All outcomes</option>
-              <option value="complete">Complete</option>
-              <option value="partial">Partial</option>
+              <option value="matched">Matched</option>
               <option value="pending">Pending</option>
+              <option value="mismatched">Mismatched</option>
               <option value="failed">Failed</option>
+              <option value="manually_reviewed">Manually reviewed</option>
             </select>
           </div>
           <div>

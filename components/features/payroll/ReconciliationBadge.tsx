@@ -1,8 +1,107 @@
 "use client";
 
-import React from "react";
-import { CheckCircle2, AlertCircle, Clock, XCircle } from "lucide-react";
-import { PayrollRun } from "@/types/models";
+import * as React from "react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Eye,
+  XCircle,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import type { PayrollRun, ReconciliationOutcome } from "@/types/models";
+import {
+  isReconciliationOutcome,
+  RECONCILIATION_STATUS_LABELS,
+  resolveReconciliationStatus,
+} from "@/lib/reconciliation/status";
+
+export type ReconciliationBadgeStatus = ReconciliationOutcome;
+
+type BadgeVariant =
+  | "success"
+  | "warning"
+  | "info"
+  | "error"
+  | "secondary";
+
+interface ReconciliationStatusConfig {
+  label: string;
+  description: string;
+  variant: BadgeVariant;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+}
+
+const RECONCILIATION_CONFIG: Record<
+  ReconciliationBadgeStatus,
+  ReconciliationStatusConfig
+> = {
+  matched: {
+    label: "Matched",
+    description: "All expected payments were reconciled.",
+    variant: "success",
+    icon: CheckCircle2,
+  },
+  pending: {
+    label: "Pending",
+    description: "Reconciliation is still in progress. Check again after settlement.",
+    variant: "info",
+    icon: Clock,
+  },
+  mismatched: {
+    label: "Mismatched",
+    description: "Reconciliation found a mismatch. Open the payroll run for details.",
+    variant: "warning",
+    icon: AlertTriangle,
+  },
+  failed: {
+    label: "Failed",
+    description: "Reconciliation could not complete. Open the payroll run to review and retry.",
+    variant: "error",
+    icon: XCircle,
+  },
+  manually_reviewed: {
+    label: "Manually reviewed",
+    description: "A reviewer acknowledged this reconciliation outcome.",
+    variant: "secondary",
+    icon: Eye,
+  },
+};
+
+export interface ReconciliationStatusBadgeProps
+  extends Omit<React.HTMLAttributes<HTMLDivElement>, "children"> {
+  status: ReconciliationBadgeStatus;
+  showIcon?: boolean;
+  size?: "sm" | "md";
+}
+
+export function ReconciliationStatusBadge({
+  status,
+  showIcon = true,
+  size = "sm",
+  className,
+  ...props
+}: ReconciliationStatusBadgeProps) {
+  const resolvedStatus = isReconciliationOutcome(status) ? status : "pending";
+  const config = RECONCILIATION_CONFIG[resolvedStatus];
+  const Icon = config.icon;
+  const sizeClass = size === "md" ? "px-2.5 py-1 text-sm" : "px-2.5 py-0.5 text-xs";
+
+  return (
+    <Badge
+      {...props}
+      variant={config.variant}
+      className={`inline-flex items-center gap-1 font-medium rounded-full ${sizeClass} ${className || ""}`}
+      role="status"
+      aria-label={`Reconciliation: ${config.label}`}
+      title={config.description}
+      data-testid="reconciliation-status-badge"
+    >
+      {showIcon && <Icon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
+      <span>{config.label}</span>
+    </Badge>
+  );
+}
 
 interface ReconciliationBadgeProps {
   payrollRun: PayrollRun;
@@ -13,117 +112,52 @@ export function ReconciliationBadge({
   payrollRun,
   variant = "compact",
 }: ReconciliationBadgeProps) {
-  const status = payrollRun.reconciliationStatus || "pending";
-  const details = payrollRun.reconciliationDetails;
+  const status = resolveReconciliationStatus(payrollRun);
 
-  const statusConfig = {
-    complete: {
-      label: "Fully Reconciled",
-      icon: CheckCircle2,
-      color: "text-green-600 bg-green-50",
-      borderColor: "border-green-200",
-    },
-    partial: {
-      label: "Partially Reconciled",
-      icon: AlertCircle,
-      color: "text-amber-600 bg-amber-50",
-      borderColor: "border-amber-200",
-    },
-    pending: {
-      label: "Awaiting Reconciliation",
-      icon: Clock,
-      color: "text-blue-600 bg-blue-50",
-      borderColor: "border-blue-200",
-    },
-    failed: {
-      label: "Reconciliation Failed",
-      icon: XCircle,
-      color: "text-red-600 bg-red-50",
-      borderColor: "border-red-200",
-    },
-  };
-
-  const config = statusConfig[status as keyof typeof statusConfig];
-  const Icon = config.icon;
-
-  if (variant === "compact") {
+  if (variant === "detailed") {
     return (
-      <div
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${config.color} border ${config.borderColor}`}
-      >
-        <Icon className="w-4 h-4" />
-        <span>{config.label}</span>
+      <div className="space-y-2">
+        <ReconciliationStatusBadge status={status} size="md" />
+        <p className="text-xs text-gray-600">
+          Open the payroll run for reconciliation progress and reviewer context.
+        </p>
       </div>
     );
   }
 
-  return (
-    <div className={`p-4 rounded-lg border ${config.borderColor} ${config.color}`}>
-      <div className="flex items-start gap-3">
-        <Icon className="w-5 h-5 mt-0.5 flex-shrink-0" />
-        <div className="flex-1">
-          <h3 className="font-semibold">{config.label}</h3>
-          {details && (
-            <div className="mt-2 text-sm space-y-1">
-              {details.processedCount !== undefined && (
-                <p>
-                  Processed: {details.processedCount} of {details.totalCount} records
-                </p>
-              )}
-              {details.discrepancies && details.discrepancies.length > 0 && (
-                <div className="mt-2">
-                  <p className="font-medium">Discrepancies:</p>
-                  <ul className="list-disc list-inside mt-1 space-y-1">
-                    {details.discrepancies.map((disc, idx) => (
-                      <li key={idx} className="text-sm">
-                        {disc}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {details.lastReconciliedAt && (
-                <p className="mt-2 text-xs opacity-75">
-                  Last reconciled: {new Date(details.lastReconciliedAt).toLocaleString()}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  return <ReconciliationStatusBadge status={status} />;
 }
 
 export function ReconciliationSummary({ payrollRun }: { payrollRun: PayrollRun }) {
-  const status = payrollRun.reconciliationStatus || "pending";
   const details = payrollRun.reconciliationDetails;
+  const status = resolveReconciliationStatus(payrollRun);
 
-  if (!details) {
-    return null;
-  }
+  if (!details) return null;
 
   const percentage =
     details.totalCount > 0
       ? Math.round((details.processedCount / details.totalCount) * 100)
       : 0;
+  const statusLabel = RECONCILIATION_STATUS_LABELS[status];
 
   return (
     <div className="space-y-2">
       <div className="flex justify-between text-sm">
         <span className="text-gray-600">Reconciliation Progress</span>
         <span className="font-medium">
-          {details.processedCount}/{details.totalCount}
+          {details.processedCount}/{details.totalCount} · {statusLabel}
         </span>
       </div>
       <div className="w-full bg-gray-200 rounded-full h-2">
         <div
           className={`h-2 rounded-full transition-all ${
-            status === "complete"
+            status === "matched"
               ? "bg-green-600"
-              : status === "partial"
+              : status === "mismatched"
                 ? "bg-amber-600"
-                : "bg-blue-600"
+                : status === "failed"
+                  ? "bg-red-600"
+                  : "bg-blue-600"
           }`}
           style={{ width: `${percentage}%` }}
         />

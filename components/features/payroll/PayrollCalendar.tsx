@@ -174,8 +174,8 @@ function MonthCalendar({
   onPrevMonth: () => void;
   onNextMonth: () => void;
 }) {
-  const year = viewDate.getFullYear();
-  const month = viewDate.getMonth();
+  const year = viewDate.getUTCFullYear();
+  const month = viewDate.getUTCMonth();
   const days = getCalendarMonthDays(year, month);
   const todayKey = toDateKey(new Date());
 
@@ -249,7 +249,7 @@ function MonthCalendar({
                     isToday ? "text-indigo-700" : "text-gray-700"
                   }`}
                 >
-                  {day.getDate()}
+                  {day.getUTCDate()}
                 </span>
                 <div className="space-y-0.5">
                   {dayRuns.slice(0, 2).map((run) => {
@@ -329,11 +329,13 @@ function PayrollCalendar({ runs = MOCK_PAYROLL_RUNS }: PayrollCalendarProps) {
 
   const initialViewDate = nextUp ? getRunDate(nextUp) : new Date();
   const [viewDate, setViewDate] = useState(
-    () => new Date(initialViewDate.getFullYear(), initialViewDate.getMonth(), 1),
+    () => new Date(Date.UTC(initialViewDate.getUTCFullYear(), initialViewDate.getUTCMonth(), 1)),
   );
 
   const shiftMonth = (delta: number) => {
-    setViewDate((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+    setViewDate((current) =>
+      new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth() + delta, 1)),
+    );
   };
 
   if (runs.length === 0) {

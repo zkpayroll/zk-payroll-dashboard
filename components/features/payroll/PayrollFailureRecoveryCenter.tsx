@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, XCircle, RotateCcw, Ban, ChevronDown, ChevronUp } from "lucide-react";
 import { MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
+import { resolveReconciliationStatus } from "@/lib/reconciliation/status";
 import type { PayrollRun } from "@/types";
 
 type FailureGroup = {
@@ -12,7 +13,7 @@ type FailureGroup = {
 };
 
 function classifyFailure(run: PayrollRun): { key: string; label: string } {
-  if (run.reconciliationStatus === "failed") {
+  if (resolveReconciliationStatus(run) === "failed") {
     return { key: "reconciliation_failed", label: "Reconciliation failed" };
   }
   if (run.reconciliationDetails?.discrepancies?.length) {
@@ -26,9 +27,7 @@ function classifyFailure(run: PayrollRun): { key: string; label: string } {
 
 export default function PayrollFailureRecoveryCenter() {
   const [runs, setRuns] = useState<PayrollRun[]>(() =>
-    MOCK_PAYROLL_RUNS.filter(
-      (r) => r.status === "failed" || r.reconciliationStatus === "failed",
-    ),
+    MOCK_PAYROLL_RUNS.filter((r) => resolveReconciliationStatus(r) === "failed"),
   );
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});

@@ -91,6 +91,21 @@ The **Attention Required** panel surfaces urgent items:
 
 **Best Practice:** Check the alerts panel at the start of each shift and before running payroll.
 
+### Reconciliation Status QA
+
+Before closing a payroll investigation, verify the reconciliation badge in the history table:
+
+- [ ] **Matched** appears after all expected payments are reconciled
+- [ ] **Pending** is used while reconciliation is still running or progress is empty
+- [ ] **Mismatched** is used for discrepancies or incomplete progress
+- [ ] **Failed** is used when reconciliation cannot complete
+- [ ] **Manually reviewed** is used only after a reviewer acknowledges the outcome
+- [ ] The payment `Status` badge is checked separately from the reconciliation badge
+- [ ] The reconciliation filter, search, and CSV export show the same normalized label
+- [ ] No salary, wallet, proof, or discrepancy text appears in the badge or exported status column
+
+Legacy `Complete` and `Partial` values should be treated as `Matched` and `Mismatched` when checking older records.
+
 ### Treasury Management
 
 #### Check Treasury Balance

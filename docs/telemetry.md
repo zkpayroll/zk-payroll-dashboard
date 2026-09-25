@@ -25,6 +25,10 @@ To avoid accidental data leakage from raw exception messages (which may interpol
 
 To prevent fingerprinting or identifying very small companies based on exact employee counts, the count of employees in a payroll run is bucketed before being sent (e.g., `"1-5"`, `"6-20"`, `"21-50"`, `"50+"`).
 
+### Reconciliation Status Labels
+
+The normalized reconciliation label is safe operational metadata: `matched`, `pending`, `mismatched`, `failed`, or `manually_reviewed`. It may be used as an enum in product analytics, but must not be accompanied by discrepancy strings, payroll amounts, employee counts, employee identifiers, wallet addresses, proofs, or transaction hashes. The history badge and CSV status column follow the same restriction.
+
 ## Event Definitions
 
 ### 1. `onboarding_completed`

@@ -46,6 +46,19 @@ describe("PayrollHistory", () => {
     expect(screen.queryByLabelText("Status")).not.toBeInTheDocument();
   });
 
+  it("filters runs by normalized reconciliation outcome", () => {
+    render(<PayrollHistory runs={MOCK_PAYROLL_RUNS} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /filter/i }));
+    fireEvent.change(screen.getByLabelText("Transaction Outcome"), {
+      target: { value: "matched" },
+    });
+
+    expect(screen.getAllByText(/Feb 28, 2025/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Mar 31, 2025/)).not.toBeInTheDocument();
+    expect(screen.getByText(/1 filter active/i)).toBeInTheDocument();
+  });
+
   it("shows the active filter indicator when a status filter is applied", () => {
     render(<PayrollHistory runs={MOCK_PAYROLL_RUNS} />);
 

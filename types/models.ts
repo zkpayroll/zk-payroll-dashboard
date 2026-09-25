@@ -95,6 +95,15 @@ export interface SessionPayload {
   expiresAt: number;
 }
 
+export type ReconciliationOutcome =
+  | "matched"
+  | "pending"
+  | "mismatched"
+  | "failed"
+  | "manually_reviewed";
+
+export type ReconciliationStatus = ReconciliationOutcome | "partial" | "complete";
+
 export interface PayrollTransaction {
   id: string;
   companyId: string;
@@ -104,6 +113,13 @@ export interface PayrollTransaction {
   employeeCount: number;
   proof: string;
   status: "pending" | "verified" | "failed" | "cancelled";
+  reconciliationStatus?: ReconciliationStatus;
+  reconciliationDetails?: {
+    processedCount: number;
+    totalCount: number;
+    discrepancies?: string[];
+    lastReconciliedAt?: string;
+  };
   approvalStatus?:
     | "draft"
     | "pending_executive_approval"
@@ -125,13 +141,6 @@ export interface PayrollRun extends PayrollTransaction {
   employeeIds: string[];
   executedAt?: string | null;
   transactionHash?: string | null;
-  reconciliationStatus?: "pending" | "partial" | "complete" | "failed";
-  reconciliationDetails?: {
-    processedCount: number;
-    totalCount: number;
-    discrepancies?: string[];
-    lastReconciliedAt?: string;
-  };
 }
 
 export interface ViewKey {

@@ -137,6 +137,12 @@ export const MOCK_TRANSACTIONS: PayrollTransaction[] = [
     employeeCount: 2,
     proof: "0xzkproof_abc123", // ZK proof string
     status: "verified",
+    reconciliationStatus: "matched",
+    reconciliationDetails: {
+      processedCount: 2,
+      totalCount: 2,
+      lastReconciliedAt: "2025-03-01T09:00:00Z",
+    },
     txHash: "abc123def456",
     isArchived: false,
   },
@@ -149,6 +155,12 @@ export const MOCK_TRANSACTIONS: PayrollTransaction[] = [
     employeeCount: 2,
     proof: "0xzkproof_def789",
     status: "verified",
+    reconciliationStatus: "manually_reviewed",
+    reconciliationDetails: {
+      processedCount: 2,
+      totalCount: 2,
+      lastReconciliedAt: "2025-02-15T09:00:00Z",
+    },
     txHash: "def789ghi012",
     isArchived: true,
   },
@@ -161,6 +173,11 @@ export const MOCK_TRANSACTIONS: PayrollTransaction[] = [
     employeeCount: 2,
     proof: "",
     status: "pending",
+    reconciliationStatus: "pending",
+    reconciliationDetails: {
+      processedCount: 0,
+      totalCount: 2,
+    },
     txHash: "pending123def456",
     isArchived: false,
   },
@@ -173,7 +190,29 @@ export const MOCK_TRANSACTIONS: PayrollTransaction[] = [
     employeeCount: 1,
     proof: "",
     status: "cancelled",
+    reconciliationStatus: "mismatched",
+    reconciliationDetails: {
+      processedCount: 0,
+      totalCount: 1,
+    },
     isArchived: false,
+  },
+  {
+    id: "tx_005",
+    companyId: "company_001",
+    timestamp: "2025-05-31T09:00:00Z",
+    createdAt: "2025-05-31T09:00:00Z",
+    totalAmount: 9500,
+    employeeCount: 2,
+    proof: "",
+    status: "failed",
+    reconciliationStatus: "failed",
+    reconciliationDetails: {
+      processedCount: 0,
+      totalCount: 2,
+    },
+    txHash: "failed123def456",
+    isArchived: true,
   },
 ];
 
