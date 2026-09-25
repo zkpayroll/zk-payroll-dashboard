@@ -1,15 +1,15 @@
 import { NextRequest } from "next/server";
-import { PayrollRun } from "@types/models";
-import { Z } from "zod";
+import { PayrollRun } from "@/types/models";
+import { z } from "zod";
 import {
   successResponse,
   notFoundResponse,
   validationErrorResponse,
   errorResponse,
-} from "@lib/api/response";
-import { withCors, handleOptions } from "@lib/api/cors";
-import { updatePayrollStatusSchema, parseBody, cancelPayrollSchema } from "@lib/api/validation";
-import { MOCK_PAYROLL_RUNS } from "@lib/api/mockData";
+} from "@/lib/api/response";
+import { withCors, handleOptions } from "@/lib/api/cors";
+import { updatePayrollStatusSchema, parseBody, cancelPayrollSchema } from "@/lib/api/validation";
+import { MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 
 interface RouteContext {
   params: { id: string };

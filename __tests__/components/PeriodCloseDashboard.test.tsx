@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach } from "vitest";
 import PeriodCloseDashboard from "@/components/features/reconciliation/PeriodCloseDashboard";
 import { usePeriodCloseStore } from "@/stores/periodClose";
@@ -43,14 +43,38 @@ describe("PeriodCloseDashboard", () => {
     expect(within(card).getByRole("button", { name: /close period/i })).not.toBeDisabled();
   });
 
-  it("closes a ready period and shows the closed state", () => {
+  it("closes a ready period and shows the closed state after confirmation", async () => {
     render(<PeriodCloseDashboard runs={[makeRun({ id: "tx_001" })]} />);
 
     const card = screen.getByTestId("period-close-card-tx_001");
     fireEvent.click(within(card).getByRole("button", { name: /close period/i }));
 
-    expect(within(card).getByText("Closed")).toBeInTheDocument();
-    expect(within(card).queryByRole("button", { name: /close period/i })).not.toBeInTheDocument();
+    // Confirmation dialog is displayed
+    expect(screen.getByTestId("period-finalization-dialog")).toBeInTheDocument();
+
+    // Confirm finalization
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: /Confirm & finalize period/i }));
+
+    await waitFor(() => {
+      expect(within(card).getByText("Closed")).toBeInTheDocument();
+      expect(within(card).queryByRole("button", { name: /close period/i })).not.toBeInTheDocument();
+    });
+  });
+
+  it("keeps period open if confirmation dialog is canceled", () => {
+    render(<PeriodCloseDashboard runs={[makeRun({ id: "tx_001" })]} />);
+
+    const card = screen.getByTestId("period-close-card-tx_001");
+    fireEvent.click(within(card).getByRole("button", { name: /close period/i }));
+
+    expect(screen.getByTestId("period-finalization-dialog")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Cancel and keep open/i }));
+
+    expect(screen.queryByTestId("period-finalization-dialog")).not.toBeInTheDocument();
+    expect(within(card).queryByText("Closed")).not.toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: /close period/i })).toBeInTheDocument();
   });
 
   it("does not render a close button that could bypass a blocked checklist via a stale click", () => {

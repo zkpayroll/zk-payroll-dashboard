@@ -23,6 +23,8 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { StaleDataIndicator } from "./StaleDataIndicator";
+import { useStaleDataRefresh } from "@/hooks/useStaleDataRefresh";
 
 type StatusFilter = "all" | "pending" | "verified" | "failed" | "cancelled";
 type OutcomeFilter = "all" | "pending" | "partial" | "complete" | "failed";
@@ -89,6 +91,15 @@ function PayrollHistory({ runs = MOCK_PAYROLL_RUNS }: PayrollHistoryProps) {
   const { openHelp } = useHelpDrawer();
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
+
+  const staleState = useStaleDataRefresh({
+    initialLastFetchedAt: runs[0]?.createdAt ?? new Date(),
+    staleThresholdMs: 5 * 60 * 1000,
+    onRefresh: async () => {
+      // Simulate/trigger fetching latest payroll runs
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    },
+  });
 
   useEffect(() => {
     setCurrentPage(1);
@@ -215,6 +226,12 @@ function PayrollHistory({ runs = MOCK_PAYROLL_RUNS }: PayrollHistoryProps) {
 
   return (
     <>
+      <StaleDataIndicator
+        state={staleState}
+        variant="banner"
+        resourceName="Payroll history"
+        className="mb-4"
+      />
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative">
           <button

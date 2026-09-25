@@ -1745,6 +1745,7 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Failed S
               data-testid="payroll-last-updated"
             >
               Last updated 
+              Jan 15, 2024, 12:00 AM
               Jan 15, 2024, 1:00 AM
             </p>
             <div
@@ -3326,6 +3327,7 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Pending 
               data-testid="payroll-last-updated"
             >
               Last updated 
+              Jan 15, 2024, 12:00 AM
               Jan 15, 2024, 1:00 AM
             </p>
             <div
@@ -4826,6 +4828,7 @@ exports[`Visual Regression - Payroll Flow States > Payroll Run Detail - Verified
               data-testid="payroll-last-updated"
             >
               Last updated 
+              Jan 15, 2024, 12:00 AM
               Jan 15, 2024, 1:00 AM
             </p>
             <div

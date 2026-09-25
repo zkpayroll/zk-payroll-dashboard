@@ -29,6 +29,7 @@ export interface IncidentTimelineProps {
 
 const STAGE_NAMES: Record<PayrollStage, string> = {
   draft: "Draft Creation",
+  draft_updated: "Draft Updated",
   validation: "Validation",
   proof_setup: "ZK Proof Setup",
   wallet_signing: "Wallet Signing",

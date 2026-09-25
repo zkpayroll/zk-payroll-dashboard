@@ -44,7 +44,7 @@ function PayrollSummary() {
       const result = await generatePayrollProof({
         merkleRoot: "0xmock_merkle_root",
         totalPayrollAmount: "124500",
-        payroolPeriodId: "2026-02",
+        payrollPeriodId: "2026-02",
         employeeId: "emp-001",
         employeeSsn: "111-22-3333",
         salaryAmount: "8500",

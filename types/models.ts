@@ -129,6 +129,8 @@ export interface PayrollTransaction {
   companyId: string;
   timestamp: string;
   createdAt: string; // Added for consistency with API filters
+  updatedAt?: string | null;
+  lastUpdated?: string | null;
   totalAmount: number;
   employeeCount: number;
   proof: string;

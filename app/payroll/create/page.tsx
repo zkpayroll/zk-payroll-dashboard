@@ -141,7 +141,7 @@ export default function PayrollCreatePage() {
               <li>Batch ref failure (malformed): entering &quot;!!&quot; or &quot;a&quot; shows &quot;at least 3 characters&quot; / &quot;Invalid batch reference&quot;.</li>
               <li>Batch ref failure (duplicate): entering &quot;BATCH-2025-001&quot; or &quot;tx_001&quot; shows &quot;already in use&quot; — duplicate guidance.</li>
               <li>Batch ref edge: pasting &quot; BATCH 2025 001 &quot; trims whitespace before validation; lowercase &quot;batch-2025-001&quot; flagged as duplicate of existing uppercase variant.</li>
-              <li>Description success: entering a valid string doesn't show any error.</li>
+              <li>Description success: entering a valid string doesn&apos;t show any error.</li>
               <li>Description failure (PII): entering &quot;$5000&quot; shows warning about financial figures.</li>
               <li>Description failure (length): entering more than 255 chars shows length error.</li>
               <li>Privacy: no salary or amount is logged or displayed here — only asset codes and reference IDs.</li>

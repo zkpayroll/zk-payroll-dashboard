@@ -39,8 +39,8 @@ export async function GET(request: NextRequest) {
       successResponse(paginated, {
         page,
         limit,
-        total: MOCK_PAYKROLL_RUNS.length,
-        totalPages: Math.ceil(MOCK_PAYKROLL_RUNS.length / limit),
+        total: MOCK_PAYROLL_RUNS.length,
+        totalPages: Math.ceil(MOCK_PAYROLL_RUNS.length / limit),
       }),
       request,
     );

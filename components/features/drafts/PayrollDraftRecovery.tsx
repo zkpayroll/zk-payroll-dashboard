@@ -109,7 +109,11 @@ function DraftRow({ draft, onRecover, onDiscard, onDelete }: {
   );
 }
 
-export default function PayrollDraftRecovery() {
+export interface PayrollDraftRecoveryProps {
+  showLastUpdated?: boolean;
+}
+
+export default function PayrollDraftRecovery({ showLastUpdated }: PayrollDraftRecoveryProps = {}) {
   const {
     drafts,
     filterStatus,

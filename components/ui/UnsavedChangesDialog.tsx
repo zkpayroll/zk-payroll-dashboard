@@ -103,10 +103,12 @@ export function UnsavedChangesDialog({
       data-testid="unsaved-changes-dialog"
     >
       <div
+        role="presentation"
         className="relative mx-4 w-full max-w-sm rounded-2xl border border-amber-200 bg-white p-6 shadow-2xl"
         // Prevent click-outside from silently discarding — operator must
         // choose explicitly.
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
       >
         {/* Icon + title */}
         <div className="flex items-start gap-3">

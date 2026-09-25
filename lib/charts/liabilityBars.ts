@@ -49,8 +49,8 @@ export function hasOutstandingBalance(bar: Pick<LiabilityBar, "outstanding">): b
 export function buildLiabilityBars(assets: ReconciliationAssetAmount[]): LiabilityBar[] {
   const canonicalOrder = SUPPORTED_PAYROLL_ASSETS.map((a) => a.code);
   const sorted = [...assets].sort((a, b) => {
-    const rankA = canonicalOrder.indexOf(a.asset.code);
-    const rankB = canonicalOrder.indexOf(b.asset.code);
+    const rankA = canonicalOrder.indexOf(a.asset.code as any);
+    const rankB = canonicalOrder.indexOf(b.asset.code as any);
     if (rankA !== -1 && rankB !== -1) return rankA - rankB;
     if (rankA !== -1) return -1;
     if (rankB !== -1) return 1;

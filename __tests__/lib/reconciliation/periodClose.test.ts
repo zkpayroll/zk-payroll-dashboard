@@ -21,24 +21,18 @@ function makeLock(overrides: Partial<PayrollLock> = {}): PayrollLock {
 }
 
 function makeDispute(overrides: Partial<PayrollDispute> = {}): PayrollDispute {
-  // @ts-expect-error
   return {
     id: "dsp_x",
     payrollPeriod: "2025-01",
-    payrollBatch: "batch_x",
-    payrollRunId: "tx_x",
-    payrollPeriod: "2025-01",
     payrollBatch: "batch_01",
-    status: "active",
-    resolutionDeadline: "2025-01-15T00:00:00Z",
-    raisedBy: "emp_x",
-    reason: "Disputed amount",
-    safeReasonCode: "manual_freeze",
-    isResolved: false,
+    payrollRunId: "tx_x",
     status: "active",
     resolutionDeadline: "2025-01-31T23:59:59Z",
+    raisedBy: "emp_x",
+    reason: "Disputed amount",
     safeReasonCode: "employee_data_changed",
     safeReasonDescription: "Disputed amount",
+    isResolved: false,
     blockedActions: ["execution"],
     requiredReviewer: "admin",
     resolutionAction: "Review",

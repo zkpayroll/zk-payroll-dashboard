@@ -174,6 +174,6 @@ describe("SnapshotLockApproval component", () => {
       />,
     );
     expect(screen.getByTestId("snapshot-blocked-state")).toBeInTheDocument();
-    expect(screen.getByText(/merkle root/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/merkle root/i)[0]).toBeInTheDocument();
   });
 });

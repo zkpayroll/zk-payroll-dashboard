@@ -34,7 +34,7 @@ const STATUS_META: Array<{
 }> = [
   { key: "drafts", label: "Drafts", icon: FileEdit, toneClass: "text-gray-600" },
   { key: "locked", label: "Locked", icon: Lock, toneClass: "text-indigo-700" },
-  { key: "cancelled", label: "Cancelled", icon: XIrcle, toneClass: "text-red-700" },
+  { key: "cancelled", label: "Cancelled", icon: XCircle, toneClass: "text-red-700" },
   { key: "settled", label: "Settled", icon: CheckCircle2, toneClass: "text-green-700" },
 ];
 

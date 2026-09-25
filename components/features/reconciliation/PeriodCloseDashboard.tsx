@@ -13,6 +13,7 @@ import {
 import { buildPeriodCloseChecklist } from "@/lib/reconciliation/periodClose";
 import { usePeriodCloseStore } from "@/stores/periodClose";
 import EmptyState from "@/components/ui/EmptyState";
+import { PeriodFinalizationDialog } from "@/components/features/payroll/PeriodFinalizationDialog";
 import type { PayrollRun, PeriodCloseChecklistItem } from "@/types/models";
 
 function ChecklistRow({ item }: { item: PeriodCloseChecklistItem }) {
@@ -49,6 +50,7 @@ function PeriodCloseCard({ run }: { run: PayrollRun }) {
   const closePeriod = usePeriodCloseStore((s) => s.closePeriod);
   const isClosed = usePeriodCloseStore((s) => s.isClosed(run.id));
   const [error, setError] = useState<string | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const checklist = useMemo(
     () =>
@@ -62,7 +64,7 @@ function PeriodCloseCard({ run }: { run: PayrollRun }) {
     [run.id],
   );
 
-  const handleClose = () => {
+  const handleConfirmedClose = () => {
     const result = closePeriod({
       payrollRunId: run.id,
       locks: MOCK_PAYROLL_LOCKS,
@@ -114,12 +116,23 @@ function PeriodCloseCard({ run }: { run: PayrollRun }) {
       {!isClosed && (
         <button
           type="button"
-          onClick={handleClose}
+          onClick={() => setIsDialogOpen(true)}
           disabled={!checklist.canClose}
           className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 transition-colors"
         >
           {checklist.canClose ? "Close period" : "Resolve blockers to close"}
         </button>
+      )}
+
+      {isDialogOpen && (
+        <PeriodFinalizationDialog
+          isOpen={isDialogOpen}
+          onClose={() => setIsDialogOpen(false)}
+          onConfirm={handleConfirmedClose}
+          periodId={run.id}
+          employeeCount={run.employeeCount}
+          totalAmount={run.totalAmount}
+        />
       )}
     </div>
   );

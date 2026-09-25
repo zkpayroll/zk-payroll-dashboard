@@ -343,13 +343,16 @@ function SelectStep() {
           filteredEntries.map((entry) => (
             <label
               key={entry.id}
+              htmlFor={`entry-${entry.id}`}
               className={`flex items-start gap-3 p-3 cursor-pointer hover:bg-muted/50 ${
                 entry.selected
                   ? "bg-blue-50/50"
                   : ""
               }`}
             >
+              <span className="sr-only">{entry.title}</span>
               <input
+                id={`entry-${entry.id}`}
                 type="checkbox"
                 checked={entry.selected}
                 onChange={() =>
@@ -668,7 +671,8 @@ function ConfigureStep() {
       </div>
 
       <div className="border rounded-lg p-4">
-        <label className="flex items-start gap-3 cursor-pointer">
+        <label htmlFor="include-metadata-checkbox" className="flex items-start gap-3 cursor-pointer">
+          <span className="sr-only">Include metadata</span>
           <input
             id="include-metadata-checkbox"
             type="checkbox"
@@ -964,8 +968,10 @@ function ExportStep() {
       )}
 
       {!isComplete && (
-        <label className="flex items-start gap-3 border rounded-lg p-4 cursor-pointer">
+        <label htmlFor="confirm-export-audit-checkbox" className="flex items-start gap-3 border rounded-lg p-4 cursor-pointer">
+          <span className="sr-only">Confirm audit export</span>
           <input
+            id="confirm-export-audit-checkbox"
             type="checkbox"
             checked={confirmed}
             onChange={(event) =>
