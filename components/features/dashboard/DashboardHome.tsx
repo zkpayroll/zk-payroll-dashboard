@@ -16,6 +16,7 @@ import OnboardingReadinessTracker from "@/components/features/employees/Onboardi
 import PinnedAlertsPanel from "@/components/features/dashboard/PinnedAlertsPanel";
 import { SessionTimeoutBanner } from "@/components/features/dashboard/SessionTimeoutBanner";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import ReviewerWorkloadSummary from "@/components/reviewers/ReviewerWorkloadSummary";
 
 function DashboardHome() {
   const { isFreighterInstalled } = useStellar();
@@ -132,6 +133,9 @@ function DashboardHome() {
       </ErrorBoundary>
       <ErrorBoundary>
         <PinnedAlertsPanel alerts={sampleAlerts} tasks={sampleTasks} />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <ReviewerWorkloadSummary />
       </ErrorBoundary>
       <ErrorBoundary>
         <QuickActions />
