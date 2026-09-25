@@ -11,7 +11,6 @@ export interface ApprovalDraft extends PayrollRun {
     | "rejected"
     | "correction_requested";
   requiresExecutiveReview: boolean;
-  reviewerName?: string;
   notes?: string;
 }
 
@@ -38,7 +37,6 @@ const INITIAL_APPROVAL_DRAFTS: ApprovalDraft[] = [
     status: "pending",
     approvalStatus: "pending_executive_approval",
     requiresExecutiveReview: true,
-    reviewerName: "Executive Admin",
     employeeIds: ["emp_001", "emp_002", "emp_003", "emp_004", "emp_005"],
     executedAt: null,
     transactionHash: null,
@@ -56,7 +54,6 @@ const INITIAL_APPROVAL_DRAFTS: ApprovalDraft[] = [
     status: "pending",
     approvalStatus: "pending_executive_approval",
     requiresExecutiveReview: true,
-    reviewerName: "Executive Admin",
     employeeIds: ["emp_001", "emp_002"],
     executedAt: null,
     transactionHash: null,
