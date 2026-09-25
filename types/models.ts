@@ -2,6 +2,22 @@ import type { StellarNetwork } from "./stellar";
 
 export type OnboardingStatus = "not_started" | "in_progress" | "completed";
 
+// ─── Employee Lifecycle Management (#454) ────────────────────────────────────
+
+export type EmployeeLifecycleStatus =
+  | "active"
+  | "suspended"
+  | "offboarded";
+
+export interface EmployeeLifecycleEvent {
+  id: string;
+  employeeId: string;
+  action: "activate" | "suspend" | "offboard";
+  performedBy: string;
+  performedAt: string;
+  note?: string;
+}
+
 export interface Employee {
   id: string;
   address: string;
@@ -18,6 +34,12 @@ export interface Employee {
   lastOnboardingAttemptAt?: string | null;
   startDate: string;
   lastPayment?: string;
+  /** Lifecycle management status — complements `isActive` / `status`. */
+  lifecycleStatus?: EmployeeLifecycleStatus;
+  suspendedAt?: string | null;
+  offboardedAt?: string | null;
+  /** Privacy-safe reason for the most recent lifecycle transition. */
+  lifecycleNote?: string | null;
 }
 
 export interface Company {

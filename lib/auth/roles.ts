@@ -121,6 +121,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
 ];
 
 export const ROUTE_ROLE_RULES: Array<{ prefix: string; roles: UserRole[] }> = [
+  { prefix: '/employees/lifecycle', roles: ['admin'] },
   { prefix: '/employees/add', roles: ['admin'] },
   { prefix: '/employees', roles: ['admin', 'operator'] },
   { prefix: '/payroll/approvals', roles: ['admin', 'operator'] },

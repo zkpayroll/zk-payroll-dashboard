@@ -254,11 +254,20 @@ After bulk import:
 4. Add reason for change
 5. Confirm update
 
-**Use Cases:**
+#### Employee Lifecycle Management Screen
 
-- Offboarding multiple employees
-- Seasonal workforce changes
-- Department reorganizations
+For dedicated administrative control over employee lifecycle transitions:
+
+1. Navigate to **Employees** → **Lifecycle** (`/employees/lifecycle`)
+2. Review current employee statuses (Active, Suspended, Offboarded)
+3. Filter by lifecycle status or search by name, department, or email
+4. Perform state transitions with full confirmation:
+   - **Suspend**: Temporarily exclude an active employee from payroll (e.g., sabbatical, compliance hold). Can be reactivated later.
+   - **Activate**: Reactivate a suspended employee when ready to resume payroll disbursements.
+   - **Offboard**: Permanently offboard an employee (terminal state; cannot be reactivated directly).
+5. All actions include an optional administrative note and append to the privacy-safe audit trail.
+
+See [Employee Lifecycle Management Guide](EMPLOYEE_LIFECYCLE.md) for full details.
 
 ---
 
