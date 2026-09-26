@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { MOCK_PAYROLL_TEMPLATES, MOCK_EMPLOYEES } from "@/lib/api/mockData";
+import { usePayrollZoneFormatter } from "@/hooks/usePayrollZoneFormatter";
 import type { PayrollTemplate, PayrollFrequency } from "@/types";
 
 // ─── Frequency labels ────────────────────────────────────────────────────────
@@ -79,6 +80,7 @@ const EMPTY_FORM: Omit<
 // ─── Component ───────────────────────────────────────────────────────────────
 
 function RecurringPayrollTemplateEditor() {
+  const { formatZoneAware } = usePayrollZoneFormatter();
   const [templates, setTemplates] = useState<PayrollTemplate[]>(
     MOCK_PAYROLL_TEMPLATES,
   );
@@ -559,7 +561,7 @@ function RecurringPayrollTemplateEditor() {
                 </button>
                 {template.nextScheduled && (
                   <span className="text-xs text-gray-400">
-                    Next: {formatDate(template.nextScheduled)}
+                    Next: {formatZoneAware(template.nextScheduled)}
                   </span>
                 )}
               </div>
