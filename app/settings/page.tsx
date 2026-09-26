@@ -1,6 +1,6 @@
 import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Sliders, Building2, Landmark, Shield, ArrowRight } from "lucide-react";
+import { Sliders, Building2, Landmark, Shield, Globe2, ArrowRight } from "lucide-react";
 
 export const metadata = {
   title: "Settings | ZK Payroll",
@@ -15,6 +15,14 @@ const SETTINGS_SECTIONS = [
     href: "/settings/payroll-policy",
     icon: Sliders,
     badge: "Active",
+  },
+  {
+    title: "Timezone Display",
+    description:
+      "Choose how payroll schedule times are displayed across the dashboard: local, organization, or UTC.",
+    href: "/settings/timezone",
+    icon: Globe2,
+    badge: "Admin",
   },
   {
     title: "Company Setup & Contracts",
