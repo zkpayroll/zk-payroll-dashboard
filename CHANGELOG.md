@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Inactive Employee Payroll Warning (#293)**: Reviewer-facing warning for inactive or suspended employees left behind in a payroll draft
+  - Payroll drafts store employee ids only, so each draft entry is re-resolved against the current roster every time a reviewer looks at it
+  - Shown on the wizard review step, the pre-signing payload review screen (`/payroll/review`), and the executive approvals screen (`/payroll/approvals`)
+  - Clear states: silent when every draft entry is eligible, amber warning for inactive or suspended employees, red critical alert when the draft references an id that is no longer in the roster (stale draft data)
+  - Every alert names the affected employees, labels the eligibility reason, and lists the two ways to resolve it: drop them from the draft or restore their status on the lifecycle screen
+  - The wizard's existing "inactive or invalid employee data" signing blocker now also catches lifecycle suspensions and offboarded records, and names the affected employees instead of a generic message
+  - State-only rendering: a warning carries the employee id, display name, and eligibility reason — salary, salary commitment, wallet address, and any other amount never enter the warning, the risk factor text, a log, or telemetry
+
+- **New modules**:
+  - `src/payroll/inactiveEmployees.ts`: Pure eligibility rules (`getIneligibilityReason`), draft-order flagging with stale-id detection, reason labels, and the privacy-safe warning/message builder (unit tested)
+  - `components/warnings/InactiveEmployeeWarning.tsx`: Accessible `role="alert"` reviewer banner with the affected-employee list, severity variant, and next steps
+
 - **Payroll Submission Progress Stepper (#295)**: Progress visibility for the six-stage payroll submission lifecycle
   - Stages: validation, approval, signing, submission, confirmation, reconciliation
   - Clear per-stage states: in progress, complete, pending, failed, and skipped (cancelled runs)
@@ -34,12 +46,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **PayrollWizard**: The review step shows the inactive/suspended employee warning above the draft roster, and the confirmation-step signing blocker now also trips on lifecycle suspensions, offboarded records, and stale draft ids, naming the affected employees
+- **PayrollReviewRiskScoring**: The `inactive_employee` risk factor now shares the draft eligibility rules, so suspended and offboarded employees (previously scored as clean) and unresolved draft ids are caught; the factor description names them
+- **Payroll approvals and payload review screens**: Render the shared reviewer warning above the existing risk score and payload inspector
 - **TransactionHistory**: Renders the quick filters toolbar above the results and applies it after search/panel filters; footer count logic extracted to a memo shared with the toolbar
 - **Mock data**: `MOCK_TRANSACTIONS` now carry `approvalStatus`, `reconciliationStatus`, and `cancellationReason` state fields for realistic filtering demos (state labels only, amounts unchanged)
 - **Types**: `PayrollTransaction` optionally exposes run-state `reconciliationStatus` and `cancellationReason` for history rows
 
 ### Testing
 
+- `__tests__/inactive-employees-rule.test.ts`: 16 unit tests for eligibility reasons (active, pending, inactive, suspended, offboarded), draft-order flagging, stale-id detection, de-duplication, severity escalation, and a privacy assertion that no salary, commitment, or wallet value survives into a warning
+- `__tests__/inactive-employee-warning.test.tsx`: 7 component tests for the clean (silent) state, the amber warning naming inactive and suspended employees, the critical stale-record state, redaction of amounts, and the risk-score factor for a suspended employee
+- `__tests__/inactive-employee-payroll-wizard.test.tsx`: 3 integration tests covering a suspended employee blocking wallet signing, an all-active draft staying unblocked, and the reviewer warning with next steps on the draft review step
 - `__tests__/payroll-quick-filters.test.ts`: 21 unit tests for derivation, matching, toggle immutability, and faceted counts
 - `__tests__/payroll-quick-filters-toolbar.test.tsx`: 10 component/integration tests covering chip toggling, counts, empty-result guidance, clear-all, archived mode, and a privacy assertion that the toolbar never renders amounts, hashes, proofs, or employee data
 
