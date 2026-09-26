@@ -218,3 +218,13 @@ export function getExportRestrictionReason(role: UserRole, permissionKey: string
   if (permission.roles.includes(role)) return null;
   return permission.restrictedReason[role] ?? 'You do not have permission to access this export.';
 }
+
+export function canCancelPayroll(role: UserRole): boolean {
+  return role === 'admin' || role === 'operator';
+}
+
+export function getCancellationRestrictionReason(role: UserRole): string | null {
+  if (canCancelPayroll(role)) return null;
+  return 'Payroll cancellation is restricted to Admin and Operator roles. Auditor view is read-only.';
+}
+

@@ -5,12 +5,15 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, Shield, Loader2, X, AlertCircle } from "lucide-react";
 import { useWalletStore } from "@/stores/walletStore";
 import { PayrollRun } from "@/types/models";
+import type { UserRole } from "@/types";
+import { canCancelPayroll, getCancellationRestrictionReason } from "@/lib/auth/roles";
 import { CancellationReasonSelect } from "@/components/payroll/CancellationReasonSelect";
 import { CancellationReasonCode, getCancellationReason } from "@/lib/constants/cancellationReasons";
 
 interface CancelPayrollDialogProps {
   isOpen: boolean;
   payroll: PayrollRun;
+  userRole?: UserRole;
   onCancel: () => void;
   onSuccess: () => void;
 }
@@ -18,6 +21,7 @@ interface CancelPayrollDialogProps {
 export function CancelPayrollDialog({
   isOpen,
   payroll,
+  userRole = "operator",
   onCancel,
   onSuccess,
 }: CancelPayrollDialogProps) {
@@ -31,7 +35,15 @@ export function CancelPayrollDialog({
 
   if (!isOpen) return null;
 
+  const isAuthorized = canCancelPayroll(userRole);
+  const restrictionReason = getCancellationRestrictionReason(userRole);
+
   const handleConfirmCancel = async () => {
+    if (!isAuthorized) {
+      setError(restrictionReason);
+      return;
+    }
+
     if (!selectedReason) {
       setReasonError("Please select a supported cancellation reason.");
       return;
@@ -99,7 +111,10 @@ export function CancelPayrollDialog({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div
+      data-testid="cancel-payroll-dialog"
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+    >
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full overflow-hidden">
         {/* Header */}
         <div
@@ -132,6 +147,19 @@ export function CancelPayrollDialog({
 
         {/* Content */}
         <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+          {!isAuthorized && restrictionReason && (
+            <div
+              data-testid="role-cancellation-restriction-alert"
+              className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex items-start gap-2"
+            >
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold">Role Restriction</p>
+                <p className="mt-0.5">{restrictionReason}</p>
+              </div>
+            </div>
+          )}
+
           {/* Warning */}
           <div className="bg-amber-50 rounded-lg p-3 border border-amber-200 flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
@@ -173,7 +201,7 @@ export function CancelPayrollDialog({
           <CancellationReasonSelect
             value={selectedReason}
             onChange={handleReasonChange}
-            disabled={isLoading}
+            disabled={isLoading || !isAuthorized}
             isLoading={isLoading}
             required={true}
             error={reasonError}
@@ -190,7 +218,7 @@ export function CancelPayrollDialog({
               value={customNotes}
               onChange={(e) => setCustomNotes(e.target.value)}
               placeholder="Additional audit or operational context..."
-              disabled={isLoading}
+              disabled={isLoading || !isAuthorized}
               rows={2}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-400"
             />
@@ -213,7 +241,7 @@ export function CancelPayrollDialog({
           <button
             type="button"
             onClick={handleConfirmCancel}
-            disabled={isLoading || !selectedReason}
+            disabled={isLoading || !selectedReason || !isAuthorized}
             className="flex-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium inline-flex items-center justify-center gap-2"
           >
             {isLoading ? (
