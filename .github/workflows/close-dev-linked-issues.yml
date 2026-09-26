@@ -39,7 +39,7 @@ jobs:
             }
 
             const text = [pr.title || '', pr.body || ''].join('\n');
-            const closingBlockPattern = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+((?:(?:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?#\d+)(?:[\s,]*(?:(?:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?#\d+)*)/gi;
+            const closingBlockPattern = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+((?:(?:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?#\d+)(?:[\s,]*(?:and\s+)?(?:(?:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?#\d+)*)/gi;
             const refPattern = /(?:(?<owner>[A-Za-z0-9_.-]+)\/(?<repo>[A-Za-z0-9_.-]+))?#(?<number>\d+)/g;
 
             for (const match of text.matchAll(closingBlockPattern)) {
