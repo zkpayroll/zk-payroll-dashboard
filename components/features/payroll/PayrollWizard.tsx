@@ -45,6 +45,11 @@ import { NoteHashPreview } from "@/components/payroll/NoteHashPreview";
 import { WalletReconnectRecoveryBanner } from "@/components/features/wallet/WalletReconnectRecoveryBanner";
 import { PayrollSubmissionStepper } from "@/components/stepper/PayrollSubmissionStepper";
 import type { SubmissionStageKey } from "@/src/payroll/submissionProgress";
+import {
+  findIneligibleEmployees,
+  formatIneligibleEmployees,
+} from "@/src/payroll/inactiveEmployees";
+import { InactiveEmployeeWarning } from "@/components/warnings/InactiveEmployeeWarning";
 import { useEnvironmentStore } from "@/stores/environment";
 import { ContractErrorHelpButton } from "@/components/features/errors/ContractErrorDrawer";
 import { MissingProofWarning } from "@/components/features/proofs/MissingProofWarning";
@@ -682,6 +687,10 @@ function ReviewStep({
         generating the ZK proof.
       </p>
       <DuplicateWarningPanel employees={selectedEmployees} />
+      <InactiveEmployeeWarning
+        employees={MOCK_EMPLOYEES}
+        employeeIds={employeeIds}
+      />
       <div className="border rounded-lg divide-y">
         {selectedEmployees.map((emp) => (
           <div key={emp.id} className="px-4 py-3 flex justify-between">
@@ -804,6 +813,7 @@ function ProofStep({
 }
 
 function ConfirmStep({
+  employeeIds,
   selectedEmployees,
   totalAmount,
   conflictingRuns,
@@ -853,6 +863,13 @@ function ConfirmStep({
     treasury: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",
   };
 
+  // Drafts store ids only, so eligibility must be re-resolved against the
+  // current roster each time the draft is reviewed.
+  const ineligibleEmployees = useMemo(
+    () => findIneligibleEmployees(MOCK_EMPLOYEES, employeeIds),
+    [employeeIds],
+  );
+
   // Compute Blockers & Warnings
   const blockers = useMemo(() => {
     const list: string[] = [];
@@ -876,9 +893,13 @@ function ConfirmStep({
       const fullEmp = MOCK_EMPLOYEES.find((e) => e.id === emp.id);
       return !fullEmp || fullEmp.status === "inactive" || !fullEmp.address;
     });
-    if (hasInvalidEmployees) {
+    if (hasInvalidEmployees || ineligibleEmployees.length > 0) {
       list.push(
-        "Payroll contains inactive or invalid employee data. Wallet signing cannot proceed.",
+        `Payroll contains inactive or invalid employee data${
+          ineligibleEmployees.length > 0
+            ? `: ${formatIneligibleEmployees(ineligibleEmployees)}`
+            : ""
+        }. Wallet signing cannot proceed.`,
       );
     }
 
@@ -905,6 +926,7 @@ function ConfirmStep({
     totalAmount,
     store.proofStatus,
     selectedEmployees,
+    ineligibleEmployees,
     isSessionExpired,
   ]);
 

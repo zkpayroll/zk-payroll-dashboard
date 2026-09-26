@@ -61,6 +61,39 @@ This workflow ensures reliable payroll operations by preventing disbursements to
 
 ---
 
+## Payroll Draft Visibility
+
+A payroll draft stores `employeeIds` only. Suspending or deactivating an employee
+after a draft has been assembled therefore does **not** rewrite the draft — the
+excluded employee stays in it until someone notices.
+
+`src/payroll/inactiveEmployees.ts` re-resolves every draft entry against the
+current roster, and `components/warnings/InactiveEmployeeWarning.tsx` shows the
+result to reviewers in three places:
+
+| Surface | What a reviewer sees |
+| --- | --- |
+| Payroll wizard review step | Amber alert naming each inactive or suspended employee, plus the two ways to resolve it |
+| `/payroll/review` (payload review) | The same alert before the signing payload is inspected |
+| `/payroll/approvals` (executive approval) | The alert plus an `inactive_employee` risk factor in the review risk score |
+
+States:
+
+- **Clean** — every draft entry is eligible: no alert is rendered.
+- **Warning (amber)** — a draft entry is inactive, suspended, or offboarded.
+- **Critical (red)** — a draft entry references an id that is no longer in the
+  roster (deleted employee or stale draft data).
+
+The wizard's confirmation step treats any of these as a hard blocker, so wallet
+signing cannot proceed against an ineligible record, and the blocker message
+names the affected employees.
+
+**Privacy**: the warning carries the employee id, display name, and eligibility
+reason only. Salary, salary commitment, and wallet address are never rendered,
+logged, or sent to telemetry with it.
+
+---
+
 ## Reproducible QA Test Cases
 
 ### QA-1: Successful Path — Suspending an Active Employee
@@ -94,3 +127,22 @@ This workflow ensures reliable payroll operations by preventing disbursements to
 3. **Expected Outcome**:
    - Middleware intercepts the request and redirects to `/` (or `/login`).
    - Direct store calls with non-admin roles return `{ success: false, error: "Only administrators can manage employee lifecycle status." }`.
+
+### QA-4: Failure Path — Inactive Employee Left in a Payroll Draft
+
+1. **Pre-condition**: A payroll draft exists that includes an employee who has since been suspended or deactivated.
+2. **Action**: Open the payroll wizard review step (or `/payroll/review`, `/payroll/approvals`).
+3. **Expected Outcome**:
+   - An amber `Inactive or suspended employees in this payroll` alert is shown, naming each affected employee with their eligibility reason.
+   - "What to do" lists both resolutions: remove them from the draft, or restore their status on `/employees/lifecycle`.
+   - Continuing to the confirmation step blocks wallet signing, and the blocker line reads `Payroll contains inactive or invalid employee data: <names>`.
+   - No salary, commitment, or wallet value appears anywhere in the alert.
+
+### QA-5: Edge Case — Stale Draft Id and Clean Drafts
+
+1. **Pre-condition**: A saved draft references an employee id that has been deleted from the roster.
+2. **Action**: Open the draft review surfaces listed above; then open a draft whose employees are all active.
+3. **Expected Outcome**:
+   - The stale entry raises the critical variant, titled `Payroll draft references unavailable employee records`, labelled `No longer in the employee roster`.
+   - A fully active draft renders no alert at all (silent clean state, not a green banner).
+   - Duplicate ids in a draft are reported once.
