@@ -8,9 +8,12 @@ import EnvironmentBanner from "./EnvironmentBanner";
 import CommandPalette from "./CommandPalette";
 import PrintAuditReport from "../features/transactions/PrintAuditReport";
 import AuditorAccessExpirationBanner from "../features/compliance/AuditorAccessExpirationBanner";
+import KeyboardShortcutsModal from "../features/shortcuts/KeyboardShortcutsModal";
+import { usePayrollShortcuts } from "@/hooks/usePayrollShortcuts";
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
+  usePayrollShortcuts();
 
   useEffect(() => {
     const handleOpen = () => setIsPaletteOpen(true);
@@ -56,6 +59,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       <CommandPalette isOpen={isPaletteOpen} onClose={() => setIsPaletteOpen(false)} />
+      <KeyboardShortcutsModal />
       <PrintAuditReport />
     </>
   );

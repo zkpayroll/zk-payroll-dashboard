@@ -8,6 +8,7 @@ import {
   UserPlus, Key, Upload, ClipboardList, FileSearch, Download
 } from "lucide-react";
 import { toast } from "sonner";
+import { useKeyboardShortcutsStore } from "@/stores/keyboardShortcuts";
 
 interface CommandItem {
   id: string;
@@ -172,6 +173,17 @@ export default function CommandPalette({ isOpen, onClose }: { isOpen: boolean; o
         toast.info("Generating proof context...", {
           description: "Initiated zero-knowledge calculation from command palette.",
         });
+      },
+    },
+    {
+      id: "action-shortcuts",
+      title: "View Keyboard Shortcuts",
+      description: "Quick reference guide for all payroll navigation and action hotkeys (press ?).",
+      category: "Actions",
+      icon: Keyboard,
+      action: () => {
+        onClose();
+        useKeyboardShortcutsStore.getState().openModal();
       },
     },
     {
