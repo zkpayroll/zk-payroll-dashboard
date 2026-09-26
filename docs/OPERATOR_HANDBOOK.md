@@ -709,12 +709,22 @@ The ZK Payroll system is designed to protect employee privacy:
 
 ### Keyboard Shortcuts
 
-The dashboard supports common keyboard shortcuts:
+The dashboard supports accessible keyboard navigation and action shortcuts:
 
-- `Ctrl/Cmd + K`: Open command palette (future feature)
-- `Esc`: Close modal dialogs
-- `Tab`: Navigate form fields
-- `Enter`: Submit forms
+- `?`: Open the interactive keyboard shortcuts cheat sheet
+- `Ctrl/Cmd + K`: Open command palette
+- `g` then `d`: Go to Dashboard
+- `g` then `p`: Go to Execute Payroll
+- `g` then `e`: Go to Employee Directory
+- `g` then `h`: Go to History
+- `g` then `a`: Go to Approvals Queue
+- `g` then `t`: Go to Treasury (Admin only)
+- `g` then `c`: Go to Compliance Center
+- `c` then `p`: Create/Execute New Payroll
+- `c` then `e`: Add New Employee (Admin only)
+- `Esc`: Close modal dialogs and cancel sequences
+
+See [Keyboard Shortcuts Guide](KEYBOARD_SHORTCUTS.md) for full accessibility and configuration details.
 
 ### Common Error Codes
 

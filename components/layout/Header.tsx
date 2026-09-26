@@ -1,5 +1,6 @@
-import { Bell, Search, User } from 'lucide-react';
+import { Bell, Search, User, Keyboard } from 'lucide-react';
 import EnvironmentSwitcher from '@/components/features/network/EnvironmentSwitcher';
+import { useKeyboardShortcutsStore } from '@/stores/keyboardShortcuts';
 
 function Header() {
   const triggerPalette = () => {
@@ -22,8 +23,20 @@ function Header() {
         </span>
       </button>
 
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-3">
         <EnvironmentSwitcher />
+        <button
+          type="button"
+          onClick={() => useKeyboardShortcutsStore.getState().openModal()}
+          className="text-gray-500 hover:text-gray-700 p-1.5 rounded-md hover:bg-gray-100 transition-colors focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none flex items-center gap-1"
+          aria-label="Keyboard shortcuts (press ?)"
+          title="Keyboard shortcuts (press ?)"
+        >
+          <Keyboard className="w-5 h-5" aria-hidden="true" />
+          <span className="hidden lg:inline text-[10px] font-mono font-semibold bg-gray-100 border border-gray-300 px-1 py-0.5 rounded text-gray-600">
+            ?
+          </span>
+        </button>
         <button
           className="text-gray-600 hover:text-gray-800 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none focus-visible:rounded"
           aria-label="Notifications"
