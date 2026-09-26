@@ -426,10 +426,22 @@ instead of a generic "no data" message.
 - **Integrated in:** `PayrollHistory`, `TransactionHistory` (history and
   archived modes).
 
+## Mobile Layout for Payroll Preflight Blockers (#527)
+
+Preflight blocker cards (`PayrollRiskWarnings`, `CompanyStateWarnings`, `OverduePayrollAlertBanner`) use flexible responsive layout containers (`flex-col sm:flex-row`, `p-4 sm:p-5`) to maintain full readability on narrow mobile screens. Touch targets (action buttons, dismiss controls) adhere to the minimum 44px height specification.
+
+## Audit-Friendly Amendment Export (#528)
+
+The amendment export utility (`exportAmendmentMetadata`) and preview modal (`AuditAmendmentExportModal`) enable exporting commitment amendment history in JSON or CSV formats. Only safe metadata fields (`id`, `commitmentVersion`, `previousVersion`, `employeeReference`, `period`, `asset`, `approvalStatus`, `previousCommitment`, `nextCommitment`, `createdAt`) are exported. Raw salary values and private keys are strictly excluded.
+
 ## Test coverage summary
 
 | Issue | Test file | Happy path | Edge case |
 | --- | --- | --- | --- |
+| #526 | `import-reference-collision.test.tsx` | Validates reference collision and renders warning | Case-insensitive duplicate detection; salary privacy verified |
+| #527 | `preflight-blockers-mobile.test.tsx` | Renders mobile responsive flex layout (`flex-col sm:flex-row`) | High visibility critical blocker layout on narrow viewports |
+| #528 | `audit-amendment-export.test.tsx` | Exports safe amendment JSON/CSV metadata; opens modal | Ensures zero raw salary leaks in exported string data |
+| #525 | `role-aware-cancellation.test.tsx` | Admin & Operator can cancel; Auditor view is read-only | Disables cancellation dialog controls for unauthorized roles |
 | #470 | `payroll-run-progress.test.tsx` | Banner renders on resumable run; Resume/Discard work | Submitted run → no banner; null runId → no record |
 | #471 | `session-timeout-warning.test.tsx` | Banner at warning; modal at urgent; expired modal | Escalation re-surfaces dismissed warning; onExpired fires once |
 | #469 | `accessible-toast-announcements.test.tsx` | Success → polite; error → assertive | Repeat message debounce; store auto-clear at 3s |
@@ -444,3 +456,4 @@ Run with:
 ```bash
 npm test
 ```
+

@@ -146,3 +146,11 @@ logged, or sent to telemetry with it.
    - The stale entry raises the critical variant, titled `Payroll draft references unavailable employee records`, labelled `No longer in the employee roster`.
    - A fully active draft renders no alert at all (silent clean state, not a green banner).
    - Duplicate ids in a draft are reported once.
+
+## Import Reference Collision Warning
+
+During employee CSV imports and batch onboarding, external import references (e.g. `IMP-2025-001`) are checked against existing processed batch identifiers before work is committed.
+
+- **Collision Prevention**: Surface actionable warnings when duplicate import references are detected to avoid creating redundant payroll entries.
+- **Privacy Guaranteed**: Only external reference strings are validated and displayed. Employee salary values and zero-knowledge commitment secrets are never exposed in validation notices.
+

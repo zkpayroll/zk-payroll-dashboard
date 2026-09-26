@@ -52,7 +52,7 @@ export function PayrollRiskWarnings({
       });
     }
 
-    // 2. Stale Wallet Risk - Check if any employee hasn't been paid recently
+    // 2. Stale Wallet Risk
     const now = new Date();
     const staleCutoff = new Date(
       now.getTime() - STALE_WALLET_THRESHOLD_DAYS * 24 * 60 * 60 * 1000,
@@ -83,7 +83,7 @@ export function PayrollRiskWarnings({
       });
     }
 
-    // 3. Unsupported Asset State Risk - Check for employees with invalid addresses or unsupported configurations
+    // 3. Unsupported Asset State Risk
     const invalidAddressEmployees = selectedEmployees
       .map((emp) => {
         const fullEmp = allEmployees.find((e) => e.id === emp.id);
@@ -115,24 +115,24 @@ export function PayrollRiskWarnings({
     return null;
   }
 
-  // Separate critical and warning risks
   const criticalRisks = risks.filter((r) => r.severity === "critical");
   const warningRisks = risks.filter((r) => r.severity === "warning");
 
   return (
-    <div className="space-y-3">
-      {/* Critical Risks - High visibility */}
+    <div className="space-y-3" data-testid="payroll-risk-warnings-container">
+      {/* Critical Risks - Mobile friendly flex stack */}
       {criticalRisks.map((risk) => (
         <div
           key={risk.id}
           role="alert"
-          className="border-l-4 border-red-500 bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3"
+          data-testid="preflight-blocker-card"
+          className="border-l-4 border-red-500 bg-red-50 border border-red-200 rounded-lg p-4 sm:p-5 flex flex-col sm:flex-row items-start gap-3 sm:gap-4"
         >
           <AlertTriangle
             className="w-5 h-5 text-red-600 mt-0.5 shrink-0"
             aria-hidden="true"
           />
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 w-full">
             <h4 className="text-sm font-semibold text-red-800">{risk.title}</h4>
             <p className="text-sm text-red-700 mt-0.5">{risk.description}</p>
             {risk.details && risk.details.length > 0 && (
@@ -149,15 +149,16 @@ export function PayrollRiskWarnings({
         </div>
       ))}
 
-      {/* Warning Risks - Medium visibility */}
+      {/* Warning Risks - Mobile friendly flex stack */}
       {warningRisks.map((risk) => (
         <div
           key={risk.id}
           role="alert"
-          className="border-l-4 border-amber-500 bg-amber-50 border border-amber-200 rounded-lg p-4 flex gap-3"
+          data-testid="preflight-blocker-card"
+          className="border-l-4 border-amber-500 bg-amber-50 border border-amber-200 rounded-lg p-4 sm:p-5 flex flex-col sm:flex-row items-start gap-3 sm:gap-4"
         >
           <RiskIcon riskType={risk.type} />
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 w-full">
             <h4 className="text-sm font-semibold text-amber-800">
               {risk.title}
             </h4>
@@ -194,12 +195,7 @@ function RiskIcon({ riskType }: { riskType: RiskWarning["type"] }) {
   }
 }
 
-/**
- * Validates if a string is a valid Stellar Classic address (public key)
- * Stellar addresses start with 'G' and are 56 characters long (base32 encoded)
- */
 function isValidStellarAddress(address: string): boolean {
   if (!address) return false;
-  // Stellar public key format: starts with 'G', 56 characters total
   return /^G[A-Z2-7]{54}$/.test(address);
 }

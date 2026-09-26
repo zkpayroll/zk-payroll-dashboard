@@ -1,8 +1,10 @@
 "use client";
 
-import { XCircle, AlertTriangle, Clock, User, FileSearch, ArrowRight, ShieldAlert } from "lucide-react";
+import { XCircle, AlertTriangle, Clock, User, FileSearch, ArrowRight, ShieldAlert, Shield } from "lucide-react";
 import Link from "next/link";
 import type { PayrollRun } from "@/types/models";
+import type { UserRole } from "@/types";
+import { canCancelPayroll, getCancellationRestrictionReason } from "@/lib/auth/roles";
 import {
   getCancellationReason,
   getCancellationSummary,
@@ -13,6 +15,7 @@ import {
 
 export interface PayrollCancellationPanelProps {
   run: PayrollRun;
+  userRole?: UserRole;
   className?: string;
 }
 
@@ -20,8 +23,9 @@ export interface PayrollCancellationPanelProps {
  * Payroll cancellation detail panel.
  * Explains why a batch was cancelled and what actions remain available,
  * without exposing private payroll values (amounts, salaries, commitments).
+ * Role-aware: displays role capability notice if role restrictions apply.
  */
-export function PayrollCancellationPanel({ run, className = "" }: PayrollCancellationPanelProps) {
+export function PayrollCancellationPanel({ run, userRole = "operator", className = "" }: PayrollCancellationPanelProps) {
   if (run.status !== "cancelled") return null;
 
   const reason = getCancellationReason(run);
@@ -30,6 +34,8 @@ export function PayrollCancellationPanel({ run, className = "" }: PayrollCancell
   const actions = getAvailableActions(run);
   const detail = sanitizeCancellationDetail(run.cancellationDetail);
   const cancelledAt = run.cancelledAt ?? run.timestamp ?? run.createdAt;
+  const isAuthorizedToCancel = canCancelPayroll(userRole);
+  const restrictionReason = getCancellationRestrictionReason(userRole);
 
   return (
     <section
@@ -41,18 +47,44 @@ export function PayrollCancellationPanel({ run, className = "" }: PayrollCancell
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-100">
           <XCircle className="w-5 h-5 text-red-600" aria-hidden="true" />
         </span>
-        <div>
-          <h2 id="cancellation-panel-heading" className="text-sm font-semibold text-red-900 flex items-center gap-2">
-            Batch Cancelled
-            <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 border border-red-200">
-              {reason.replace(/_/g, " ")}
-            </span>
-          </h2>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h2 id="cancellation-panel-heading" className="text-sm font-semibold text-red-900 flex items-center gap-2">
+              Batch Cancelled
+              <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 border border-red-200">
+                {reason.replace(/_/g, " ")}
+              </span>
+            </h2>
+            {userRole && (
+              <span
+                data-testid="role-cancellation-badge"
+                className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+                  isAuthorizedToCancel ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
+                }`}
+              >
+                <Shield className="w-3 h-3" />
+                Role: {userRole} ({isAuthorizedToCancel ? "Cancel Authorized" : "Read-Only"})
+              </span>
+            )}
+          </div>
           <p className="text-sm text-red-800 mt-1">{summary}</p>
         </div>
       </div>
 
       <div className="px-5 py-4 space-y-4">
+        {!isAuthorizedToCancel && restrictionReason && (
+          <div
+            data-testid="cancellation-role-restriction-banner"
+            className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800 flex items-start gap-2"
+          >
+            <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold">Role Restriction Notice</p>
+              <p className="mt-0.5">{restrictionReason}</p>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-start gap-2 text-sm text-gray-700">
           <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
           <p data-testid="cancellation-description">{description}</p>
