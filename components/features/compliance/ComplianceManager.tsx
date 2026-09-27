@@ -28,6 +28,7 @@ import ComplianceEvidenceBundleView from "./ComplianceEvidenceBundleView";
 import AuditorAccessExpiryBadge from "./AuditorAccessExpiryBadge";
 import AuditReadyTimeline from "@/components/features/payroll/AuditReadyTimeline";
 import ComplianceHoldDialog from "./ComplianceHoldDialog";
+import AuditHoldReleaseDialog from "./AuditHoldReleaseDialog";
 import type { AuditAccessRequest } from "@/types/models";
 
 function generateKeyId(): string {
@@ -69,9 +70,20 @@ function ComplianceManager() {
 
   // Compliance holds state
   const [holds, setHolds] = useState<
-    Array<{ id: string; targetLabel: string; reasonCode: string; notes: string; placedAt: string }>
+    Array<{
+      id: string;
+      targetLabel: string;
+      reasonCode: string;
+      notes: string;
+      placedAt: string;
+      // #543 — release tracking
+      releasedAt?: string;
+      releaseNote?: string;
+    }>
   >([]);
   const [holdDialogOpen, setHoldDialogOpen] = useState(false);
+  const [releasingHoldId, setReleasingHoldId] = useState<string | null>(null);
+  const releasingHold = holds.find((h) => h.id === releasingHoldId) ?? null;
 
   useEffect(() => {
     if (viewKeys.length === 0) setViewKeys(MOCK_VIEW_KEYS);
@@ -257,6 +269,38 @@ function ComplianceManager() {
     setHoldDialogOpen(false);
     toast.success("Hold placed", {
       description: `Compliance hold recorded with reason: ${reasonCode}.`,
+    });
+  };
+
+  const handleReleaseHold = async ({
+    holdId,
+    releaseNote,
+  }: {
+    holdId: string;
+    releaseNote: string;
+  }) => {
+    const hold = holds.find((h) => h.id === holdId);
+    if (!hold) throw new Error("This hold no longer exists. Refresh and try again.");
+    if (hold.releasedAt) throw new Error("This hold has already been released.");
+
+    const releasedAt = new Date().toISOString();
+    setHolds((prev) =>
+      prev.map((h) => (h.id === holdId ? { ...h, releasedAt, releaseNote } : h)),
+    );
+    addActivity({
+      id: `aud_act_${Date.now()}`,
+      action: "export_prepared", // closest available action type
+      actor: "Current Admin",
+      actorOrg: "ZK Payroll Inc.",
+      targetName: "Compliance Hold",
+      targetOrg: "—",
+      scope: "read-only",
+      timestamp: releasedAt,
+      summary: `Compliance hold released: ${hold.reasonCode} — ${releaseNote}`,
+    });
+    setReleasingHoldId(null);
+    toast.success("Hold released", {
+      description: `Compliance hold ${hold.reasonCode} released and recorded in the audit trail.`,
     });
   };
 
@@ -919,7 +963,27 @@ function ComplianceManager() {
                     <p className="text-xs text-gray-400 mt-1">
                       Placed {new Date(hold.placedAt).toLocaleString()}
                     </p>
+                    {hold.releasedAt && (
+                      <p className="text-xs text-green-700 mt-1">
+                        Released {new Date(hold.releasedAt).toLocaleString()}
+                        {hold.releaseNote ? ` — ${hold.releaseNote}` : ""}
+                      </p>
+                    )}
                   </div>
+                  {hold.releasedAt ? (
+                    <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                      Released
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setReleasingHoldId(hold.id)}
+                      className="shrink-0 px-3 py-1.5 text-xs font-medium text-green-700 border border-green-300 rounded-lg hover:bg-green-50 transition-colors"
+                      aria-label={`Release hold ${hold.reasonCode}`}
+                    >
+                      Release
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -930,6 +994,13 @@ function ComplianceManager() {
             targetLabel="Current Compliance Period"
             onClose={() => setHoldDialogOpen(false)}
             onSubmit={handlePlaceHold}
+          />
+
+          <AuditHoldReleaseDialog
+            isOpen={releasingHold !== null}
+            hold={releasingHold}
+            onClose={() => setReleasingHoldId(null)}
+            onConfirm={handleReleaseHold}
           />
         </div>
       ) : (

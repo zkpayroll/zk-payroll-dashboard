@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Employee identifier format helper text** (#541): The Add Employee wallet address field now explains the Stellar public key format (56 characters, starts with G, A–Z/2–7, never a secret key) and gives specific, actionable validation errors without echoing the entered address.
+- **Payout count limit indicator** (#542): The payroll review step shows payouts against the capacity policy's batch limit, warns from 80%, and blocks Continue with remediation (batches needed) when a run exceeds the limit.
+- **Audit hold release confirmation dialog** (#543): Compliance holds can now be released from the Holds tab through a confirmation dialog that requires a written justification and an explicit acknowledgement; releases are recorded in the audit activity feed and shown on the hold.
 - **Multi-asset rounding explanation tooltip** (#544): An info tooltip next to each asset total on the multi-asset payroll review explains 7-decimal Stellar settlement, how totals are displayed, and the maximum rounding drift for the group (based only on the payment count, never on individual salaries). Keyboard, hover and click accessible; closes on Escape.
 - **Visual Regression Coverage for Payroll Status Badges**: Status colours, labels, and contrast are now declared in one contract and asserted by tests, so a failed run cannot quietly render in green
   - `src/payroll/statusBadges.ts` owns the approved label, badge variant, and colour pair for every run lifecycle status (`pending`, `verified`, `failed`, `cancelled`) and every reconciliation outcome (`matched`, `pending`, `mismatched`, `failed`, `manually_reviewed`)
