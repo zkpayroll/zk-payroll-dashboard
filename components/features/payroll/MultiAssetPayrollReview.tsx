@@ -17,6 +17,7 @@ import {
 import type { AssetGroup, MultiAssetPayrollRun } from "@/types/models";
 import { assetLabel, formatAssetAmount, groupRiskLabel } from "@/lib/payroll/multiAsset";
 import { ProofStatusCard } from "@/components/features/proofs/ProofStatusCard";
+import { RoundingInfoTooltip } from "@/components/features/payroll/RoundingInfoTooltip";
 import type { ProofLifecycleState } from "@/stores/proofStatus";
 
 // ── Status helpers ────────────────────────────────────────────────────────────
@@ -175,6 +176,7 @@ export default function MultiAssetPayrollReview({
   const totalByAsset = run.assetGroups.map((g) => ({
     assetCode: g.asset.code,
     total: g.totalAmount,
+    paymentCount: g.transactionCount,
   }));
 
   // Map run.proofStatus to 7-state lifecycle for card
@@ -241,7 +243,10 @@ export default function MultiAssetPayrollReview({
         </div>
         {totalByAsset.map((t) => (
           <div key={t.assetCode} className="rounded-lg border border-gray-200 bg-white p-3">
-            <p className="text-xs text-gray-500">{t.assetCode} total</p>
+            <p className="text-xs text-gray-500 flex items-center gap-1">
+              {t.assetCode} total
+              <RoundingInfoTooltip assetCode={t.assetCode} paymentCount={t.paymentCount} />
+            </p>
             <p className="text-lg font-bold text-gray-900 font-mono">
               {formatAssetAmount(t.total, t.assetCode)}
             </p>
