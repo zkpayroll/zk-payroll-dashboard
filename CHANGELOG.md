@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Multi-asset rounding explanation tooltip** (#544): An info tooltip next to each asset total on the multi-asset payroll review explains 7-decimal Stellar settlement, how totals are displayed, and the maximum rounding drift for the group (based only on the payment count, never on individual salaries). Keyboard, hover and click accessible; closes on Escape.
 - **Visual Regression Coverage for Payroll Status Badges**: Status colours, labels, and contrast are now declared in one contract and asserted by tests, so a failed run cannot quietly render in green
   - `src/payroll/statusBadges.ts` owns the approved label, badge variant, and colour pair for every run lifecycle status (`pending`, `verified`, `failed`, `cancelled`) and every reconciliation outcome (`matched`, `pending`, `mismatched`, `failed`, `manually_reviewed`)
   - `components/ui/StatusBadge.tsx` and `components/features/payroll/ReconciliationBadge.tsx` now read their labels and variants from that contract, so a change is made once and covered by tests; rendered output is unchanged
