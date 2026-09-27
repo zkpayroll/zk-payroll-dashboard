@@ -206,13 +206,6 @@ When handing off to engineering or operations, include:
 - Current treasury XLM and payroll asset balances.
 - Steps already attempted from this guide.
 
-## Role-Aware Cancellation Controls (#525)
-
-Payroll cancellation functionality is strictly protected by role-based capabilities:
-
-- **Authorized Roles**: Only `Admin` and `Operator` roles can invoke batch cancellation (`canCancelPayroll`).
-- **Read-Only Roles**: `Auditor` users view cancellation status and historical cancellation reasons in read-only mode (`PayrollCancellationPanel`). Cancellation confirmation buttons in `CancelPayrollDialog` are automatically disabled for unauthorized roles with an explanatory banner.
-
 ## Related docs
 
 - [Dashboard setup guide](./SETUP_GUIDE.md)
@@ -222,4 +215,3 @@ Payroll cancellation functionality is strictly protected by role-based capabilit
 - [Stellar Testnet guide](https://developers.stellar.org/docs/network/testnet)
 - [Freighter wallet docs](https://docs.freighter.app/)
 - [Stellar Expert Testnet explorer](https://testnet.stellarexpert.com/)
-
