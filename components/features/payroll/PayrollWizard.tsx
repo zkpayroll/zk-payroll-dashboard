@@ -527,7 +527,7 @@ function PayrollWizard() {
         </div>
       )}
 
-      {/* Submission progress stepper (issue #295): lifecycle stages across
+      <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm">`n        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />`n        <div>`n          <p className="font-medium text-amber-800">Review the transaction fee before signing</p>`n          <p className="mt-1 text-amber-700">Your wallet displays the final network fee. Stop and review it if it exceeds your organization's approved fee ceiling.</p>`n        </div>`n      </div>`n`n      {/* Submission progress stepper (issue #295): lifecycle stages across
           validation, approval, signing, submission, confirmation, and
           reconciliation. State-only — renders no payroll values. */}
       <PayrollSubmissionStepper
