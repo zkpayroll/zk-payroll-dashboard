@@ -553,28 +553,15 @@ These are warnings, not blockers: the new owner has a read-only role (auditor or
 
 ## Test coverage summary
 
-| Issue | Test file | Happy path | Edge case |
-| --- | --- | --- | --- |
-| #546 | `payroll-owner-transfer-review.test.tsx` | Select member, review masked summary, confirm, submit audit-safe request | In-flight runs block; invalid/manual address; current owner not offered; no full address rendered |
-| #546 | `payroll-owner-transfer-rule.test.ts` | Valid confirmed transfer passes | Bad checksum; self-transfer; exact phrase; all blockers reported; read-only/out-of-directory warnings |
-| #530 | `payroll-run-notes-panel.test.tsx` | Admin adds, confirms, lists, and removes a note | Blocked sensitive note; over-length note; operator/auditor read-only; cancelled run locked; per-run scoping |
-| #530 | `payroll-run-notes-rule.test.ts` | Clean note validates and reports the remaining budget | Currency/bare-number/name/email/wallet/credential detection; date-shaped numbers not treated as amounts; length reported before privacy |
-| #526 | `import-reference-collision.test.tsx` | Validates reference collision and renders warning | Case-insensitive duplicate detection; salary privacy verified |
-| #527 | `preflight-blockers-mobile.test.tsx` | Renders mobile responsive flex layout (`flex-col sm:flex-row`) | High visibility critical blocker layout on narrow viewports |
-| #528 | `audit-amendment-export.test.tsx` | Exports safe amendment JSON/CSV metadata; opens modal | Ensures zero raw salary leaks in exported string data |
-| #525 | `role-aware-cancellation.test.tsx` | Admin & Operator can cancel; Auditor view is read-only | Disables cancellation dialog controls for unauthorized roles |
-| #470 | `payroll-run-progress.test.tsx` | Banner renders on resumable run; Resume/Discard work | Submitted run → no banner; null runId → no record |
-| #471 | `session-timeout-warning.test.tsx` | Banner at warning; modal at urgent; expired modal | Escalation re-surfaces dismissed warning; onExpired fires once |
-| #469 | `accessible-toast-announcements.test.tsx` | Success → polite; error → assertive | Repeat message debounce; store auto-clear at 3s |
-| #468 | `unsaved-changes-guard.test.tsx` | Clean form proceeds immediately; dirty opens dialog | Two sequential actions; beforeunload registered/removed |
-| #460 | `stale-data-refresh-indicator.test.tsx` | Banner/inline indicator appears when data exceeds threshold | Refresh in-flight disables button; error state handled gracefully |
-| #463 | `responsive-employee-table-controls.test.tsx` | Sort by column, search filtering, direction toggle | No results empty state, mobile sort selector |
-| #462 | `payroll-conflict-warning.test.tsx` | Conflict banner appears on concurrent update; reload fetches remote | Overwrite disabled until acknowledgement checked |
-| #455 | `period-finalization-dialog.test.tsx` | Dialog displays downstream impacts; confirms and closes period | Cancellation keeps period open; handles failure on confirm |
+| #510 | `payroll-preflight-results-screen.test.tsx` | Renders readiness score, blocker cards, warnings, passed checks, and dry-run summary | Disables execution button when blockers exist; enables fix actions and re-run dry run |
+| #509 | `payroll-amendment-history-panel.test.tsx` | Displays authorized amendment revision history, safe reason labels, and details drawer | Filters by status & search query; exports safe JSON/CSV metadata |
+| #514 | `payroll-cancellation-reason-selector.test.tsx` | Enforces selecting documented cancellation reason before confirming cancellation | Provides helper text and custom audit notes input; disables confirmation until reason selected |
+| #515 | `audit-grant-scope-details-drawer.test.tsx` | Displays auditor identity, expiry indicator, accessible scopes, restricted scopes, and masking tier | Triggers extend, revoke, and export scope callbacks |
 
 Run with:
 
 ```bash
 npm test
 ```
+
 
