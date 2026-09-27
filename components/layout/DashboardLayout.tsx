@@ -10,8 +10,10 @@ import PrintAuditReport from "../features/transactions/PrintAuditReport";
 import AuditorAccessExpirationBanner from "../features/compliance/AuditorAccessExpirationBanner";
 import KeyboardShortcutsModal from "../features/shortcuts/KeyboardShortcutsModal";
 import { usePayrollShortcuts } from "@/hooks/usePayrollShortcuts";
+import { useSession } from "@/hooks/useSession";
 
 function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const { sessionInfo } = useSession();
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   usePayrollShortcuts();
 
@@ -41,7 +43,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
         >
           Skip to main content
         </a>
-        <Sidebar />
+        <Sidebar role={sessionInfo?.role} />
         <div className="flex-1 flex flex-col overflow-hidden">
           <EnvironmentBanner />
           <div className="px-6 pt-4 print:hidden" data-testid="auditor-expiration-banner-wrapper">
