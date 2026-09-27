@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Withholding configuration form validation** (#535): Interactive form component and validation rules for withholding rates, threshold amounts, jurisdiction codes, and effective dates with privacy guardrails preventing salary/PII leakage.
+- **Deactivated asset status banner** (#550): Alert banner component and status validation warning operators when a settlement asset is deactivated and offering remediation steps.
+- **Payroll period health summary card** (#549): Summary card displaying overall period health status score, treasury funding readiness, cutoff deadlines, and active blockers.
+- **Request ID support panel** (#551): Operational support panel and diagnostic bundle generator enabling safe, sanitized trace ID copying for support tickets.
 - **Multi-asset rounding explanation tooltip** (#544): An info tooltip next to each asset total on the multi-asset payroll review explains 7-decimal Stellar settlement, how totals are displayed, and the maximum rounding drift for the group (based only on the payment count, never on individual salaries). Keyboard, hover and click accessible; closes on Escape.
 - **Visual Regression Coverage for Payroll Status Badges**: Status colours, labels, and contrast are now declared in one contract and asserted by tests, so a failed run cannot quietly render in green
   - `src/payroll/statusBadges.ts` owns the approved label, badge variant, and colour pair for every run lifecycle status (`pending`, `verified`, `failed`, `cancelled`) and every reconciliation outcome (`matched`, `pending`, `mismatched`, `failed`, `manually_reviewed`)
