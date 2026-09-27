@@ -64,6 +64,9 @@ import {
   getPayrollButtonAriaLabel,
 } from "@/components/ui/PayrollActionLoader";
 import type { PayrollLoadingPhase } from "@/components/ui/PayrollActionLoader";
+import { PayoutCountLimitIndicator } from "@/components/features/payroll/PayoutCountLimitIndicator";
+import { getPayoutLimitStatus } from "@/lib/payroll/payoutLimit";
+import { usePayrollPolicyStore } from "@/stores/payrollPolicy";
 
 const STEPS: { key: PayrollWizardStep; label: string }[] = [
   { key: "review", label: "Review" },
@@ -660,6 +663,10 @@ function ReviewStep({
   onNext: () => void;
   isWrongNetwork: boolean;
 }) {
+  // #542 — enforce the saved (active) capacity policy, not unsaved edits.
+  const maxBatchSize = usePayrollPolicyStore((st) => st.savedPolicy.capacity.maxBatchSize);
+  const payoutLimit = getPayoutLimitStatus(selectedEmployees.length, maxBatchSize);
+
   if (employeeIds.length === 0) {
     return (
       <div className="text-center py-8">
@@ -686,6 +693,7 @@ function ReviewStep({
         Review the employees and amounts included in this payroll run before
         generating the ZK proof.
       </p>
+      <PayoutCountLimitIndicator count={selectedEmployees.length} limit={maxBatchSize} />
       <DuplicateWarningPanel employees={selectedEmployees} />
       <InactiveEmployeeWarning
         employees={MOCK_EMPLOYEES}
@@ -708,7 +716,9 @@ function ReviewStep({
         <button
           type="button"
           onClick={onNext}
-          className="w-full sm:w-auto px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-1"
+          disabled={payoutLimit.blocking}
+          title={payoutLimit.blocking ? "Reduce payouts to the batch limit to continue" : undefined}
+          className="w-full sm:w-auto px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Continue
           <ArrowRight className="w-4 h-4" />
