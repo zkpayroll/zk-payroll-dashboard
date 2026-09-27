@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Privacy-Safe Operational Notes on Payroll Runs (#530)**: Admins can attach handoff context to a payroll run, and a note can never become a place where a salary figure or employee data is stored
+  - Rendered as an "Operational Notes" panel on the payroll run detail screen (`/payroll/[id]`), above the employee results table
+  - Clear states: empty, live character counter (280 limit), inline `role="alert"` block with per-category rewrite guidance, `role="status"` save confirmation, read-only restriction banner for non-admins, and a lock notice on cancelled or failed runs
+  - Blocked content is reported by category — salary or payment amount, employee personal data (roster name, email, wallet address, employee id), and credential or secret — and the message never echoes the note text back
+  - Dates (`2026-09-25`), years, batch references (`20260925`), small counts, and compensation vocabulary without a figure ("compensation review", "Q1 bonus run") remain writable so ordinary operations are not blocked
+  - The store re-runs the same rules on write, so the role check, run lock, and privacy scan cannot be bypassed by calling the store directly
+  - Session-scoped and in-memory only: notes are not persisted to `localStorage` and are not sent to a payroll API, log, or telemetry event; `buildRunNoteAuditEntry` emits run id, note id, role, character count, and timestamp for any future audit trail without the note body
+
+- **New modules**:
+  - `lib/privacy/runNotes.ts`: Sensitive-content scanner (compensation / employee identity / credential) and privacy-safe audit metadata builder (unit tested)
+  - `src/payroll/runNotes.ts`: Length budget, validation states, admin-only role gate, and run lock rules (unit tested)
+  - `stores/payrollRunNotes.ts`: In-memory note store with admin-gated writes, `lastError` surfacing, and body-free audit entries
+  - `components/features/payroll/PayrollRunNotesPanel.tsx`: Accessible note panel with editor, findings list, and empty/locked/read-only states
+
 - **Inactive Employee Payroll Warning (#293)**: Reviewer-facing warning for inactive or suspended employees left behind in a payroll draft
   - Payroll drafts store employee ids only, so each draft entry is re-resolved against the current roster every time a reviewer looks at it
   - Shown on the wizard review step, the pre-signing payload review screen (`/payroll/review`), and the executive approvals screen (`/payroll/approvals`)
@@ -46,6 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **PayrollRunDetail**: Accepts a `userRole` prop (default `operator`) and renders the operational notes panel; the role is also forwarded to the cancellation dialog so role-gated affordances on the run screen agree
+- **Payroll run page** (`app/payroll/[id]/page.tsx`): Resolves the signed-in role from the session cookie (`verifySessionToken`) and falls back to `operator`, so only an authenticated admin sees the note editor
 - **PayrollWizard**: The review step shows the inactive/suspended employee warning above the draft roster, and the confirmation-step signing blocker now also trips on lifecycle suspensions, offboarded records, and stale draft ids, naming the affected employees
 - **PayrollReviewRiskScoring**: The `inactive_employee` risk factor now shares the draft eligibility rules, so suspended and offboarded employees (previously scored as clean) and unresolved draft ids are caught; the factor description names them
 - **Payroll approvals and payload review screens**: Render the shared reviewer warning above the existing risk score and payload inspector

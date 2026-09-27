@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { MOCK_EMPLOYEES, MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import type { PayrollRun, ProofReference } from "@/types/models";
+import type { UserRole } from "@/types";
+import PayrollRunNotesPanel from "@/components/features/payroll/PayrollRunNotesPanel";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ProofFreshnessBadge from "@/components/features/proofs/ProofFreshnessBadge";
 import { evaluateProofFreshness } from "@/lib/formatting/proofFreshness";
@@ -93,9 +95,14 @@ interface PayrollRunDetailProps {
   run?: PayrollRun;
   /** Optional proof metadata driving the freshness warning experience. */
   proofReference?: ProofReference | null;
+  /**
+   * Role of the signed-in user. Drives role-gated affordances such as
+   * operational notes; defaults to the read-mostly `operator` view.
+   */
+  userRole?: UserRole;
 }
 
-export default function PayrollRunDetail({ run: propRun, proofReference }: PayrollRunDetailProps = {}) {
+export default function PayrollRunDetail({ run: propRun, proofReference, userRole = "operator" }: PayrollRunDetailProps = {}) {
   const router = useRouter();
   const params = useParams();
   const runId = params?.id as string;
@@ -347,6 +354,7 @@ export default function PayrollRunDetail({ run: propRun, proofReference }: Payro
         <CancelPayrollDialog
           isOpen={isCancelDialogOpen}
           payroll={run}
+          userRole={userRole}
           onCancel={() => setIsCancelDialogOpen(false)}
           onSuccess={() => {
             setIsCancelDialogOpen(false);
@@ -445,6 +453,9 @@ export default function PayrollRunDetail({ run: propRun, proofReference }: Payro
           </p>
         </div>
       </div>
+
+      {/* Operational notes — admin-only, privacy-scanned handoff context */}
+      <PayrollRunNotesPanel run={run} userRole={userRole} employees={employeesInRun} />
 
       {/* Employee-level results */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">

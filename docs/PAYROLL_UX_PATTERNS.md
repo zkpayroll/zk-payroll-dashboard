@@ -434,10 +434,93 @@ Preflight blocker cards (`PayrollRiskWarnings`, `CompanyStateWarnings`, `Overdue
 
 The amendment export utility (`exportAmendmentMetadata`) and preview modal (`AuditAmendmentExportModal`) enable exporting commitment amendment history in JSON or CSV formats. Only safe metadata fields (`id`, `commitmentVersion`, `previousVersion`, `employeeReference`, `period`, `asset`, `approvalStatus`, `previousCommitment`, `nextCommitment`, `createdAt`) are exported. Raw salary values and private keys are strictly excluded.
 
+## Privacy-Safe Operational Notes on Payroll Runs (#530)
+
+**Goal:** Let an admin hand off context on a payroll run ("second attempt
+after a reference collision") without a note ever becoming a place where a
+salary figure, an employee's personal data, or a credential is stored.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `lib/privacy/runNotes.ts` | Sensitive-content scanner and audit-metadata builder. Single source of truth for what a note may contain. |
+| `src/payroll/runNotes.ts` | Payroll-facing rules: length budget, validation, role gate, run lock states. |
+| `stores/payrollRunNotes.ts` | Session-scoped note store. Re-runs the same rules on write so the guard cannot be bypassed. |
+| `components/features/payroll/PayrollRunNotesPanel.tsx` | The panel rendered on `/payroll/[id]`. |
+| `__tests__/payroll-run-notes-rule.test.ts` | Scanner, validation, and role/lock rule unit tests. |
+| `__tests__/payroll-run-notes-panel.test.tsx` | Store write-path and panel render/interaction tests. |
+
+### Roles
+
+| Role | Behaviour |
+| --- | --- |
+| `admin` | Full editor: add, list, and remove notes. |
+| `operator` | Read-only. The panel states that notes are admin-only instead of hiding a disabled control. |
+| `auditor` | Read-only, same restriction copy. |
+
+`PayrollRunDetail` takes a `userRole` prop (default `operator`). The run page
+resolves it from the session cookie via `verifySessionToken` and falls back to
+`operator`, so an unauthenticated render can never unlock the admin editor.
+
+### States
+
+`validateRunNote` returns an explicit state that the panel renders:
+
+| State | Trigger | UI |
+| --- | --- | --- |
+| `empty` | Nothing entered (or whitespace only) | Save disabled |
+| `valid` | Clean note within the 280-character budget | Live character counter, save enabled |
+| `too_long` | Over 280 characters | Red alert stating the exact overflow; save disabled |
+| `blocked` | Privacy scanner matched a category | Red alert naming each category plus rewrite guidance; save disabled |
+| `read_only` | Non-admin role | Amber restriction banner, no editor |
+| `locked` | Run is `cancelled` or `failed` | Lock notice pointing at a replacement batch, no editor |
+
+A successful save shows a `role="status"` confirmation; a rejected write leaves
+the text in the editor so the admin can fix it rather than retype it.
+
+### What is blocked
+
+| Category | Examples |
+| --- | --- |
+| `compensation` | `$5,250`, `1200 USDC`, `48200`, `salary was 90000` |
+| `employee_identity` | A roster name, an email address, a `G…` wallet address, `emp_004` |
+| `credential` | `seed phrase`, `private key`, `0x` + 40 or more hex characters |
+
+Not blocked, so ordinary operations stay writable: dates (`2026-09-25`), years
+(`2026`), batch references (`20260925`), small counts, and compensation
+*vocabulary* without a figure ("compensation review", "Q1 bonus run").
+
+### Privacy guarantees
+
+- **No echo.** A finding is a static label and static guidance. A rejected note
+  is never quoted back into a message, so nothing from the note body can reach
+  a log, export, telemetry event, or rendered error.
+- **Two gates.** The store re-validates on write, so calling
+  `usePayrollRunNotesStore.getState().addNote(...)` directly cannot bypass the
+  role check, the lock check, or the scanner.
+- **Session-only.** Notes are held in memory; nothing is persisted to
+  `localStorage` and no note is sent to a payroll API.
+- **Audit metadata only.** `buildRunNoteAuditEntry` emits run id, note id,
+  author role, character count, and timestamp — never the body. Use that shape
+  if notes are ever added to an audit trail or export.
+
+### Usage
+
+```tsx
+<PayrollRunNotesPanel
+  run={run}
+  userRole={session.role}
+  employees={employeesInRun} // lets the scanner catch a name from this run
+/>
+```
+
 ## Test coverage summary
 
 | Issue | Test file | Happy path | Edge case |
 | --- | --- | --- | --- |
+| #530 | `payroll-run-notes-panel.test.tsx` | Admin adds, confirms, lists, and removes a note | Blocked sensitive note; over-length note; operator/auditor read-only; cancelled run locked; per-run scoping |
+| #530 | `payroll-run-notes-rule.test.ts` | Clean note validates and reports the remaining budget | Currency/bare-number/name/email/wallet/credential detection; date-shaped numbers not treated as amounts; length reported before privacy |
 | #526 | `import-reference-collision.test.tsx` | Validates reference collision and renders warning | Case-insensitive duplicate detection; salary privacy verified |
 | #527 | `preflight-blockers-mobile.test.tsx` | Renders mobile responsive flex layout (`flex-col sm:flex-row`) | High visibility critical blocker layout on narrow viewports |
 | #528 | `audit-amendment-export.test.tsx` | Exports safe amendment JSON/CSV metadata; opens modal | Ensures zero raw salary leaks in exported string data |
