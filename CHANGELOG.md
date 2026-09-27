@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Visual Regression Coverage for Payroll Status Badges**: Status colours, labels, and contrast are now declared in one contract and asserted by tests, so a failed run cannot quietly render in green
+  - `src/payroll/statusBadges.ts` owns the approved label, badge variant, and colour pair for every run lifecycle status (`pending`, `verified`, `failed`, `cancelled`) and every reconciliation outcome (`matched`, `pending`, `mismatched`, `failed`, `manually_reviewed`)
+  - `components/ui/StatusBadge.tsx` and `components/features/payroll/ReconciliationBadge.tsx` now read their labels and variants from that contract, so a change is made once and covered by tests; rendered output is unchanged
+  - WCAG 2.1 contrast is measured, not assumed: each payroll badge colour pair is scored against the 4.5:1 AA floor for its 12px text, and an unapproved shade fails as unresolvable rather than being quietly accepted
+  - Colour-collision detection rejects two statuses on one surface that would be indistinguishable at a glance
+  - Label inspection rejects digits, currency symbols, contact details, and over-long labels, so a badge can never carry an amount, a count, or a counterparty
+  - Failure diagnostics are actionable but value-free: they name the status, the expected pair, the actual pair, and the measured ratio, so they are safe to print in CI logs
+  - The shared `destructive` variant measures 3.60:1 and is recorded in `KNOWN_STATUS_BADGE_CONTRAST_DEVIATIONS` as a tracked deviation; the suite fails if a deviation is claimed for a colour the payroll badges actually use
+  - `__tests__/visual-regression/payroll-status-badges.test.tsx` adds 52 tests and 11 snapshots covering per-status rendering, a side-by-side colour family, contrast, collisions, label privacy, and edge cases (unrecognised status, empty status, upper-case status, hidden icon)
+
 - **Privacy-Safe Operational Notes on Payroll Runs (#530)**: Admins can attach handoff context to a payroll run, and a note can never become a place where a salary figure or employee data is stored
   - Rendered as an "Operational Notes" panel on the payroll run detail screen (`/payroll/[id]`), above the employee results table
   - Clear states: empty, live character counter (280 limit), inline `role="alert"` block with per-category rewrite guidance, `role="status"` save confirmation, read-only restriction banner for non-admins, and a lock notice on cancelled or failed runs

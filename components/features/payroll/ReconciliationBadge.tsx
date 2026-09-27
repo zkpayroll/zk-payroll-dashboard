@@ -15,6 +15,10 @@ import {
   RECONCILIATION_STATUS_LABELS,
   resolveReconciliationStatus,
 } from "@/lib/reconciliation/status";
+import {
+  RECONCILIATION_FALLBACK_STATUS,
+  RECONCILIATION_STATUS_BADGE_SPECS,
+} from "@/src/payroll/statusBadges";
 
 export type ReconciliationBadgeStatus = ReconciliationOutcome;
 
@@ -32,41 +36,37 @@ interface ReconciliationStatusConfig {
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 }
 
+/** Glyphs for the reconciliation outcomes, keyed by the contract's statuses. */
+const RECONCILIATION_STATUS_ICONS: Record<
+  string,
+  React.ComponentType<React.SVGProps<SVGSVGElement>>
+> = {
+  matched: CheckCircle2,
+  pending: Clock,
+  mismatched: AlertTriangle,
+  failed: XCircle,
+  manually_reviewed: Eye,
+};
+
+/**
+ * Labels, colour variants, and tooltips come from the shared contract in
+ * @/src/payroll/statusBadges so the visual regression suite can hold the
+ * colours, words, and contrast of every outcome to one declared standard.
+ */
 const RECONCILIATION_CONFIG: Record<
   ReconciliationBadgeStatus,
   ReconciliationStatusConfig
-> = {
-  matched: {
-    label: "Matched",
-    description: "All expected payments were reconciled.",
-    variant: "success",
-    icon: CheckCircle2,
-  },
-  pending: {
-    label: "Pending",
-    description: "Reconciliation is still in progress. Check again after settlement.",
-    variant: "info",
-    icon: Clock,
-  },
-  mismatched: {
-    label: "Mismatched",
-    description: "Reconciliation found a mismatch. Open the payroll run for details.",
-    variant: "warning",
-    icon: AlertTriangle,
-  },
-  failed: {
-    label: "Failed",
-    description: "Reconciliation could not complete. Open the payroll run to review and retry.",
-    variant: "error",
-    icon: XCircle,
-  },
-  manually_reviewed: {
-    label: "Manually reviewed",
-    description: "A reviewer acknowledged this reconciliation outcome.",
-    variant: "secondary",
-    icon: Eye,
-  },
-};
+> = Object.fromEntries(
+  RECONCILIATION_STATUS_BADGE_SPECS.map((spec) => [
+    spec.status,
+    {
+      label: spec.label,
+      description: spec.description ?? "",
+      variant: spec.variant as BadgeVariant,
+      icon: RECONCILIATION_STATUS_ICONS[spec.status],
+    },
+  ]),
+) as Record<ReconciliationBadgeStatus, ReconciliationStatusConfig>;
 
 export interface ReconciliationStatusBadgeProps
   extends Omit<React.HTMLAttributes<HTMLDivElement>, "children"> {
@@ -82,7 +82,7 @@ export function ReconciliationStatusBadge({
   className,
   ...props
 }: ReconciliationStatusBadgeProps) {
-  const resolvedStatus = isReconciliationOutcome(status) ? status : "pending";
+  const resolvedStatus = isReconciliationOutcome(status) ? status : RECONCILIATION_FALLBACK_STATUS;
   const config = RECONCILIATION_CONFIG[resolvedStatus];
   const Icon = config.icon;
   const sizeClass = size === "md" ? "px-2.5 py-1 text-sm" : "px-2.5 py-0.5 text-xs";
