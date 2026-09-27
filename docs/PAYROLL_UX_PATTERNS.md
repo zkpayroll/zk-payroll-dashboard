@@ -515,10 +515,48 @@ Not blocked, so ordinary operations stay writable: dates (`2026-09-25`), years
 />
 ```
 
+## Payroll Owner Transfer Review (#546)
+
+The payroll owner is the company admin wallet: it controls the treasury and signs payroll runs. `/settings/roles` now includes a **Transfer payroll ownership** review screen below the role directory.
+
+### Files
+
+- `src/payroll/ownerTransfer.ts`: pure validation (`reviewOwnerTransfer`), `maskWalletAddress`, `isValidStellarAccount`, and `buildOwnerTransferAuditEntry`
+- `components/features/settings/OwnerTransferReview.tsx`: the review screen (props-driven)
+- `components/features/settings/OwnerTransferReviewContainer.tsx`: supplies the current owner (company admin), role-directory candidates, and the in-flight run count
+
+### Flow
+
+1. Choose the new owner from the role directory (the current owner is excluded), or enter a wallet address.
+2. Review the current owner → new owner summary (masked addresses) and the consequences.
+3. Type `TRANSFER OWNERSHIP` and tick the acknowledgement.
+4. Submit. The request is recorded; the new owner must accept it from their wallet before it takes effect.
+
+### Blocking rules
+
+| Code | When |
+| --- | --- |
+| `no_candidate` | No new owner is chosen |
+| `invalid_address` | Not a valid Stellar account (`StrKey` checksum is verified) |
+| `same_as_current_owner` | The address already owns the payroll |
+| `runs_in_flight` | Any payroll run is still `pending`: the owner signs in-flight runs |
+| `confirmation_mismatch` | The phrase isn't typed exactly |
+| `not_acknowledged` | The loss-of-access checkbox isn't ticked |
+
+These are warnings, not blockers: the new owner has a read-only role (auditor or compliance reviewer), or the address is outside the role directory.
+
+### Privacy guarantees
+
+- Addresses are always shown masked (`GABCDE…WXYZ`). No payroll amounts appear on the screen, in messages, or in the audit entry.
+- `buildOwnerTransferAuditEntry` records only the action, both masked addresses, and a timestamp.
+- There is no backend endpoint yet: `onSubmit` receives the audit-safe entry for a future API or on-chain call.
+
 ## Test coverage summary
 
 | Issue | Test file | Happy path | Edge case |
 | --- | --- | --- | --- |
+| #546 | `payroll-owner-transfer-review.test.tsx` | Select member, review masked summary, confirm, submit audit-safe request | In-flight runs block; invalid/manual address; current owner not offered; no full address rendered |
+| #546 | `payroll-owner-transfer-rule.test.ts` | Valid confirmed transfer passes | Bad checksum; self-transfer; exact phrase; all blockers reported; read-only/out-of-directory warnings |
 | #530 | `payroll-run-notes-panel.test.tsx` | Admin adds, confirms, lists, and removes a note | Blocked sensitive note; over-length note; operator/auditor read-only; cancelled run locked; per-run scoping |
 | #530 | `payroll-run-notes-rule.test.ts` | Clean note validates and reports the remaining budget | Currency/bare-number/name/email/wallet/credential detection; date-shaped numbers not treated as amounts; length reported before privacy |
 | #526 | `import-reference-collision.test.tsx` | Validates reference collision and renders warning | Case-insensitive duplicate detection; salary privacy verified |

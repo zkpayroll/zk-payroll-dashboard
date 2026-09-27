@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Payroll owner transfer review screen** (#546): `/settings/roles` gains a review step for handing payroll ownership (the company admin wallet) to another account. The screen shows a masked current → new owner summary and the consequences, and requires a typed `TRANSFER OWNERSHIP` confirmation plus an acknowledgement. Transfers are blocked for invalid Stellar addresses (checksum verified), self-transfer, and while any payroll run is still in flight. Read-only-role and out-of-directory recipients get warnings. Addresses are always masked and no payroll amounts appear in the UI, messages, or the audit entry.
 - **Multi-asset rounding explanation tooltip** (#544): An info tooltip next to each asset total on the multi-asset payroll review explains 7-decimal Stellar settlement, how totals are displayed, and the maximum rounding drift for the group (based only on the payment count, never on individual salaries). Keyboard, hover and click accessible; closes on Escape.
 - **Visual Regression Coverage for Payroll Status Badges**: Status colours, labels, and contrast are now declared in one contract and asserted by tests, so a failed run cannot quietly render in green
   - `src/payroll/statusBadges.ts` owns the approved label, badge variant, and colour pair for every run lifecycle status (`pending`, `verified`, `failed`, `cancelled`) and every reconciliation outcome (`matched`, `pending`, `mismatched`, `failed`, `manually_reviewed`)
