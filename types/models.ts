@@ -254,6 +254,13 @@ export interface PayrollWizardState {
   currentStep: PayrollWizardStep;
   employeeIds: string[];
   totalAmount: number;
+  /**
+   * Version of the saved payroll policy snapshotted when this draft started
+   * (#534). The badge on the review/confirm steps compares it against the
+   * active version so a mid-run policy change is visible. Null when the draft
+   * predates version snapshotting or no saved policy existed.
+   */
+  instructionVersion?: number | null;
   proof: string | null;
   proofStatus: "idle" | "generating" | "success" | "error";
   proofError: string | null;

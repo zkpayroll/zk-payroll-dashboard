@@ -96,6 +96,32 @@ npx vitest run \
 
 ---
 
+## Payroll instruction version badge (#534)
+
+**Where:** Payroll → Run payroll → **Review** and **Confirmation** steps (`PayrollWizard` → `PayrollInstructionVersionBadge`).
+
+**Behaviour** (`getInstructionVersionStatus` in `src/payroll/instructionVersion.ts`):
+- A payroll *instruction* is the compiled policy payload that governs a run (saved policy version + digest, compiled by `lib/sdk/payrollPolicyCompiler.ts`).
+- The wizard **snapshots the saved policy version when a draft starts**. The badge compares the snapshot with the active saved version; the run keeps its drafted version — it never silently adopts a newer policy.
+
+| State | When | UI |
+|-------|------|----|
+| `current` | draft snapshot matches the active version (or no snapshot — legacy drafts) | Indigo pill `vN` with a tooltip naming the governing version. |
+| `stale` | active saved version differs from the snapshot | Amber pill `vN · drafted` plus a tooltip explaining which version governs the run and how to adopt the newer one (start a new draft). |
+| `unconfigured` | no saved policy version exists | Badge is hidden. |
+
+**Privacy:** the badge shows only version numbers and operational metadata — never amounts, employee data, wallet addresses, or digest material.
+
+| # | Steps | Expected |
+|---|-------|----------|
+| 1 | Start a run with the default policy | Review shows "Payroll instructions" with an indigo `v1` badge; tooltip says the run follows the active policy version. |
+| 2 | On Confirm | The same version pill appears next to the Ready/Warning/Blocked status. |
+| 3 | Failure state: save a new policy version while a draft is open, then view Review | Amber `v1 · drafted` badge; tooltip says a newer policy (v2) is active and how to adopt it. |
+| 4 | Edge case: a restored draft from before this feature (no snapshot) | Badge shows the active version as `current`. |
+| 5 | Edge case: unsaved policy edits in the editor | Badge still reflects the **saved** version only. |
+
+---
+
 ## Audit hold release confirmation dialog (#543)
 
 **Where:** Compliance → **Holds** tab. Each active hold has a **Release** button, which opens `AuditHoldReleaseDialog`.

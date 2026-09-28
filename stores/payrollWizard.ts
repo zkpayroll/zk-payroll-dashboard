@@ -1,6 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { PayrollWizardState, PayrollWizardStep } from "@/types";
+import {
+  getInstructionVersionStatus,
+} from "@/src/payroll/instructionVersion";
 
 const STEPS: PayrollWizardStep[] = ["review", "proof", "confirm", "submit"];
 
@@ -18,6 +21,8 @@ interface PayrollWizardStore extends PayrollWizardState {
   ) => void;
   setSubmissionError: (error: string | null) => void;
   setTransactionHash: (hash: string | null) => void;
+  /** Snapshot the saved policy's version for this draft (#534). */
+  setInstructionVersion: (version: number | null) => void;
   setIsProofNearingExpiration: (val: boolean) => void;
   setTreasuryBalanceOverride: (balance: number | null) => void;
   reset: () => void;
@@ -39,6 +44,18 @@ const initialState: PayrollWizardState = {
   isProofNearingExpiration: false,
   treasuryBalanceOverride: null,
 };
+
+/**
+ * Compare the snapshotted draft version against the active saved policy
+ * version (#534). A draft never silently adopts a newer policy: the badge
+ * keeps showing the version the run was drafted under.
+ */
+export function getWizardInstructionVersionStatus(
+  draftVersion: number | null | undefined,
+  activeVersion: number | null | undefined,
+) {
+  return getInstructionVersionStatus(activeVersion, draftVersion);
+}
 
 export const usePayrollWizardStore = create<PayrollWizardStore>()(
   persist(
@@ -69,6 +86,7 @@ export const usePayrollWizardStore = create<PayrollWizardStore>()(
       setSubmissionStatus: (submissionStatus) => set({ submissionStatus }),
       setSubmissionError: (submissionError) => set({ submissionError }),
       setTransactionHash: (transactionHash) => set({ transactionHash }),
+      setInstructionVersion: (instructionVersion) => set({ instructionVersion }),
       setIsProofNearingExpiration: (isProofNearingExpiration) => set({ isProofNearingExpiration }),
       setTreasuryBalanceOverride: (treasuryBalanceOverride) => set({ treasuryBalanceOverride }),
       reset: () => set({ ...initialState }),
@@ -82,7 +100,7 @@ export const usePayrollWizardStore = create<PayrollWizardStore>()(
           set({ currentStep: "review" });
         }
       },
-      clearDraft: () => set({ ...initialState }),
+      clearDraft: () => set({ ...initialState, instructionVersion: null }),
     }),
     {
       name: "zk-payroll-wizard-draft",

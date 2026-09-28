@@ -67,6 +67,11 @@ import type { PayrollLoadingPhase } from "@/components/ui/PayrollActionLoader";
 import { PayoutCountLimitIndicator } from "@/components/features/payroll/PayoutCountLimitIndicator";
 import { getPayoutLimitStatus } from "@/lib/payroll/payoutLimit";
 import { usePayrollPolicyStore } from "@/stores/payrollPolicy";
+import { PayrollInstructionVersionBadge } from "@/components/features/payroll/PayrollInstructionVersionBadge";
+import {
+  getDraftInstructionVersion,
+  getInstructionVersionStatus,
+} from "@/src/payroll/instructionVersion";
 
 const STEPS: { key: PayrollWizardStep; label: string }[] = [
   { key: "review", label: "Review" },
@@ -124,6 +129,7 @@ function PayrollWizard() {
     submissionStatus,
     submissionError,
     transactionHash,
+    instructionVersion,
     nextStep,
     prevStep,
     setEmployeeIds,
@@ -133,6 +139,7 @@ function PayrollWizard() {
     setSubmissionStatus,
     setSubmissionError,
     setTransactionHash,
+    setInstructionVersion,
     reset,
     hasDraft,
     restoreDraft,
@@ -148,6 +155,10 @@ function PayrollWizard() {
   const walletPublicKey = useWalletStore((s) => s.publicKey) ?? "unknown";
   const addApprovalEvent = useApprovalHistory((s) => s.addEvent);
   const clearApprovalHistory = useApprovalHistory((s) => s.clearHistory);
+
+  // #534 — the saved policy governs the run; the wizard reads the saved
+  // policy (not unsaved edits), mirroring the payout limit indicator.
+  const savedPolicyVersion = usePayrollPolicyStore((st) => st.savedPolicy.version);
 
   useEffect(() => {
     if (
@@ -181,6 +192,8 @@ function PayrollWizard() {
     setPayrollRunId(runId);
     setEmployeeIds(selected);
     setTotalAmount(MOCK_EMPLOYEES.reduce((sum, e) => sum + e.salary, 0));
+    // #534 — anchor this draft to the saved policy version it will execute under.
+    setInstructionVersion(getDraftInstructionVersion(usePayrollPolicyStore.getState().savedPolicy));
     draftResolvedRef.current = true;
     initialEventRecordedRef.current = true;
 
@@ -205,6 +218,7 @@ function PayrollWizard() {
   }, [
     setEmployeeIds,
     setTotalAmount,
+    setInstructionVersion,
     addApprovalEvent,
     walletPublicKey,
     logEvent,
@@ -613,6 +627,7 @@ function PayrollWizard() {
             selectedEmployees={selectedEmployees}
             totalAmount={totalAmount}
             conflictingRuns={conflictingRuns}
+            instructionVersion={instructionVersion}
             onBack={prevStep}
             onSubmit={handleSubmit}
             isWrongNetwork={isWrongNetwork}
@@ -667,6 +682,11 @@ function ReviewStep({
   const maxBatchSize = usePayrollPolicyStore((st) => st.savedPolicy.capacity.maxBatchSize);
   const payoutLimit = getPayoutLimitStatus(selectedEmployees.length, maxBatchSize);
 
+  // #534 — compare the draft's snapshotted version against the active policy.
+  const savedPolicyVersion = usePayrollPolicyStore((st) => st.savedPolicy.version);
+  const draftInstructionVersion = usePayrollWizardStore((st) => st.instructionVersion);
+  const versionStatus = getInstructionVersionStatus(savedPolicyVersion, draftInstructionVersion ?? null);
+
   if (employeeIds.length === 0) {
     return (
       <div className="text-center py-8">
@@ -694,6 +714,16 @@ function ReviewStep({
         generating the ZK proof.
       </p>
       <PayoutCountLimitIndicator count={selectedEmployees.length} limit={maxBatchSize} />
+      {/* #534 — which payroll instruction (policy version) governs this run. */}
+      {versionStatus.state !== "unconfigured" && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-500">Payroll instructions</span>
+          <PayrollInstructionVersionBadge
+            version={savedPolicyVersion}
+            draftVersion={draftInstructionVersion ?? null}
+          />
+        </div>
+      )}
       <DuplicateWarningPanel employees={selectedEmployees} />
       <InactiveEmployeeWarning
         employees={MOCK_EMPLOYEES}
@@ -827,6 +857,7 @@ function ConfirmStep({
   selectedEmployees,
   totalAmount,
   conflictingRuns,
+  instructionVersion,
   onBack,
   onSubmit,
   isWrongNetwork,
@@ -836,6 +867,8 @@ function ConfirmStep({
   selectedEmployees: { id: string; name: string; salary: number }[];
   totalAmount: number;
   conflictingRuns: PayrollRun[];
+  /** Saved policy version snapshotted when this draft started (#534). */
+  instructionVersion: number | null | undefined;
   onBack: () => void;
   onSubmit: () => void;
   isWrongNetwork: boolean;
@@ -885,6 +918,10 @@ function ConfirmStep({
   const company = MOCK_COMPANIES[0] || {
     treasury: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",
   };
+
+  // #534 — surface which payroll instruction (policy version) governs this run.
+  const savedPolicyVersion = usePayrollPolicyStore((st) => st.savedPolicy.version);
+  const versionStatus = getInstructionVersionStatus(savedPolicyVersion, instructionVersion);
 
   // Drafts store ids only, so eligibility must be re-resolved against the
   // current roster each time the draft is reviewed.
@@ -1079,7 +1116,12 @@ function ConfirmStep({
             the transaction.
           </p>
         </div>
-        <div className="shrink-0 flex items-center">
+        <div className="shrink-0 flex items-center gap-2">
+          {/* #534 — governing instruction version for this run. */}
+          <PayrollInstructionVersionBadge
+            version={savedPolicyVersion}
+            draftVersion={instructionVersion ?? null}
+          />
           {state === "ready" && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
               <ShieldCheck className="w-4 h-4 text-green-600" />

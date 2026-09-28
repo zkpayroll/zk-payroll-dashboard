@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Payroll instruction version badge** (#534): The payroll wizard now shows which payroll instruction (compiled policy payload) governs the run
+  - The review and confirmation steps render a version pill next to the "Payroll instructions" label, comparing the version snapshotted when the draft started against the currently saved policy version
+  - Indigo `vN` when the draft matches the active policy; amber `vN · drafted` with a tooltip when a newer policy version was saved mid-run — the run keeps its drafted version instead of silently adopting new rules, and the tooltip names the remediation (start a new draft)
+  - Snapshots are taken from the **saved** policy only, mirroring the payout limit indicator; unsaved editor edits never affect an in-flight run
+  - Restored legacy drafts without a snapshot render the active version as current; runs with no saved policy version hide the badge entirely
+  - State-only rendering: the badge carries version numbers and operational metadata only — no amounts, employee data, wallet addresses, or digest material
+
+- **New modules**:
+  - `src/payroll/instructionVersion.ts`: Pure version sanitization, draft snapshotting, and privacy-safe status/label derivation (unit tested)
+  - `components/features/payroll/PayrollInstructionVersionBadge.tsx`: Accessible version pill with current/stale/unconfigured states and tooltip detail
+
 - **Withholding configuration form validation** (#535): Interactive form component and validation rules for withholding rates, threshold amounts, jurisdiction codes, and effective dates with privacy guardrails preventing salary/PII leakage.
 - **Deactivated asset status banner** (#550): Alert banner component and status validation warning operators when a settlement asset is deactivated and offering remediation steps.
 - **Payroll period health summary card** (#549): Summary card displaying overall period health status score, treasury funding readiness, cutoff deadlines, and active blockers.
@@ -77,7 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **PayrollRunDetail**: Accepts a `userRole` prop (default `operator`) and renders the operational notes panel; the role is also forwarded to the cancellation dialog so role-gated affordances on the run screen agree
 - **Payroll run page** (`app/payroll/[id]/page.tsx`): Resolves the signed-in role from the session cookie (`verifySessionToken`) and falls back to `operator`, so only an authenticated admin sees the note editor
-- **PayrollWizard**: The review step shows the inactive/suspended employee warning above the draft roster, and the confirmation-step signing blocker now also trips on lifecycle suspensions, offboarded records, and stale draft ids, naming the affected employees
+- **PayrollWizard**: The review step shows the inactive/suspended employee warning above the draft roster, the confirmation-step signing blocker now also trips on lifecycle suspensions, offboarded records, and stale draft ids, naming the affected employees, and both review and confirmation steps render the payroll instruction version badge comparing the draft's snapshotted policy version against the active one (#534)
 - **PayrollReviewRiskScoring**: The `inactive_employee` risk factor now shares the draft eligibility rules, so suspended and offboarded employees (previously scored as clean) and unresolved draft ids are caught; the factor description names them
 - **Payroll approvals and payload review screens**: Render the shared reviewer warning above the existing risk score and payload inspector
 - **TransactionHistory**: Renders the quick filters toolbar above the results and applies it after search/panel filters; footer count logic extracted to a memo shared with the toolbar
@@ -86,6 +97,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Testing
 
+- `__tests__/instruction-version-rule.test.ts`: Unit tests for version sanitization (fractional, zero, negative, NaN), draft snapshotting, current/stale/unconfigured derivation (including draft-newer-than-saved), the wizard store delegation, and a privacy assertion that no amount, address, or employee id survives into a label or detail
+- `__tests__/instruction-version-badge.test.tsx`: Component tests for the current and stale pill states (including the "drafted" marker and aria-label), hidden unconfigured state, snapshot/clear store behaviour, and agreement between the shared derivation and the badge
 - `__tests__/inactive-employees-rule.test.ts`: 16 unit tests for eligibility reasons (active, pending, inactive, suspended, offboarded), draft-order flagging, stale-id detection, de-duplication, severity escalation, and a privacy assertion that no salary, commitment, or wallet value survives into a warning
 - `__tests__/inactive-employee-warning.test.tsx`: 7 component tests for the clean (silent) state, the amber warning naming inactive and suspended employees, the critical stale-record state, redaction of amounts, and the risk-score factor for a suspended employee
 - `__tests__/inactive-employee-payroll-wizard.test.tsx`: 3 integration tests covering a suspended employee blocking wallet signing, an all-active draft staying unblocked, and the reviewer warning with next steps on the draft review step
