@@ -16,7 +16,11 @@ npx vitest run \
   __tests__/multi-asset-rounding-tooltip.test.tsx \
   __tests__/employee-identifier-format.test.ts \
   __tests__/payout-count-limit-indicator.test.tsx \
-  __tests__/audit-hold-release-dialog.test.tsx
+  __tests__/audit-hold-release-dialog.test.tsx \
+  __tests__/draft-checksum.test.ts \
+  __tests__/approval-expiry-badge.test.tsx \
+  __tests__/payer-account-status.test.tsx \
+  __tests__/pending-payroll-obligations.test.tsx
 ```
 
 ---
@@ -148,3 +152,22 @@ npx vitest run \
 | 4 | Edge case: enter a justification of "ok" and tick the box | Release Hold stays disabled. |
 | 5 | Failure state: trigger a release error, e.g. a hold already released in another tab | The error appears inline and the dialog stays open. |
 | 6 | Press **Escape** | The dialog closes with no change to the hold. |
+
+---
+
+## Draft integrity, approval timestamps, payer status, and pending obligations (#516, #568–#570)
+
+**Where:** Payroll → Run Payroll → Confirmation, Payroll Run Details, and Payroll → Approvals.
+
+- The wizard hashes the reviewed employee commitments, payout destinations, eligibility state, and aggregate total with SHA-256. It compares that digest immediately before submission. A mismatch returns the operator to Review, clears the old proof, and requires a fresh proof before another submission attempt.
+- Approval status validates timestamps before showing an active or expiring state. If an approval record has a missing, malformed, future, or inconsistent timestamp, execution is blocked and a recovery message is shown; no payroll values are included.
+- The payer status indicator checks account existence against the configured Horizon endpoint. It distinguishes disconnected, checking, active, missing, network-mismatch, and unavailable states. It never renders the wallet address or balance.
+- The approvals page lists pending runs using period and recipient-count metadata only. It does not show payroll amounts, employee names, employee IDs, or wallet addresses.
+
+| # | Steps | Expected |
+|---|-------|----------|
+| 1 | Start a payroll run, review it, generate a proof, and continue to confirmation | Submission is allowed only when the reviewed draft digest still matches. |
+| 2 | Change a reviewed draft commitment or payout destination before submission | The wizard returns to Review, shows a privacy-safe mismatch warning, clears the old proof, and requires a new proof. |
+| 3 | Open a payroll run whose approval has a malformed or future timestamp | The approval badge shows a blocking validation error and links to the approval workflow. |
+| 4 | Open confirmation with the payer wallet disconnected, then connect it | The status changes from a connection prompt to a Horizon account check and then to active or an actionable error state. |
+| 5 | Open Payroll → Approvals with pending runs | Pending count, period, recipient count, and review links appear; amounts and employee details remain absent. |

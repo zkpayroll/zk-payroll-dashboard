@@ -66,6 +66,8 @@ import {
 import type { PayrollLoadingPhase } from "@/components/ui/PayrollActionLoader";
 import { PayoutCountLimitIndicator } from "@/components/features/payroll/PayoutCountLimitIndicator";
 import { getPayoutLimitStatus } from "@/lib/payroll/payoutLimit";
+import { createPayrollDraftChecksum, matchesReviewedPayrollDraft } from "@/lib/payroll/draftChecksum";
+import PayerAccountStatus from "@/components/features/payroll/PayerAccountStatus";
 import { usePayrollPolicyStore } from "@/stores/payrollPolicy";
 import { PayrollInstructionVersionBadge } from "@/components/features/payroll/PayrollInstructionVersionBadge";
 import {
@@ -132,8 +134,10 @@ function PayrollWizard() {
     instructionVersion,
     nextStep,
     prevStep,
+    goToStep,
     setEmployeeIds,
     setTotalAmount,
+    setProof,
     setProofStatus,
     setProofError,
     setSubmissionStatus,
@@ -151,6 +155,8 @@ function PayrollWizard() {
   const draftResolvedRef = useRef(false);
   const initialEventRecordedRef = useRef(false);
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
+  const [draftChecksumWarning, setDraftChecksumWarning] = useState<string | null>(null);
+  const reviewedDraftChecksum = useRef<string | null>(null);
 
   const walletPublicKey = useWalletStore((s) => s.publicKey) ?? "unknown";
   const addApprovalEvent = useApprovalHistory((s) => s.addEvent);
@@ -246,6 +252,7 @@ function PayrollWizard() {
     const success = Math.random() > 0.2;
     if (success) {
       setProofStatus("success");
+      setDraftChecksumWarning(null);
       if (payrollRunId) {
         logEvent({
           payrollRunId,
@@ -306,6 +313,32 @@ function PayrollWizard() {
       });
       return;
     }
+
+    let currentChecksum: string;
+    try {
+      currentChecksum = await createPayrollDraftChecksum(employeeIds, selectedEmployees, totalAmount);
+    } catch {
+      const message = "The reviewed payroll draft could not be validated. Return to review and refresh the payroll records before submitting.";
+      setProof(null);
+      setProofStatus("idle");
+      setProofError(null);
+      setDraftChecksumWarning(message);
+      goToStep("review");
+      toast.error("Payroll draft needs review", { description: message });
+      return;
+    }
+    if (!matchesReviewedPayrollDraft(reviewedDraftChecksum.current, currentChecksum)) {
+      const message = "This payroll draft changed after review. Review the updated draft and generate a fresh proof before submitting.";
+      reviewedDraftChecksum.current = null;
+      setProof(null);
+      setProofStatus("idle");
+      setProofError(null);
+      setDraftChecksumWarning(message);
+      goToStep("review");
+      toast.error("Payroll draft changed", { description: message });
+      return;
+    }
+    setDraftChecksumWarning(null);
 
     // Log wallet signing before submission
     if (payrollRunId) {
@@ -391,18 +424,53 @@ function PayrollWizard() {
     setSubmissionStatus,
     setSubmissionError,
     setTransactionHash,
+    setProof,
+    setProofStatus,
+    setProofError,
     nextStep,
+    goToStep,
     isWrongNetwork,
     addApprovalEvent,
     walletPublicKey,
     employeeIds,
     totalAmount,
+    selectedEmployees,
     payrollRunId,
     logEvent,
     selectedEmployees.length,
   ]);
 
-  const handleReviewNext = useCallback(() => {
+  const handleReviewNext = useCallback(async () => {
+    try {
+      const nextChecksum = await createPayrollDraftChecksum(
+        employeeIds,
+        selectedEmployees,
+        totalAmount,
+      );
+      const changedSinceReview =
+        reviewedDraftChecksum.current !== null &&
+        !matchesReviewedPayrollDraft(reviewedDraftChecksum.current, nextChecksum);
+      reviewedDraftChecksum.current = nextChecksum;
+      if (changedSinceReview) {
+        setProof(null);
+        setProofStatus("idle");
+        setProofError(null);
+        setDraftChecksumWarning("This payroll draft changed since its previous review. Generate a fresh proof for the updated draft before submitting.");
+      } else {
+        setDraftChecksumWarning(null);
+      }
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : "Payroll draft could not be validated. Refresh the draft before continuing.";
+      reviewedDraftChecksum.current = null;
+      setProof(null);
+      setProofStatus("idle");
+      setProofError(null);
+      setDraftChecksumWarning(message);
+      toast.error("Payroll draft needs review", { description: message });
+      return;
+    }
     if (payrollRunId) {
       logEvent({
         payrollRunId,
@@ -413,7 +481,7 @@ function PayrollWizard() {
       });
     }
     nextStep();
-  }, [payrollRunId, logEvent, nextStep, selectedEmployees.length, totalAmount]);
+  }, [employeeIds, selectedEmployees, totalAmount, payrollRunId, logEvent, nextStep, setProof, setProofStatus, setProofError]);
 
   const handleReset = useCallback(() => {
     if (payrollRunId) {
@@ -426,6 +494,8 @@ function PayrollWizard() {
       });
     }
     reset();
+    reviewedDraftChecksum.current = null;
+    setDraftChecksumWarning(null);
     clearApprovalHistory();
   }, [payrollRunId, logEvent, reset, submissionStatus, clearApprovalHistory]);
 
@@ -599,6 +669,13 @@ function PayrollWizard() {
           </div>
         ))}
       </nav>
+
+      {draftChecksumWarning && (
+        <div role="alert" data-testid="draft-checksum-warning" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-semibold">Payroll draft needs review</p>
+          <p className="mt-1">{draftChecksumWarning}</p>
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
         {currentStep === "review" && (
@@ -1372,6 +1449,8 @@ function ConfirmStep({
           })}
         </div>
       </div>
+
+      <PayerAccountStatus />
 
       {/* Treasury and Proof details */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

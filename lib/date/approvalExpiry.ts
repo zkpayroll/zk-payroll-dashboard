@@ -4,7 +4,7 @@
  * Privacy-safe: only timestamps and status strings are evaluated, no salary values.
  */
 
-export type ApprovalExpiryState = "active" | "expiring_soon" | "expired" | "missing";
+export type ApprovalExpiryState = "active" | "expiring_soon" | "expired" | "missing" | "invalid";
 
 export const APPROVAL_EXPIRING_WINDOW_MS = 48 * 60 * 60 * 1000; // 48h
 
@@ -41,7 +41,7 @@ export function evaluateApprovalExpiry(
   const { approvedAt, expiresAt, approvalStatus, hasApproval } = input;
 
   // Explicit missing: no record at all
-  if (hasApproval === false || (!approvedAt && !expiresAt && !approvalStatus)) {
+  if (hasApproval === false || (hasApproval !== true && !approvedAt && !expiresAt && !approvalStatus)) {
     return {
       state: "missing",
       label: "Approval missing",
@@ -68,6 +68,56 @@ export function evaluateApprovalExpiry(
     };
   }
 
+  if ((hasApproval === true || Boolean(expiresAt) || normalizedStatus === "approved") && !approvedAt) {
+    return {
+      state: "invalid",
+      label: "Approval timestamp missing",
+      message: "Approval metadata has no recorded approval time. Verify the approval record and request a fresh approval before execution.",
+      remainingMs: null,
+      blocksExecution: true,
+    };
+  }
+
+  const approvedAtMs = approvedAt ? Date.parse(approvedAt) : null;
+  if (approvedAt && Number.isNaN(approvedAtMs)) {
+    return {
+      state: "invalid",
+      label: "Approval timestamp invalid",
+      message: "The approval time could not be validated. Verify the approval record and request a fresh approval before execution.",
+      remainingMs: null,
+      blocksExecution: true,
+    };
+  }
+  if (approvedAtMs !== null && approvedAtMs > now) {
+    return {
+      state: "invalid",
+      label: "Approval timestamp is in the future",
+      message: "The approval time is later than the current time. Verify the approval record before execution.",
+      remainingMs: null,
+      blocksExecution: true,
+    };
+  }
+
+  const expiresAtMs = expiresAt ? Date.parse(expiresAt) : null;
+  if (expiresAt && Number.isNaN(expiresAtMs)) {
+    return {
+      state: "invalid",
+      label: "Approval expiry invalid",
+      message: "The approval expiry could not be validated. Verify the approval record before execution.",
+      remainingMs: null,
+      blocksExecution: true,
+    };
+  }
+  if (approvedAtMs !== null && expiresAtMs !== null && expiresAtMs < approvedAtMs) {
+    return {
+      state: "invalid",
+      label: "Approval timestamps inconsistent",
+      message: "The approval expiry is earlier than its approval time. Verify the record or request a fresh approval before execution.",
+      remainingMs: null,
+      blocksExecution: true,
+    };
+  }
+
   // No expiry timestamp — treat as active but warn if not approved
   if (!expiresAt) {
     if (approvedAt) {
@@ -88,18 +138,10 @@ export function evaluateApprovalExpiry(
     };
   }
 
-  const expiresAtMs = Date.parse(expiresAt);
-  if (Number.isNaN(expiresAtMs)) {
-    return {
-      state: "missing",
-      label: "Approval missing",
-      message: "Approval expiry is invalid. Re-validate the approval before executing.",
-      remainingMs: null,
-      blocksExecution: true,
-    };
-  }
+  // `expiresAtMs` was validated above before comparing approval timestamps.
+  const validatedExpiry = expiresAtMs as number;
 
-  if (expiresAtMs <= now) {
+  if (validatedExpiry <= now) {
     return {
       state: "expired",
       label: "Approval expired",
@@ -109,7 +151,7 @@ export function evaluateApprovalExpiry(
     };
   }
 
-  const remainingMs = expiresAtMs - now;
+  const remainingMs = validatedExpiry - now;
   if (remainingMs <= APPROVAL_EXPIRING_WINDOW_MS) {
     return {
       state: "expiring_soon",

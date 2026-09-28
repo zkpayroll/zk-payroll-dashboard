@@ -17,6 +17,8 @@ function scheduledRun(overrides: Partial<any> = {}) {
     proof: "",
     status: "pending" as const,
     employeeIds: ["emp_001"],
+    approvalStatus: "approved" as const,
+    approvalHistory: [{ approvedBy: "admin", approvedAt: new Date().toISOString(), role: "admin" }],
     executedAt: null,
     transactionHash: null,
     ...overrides,
@@ -81,13 +83,37 @@ describe("PayrollRunDetail — proof missing blocks execution", () => {
       expiresAt: new Date(NOW + 10 * 24 * 60 * 60 * 1000).toISOString(),
       rawProofHash: "0xraw",
     };
-    render(<PayrollRunDetail run={scheduledRun()} proofReference={freshRef} />);
-    expect(screen.queryByTestId("missing-proof-warning")).not.toBeInTheDocument();
     // Fresh proof should allow Process payroll (scheduled + not locked + not expired/missing)
     // Note: PayrollRunDetail uses Date.now() for freshness, so we use far-future expiry
     const futureRef = { ...freshRef, expiresAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString() };
-    const { unmount } = render(<PayrollRunDetail run={scheduledRun({ id: "tx_100" })} proofReference={futureRef} />);
-    unmount();
+    render(<PayrollRunDetail run={scheduledRun({ id: "tx_100" })} proofReference={futureRef} />);
+    expect(screen.queryByTestId("missing-proof-warning")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Process payroll/i })).toBeInTheDocument();
+  });
+
+  it("blocks execution when the approval timestamp cannot be validated", () => {
+    const futureRef: ProofReference = {
+      proofId: "zkp_ref_valid",
+      verifierContract: "CCVERIFIER",
+      circuitHash: "0xcircuit",
+      publicSignalsDigest: "0xdigest",
+      proofStatus: "verified",
+      expiresAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+      rawProofHash: "0xraw",
+    };
+    render(
+      <PayrollRunDetail
+        run={scheduledRun({
+          id: "tx_101",
+          approvalHistory: [{ approvedBy: "admin", approvedAt: "invalid-timestamp", role: "admin" }],
+        })}
+        proofReference={futureRef}
+      />,
+    );
+
+    expect(screen.getByTestId("approval-expiry-invalid")).toBeInTheDocument();
+    expect(screen.getByTestId("execution-blocked-by-approval")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Process payroll/i })).not.toBeInTheDocument();
   });
 
   it("shows expired warning when proof is expired (expired path)", () => {

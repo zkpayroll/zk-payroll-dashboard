@@ -27,6 +27,10 @@ const STATE_CONFIG: Record<ApprovalExpiryState, { icon: LucideIcon; badgeClass: 
     icon: FileWarning,
     badgeClass: "bg-gray-100 text-gray-600 border-gray-200",
   },
+  invalid: {
+    icon: AlertTriangle,
+    badgeClass: "bg-red-50 text-red-700 border-red-200",
+  },
 };
 
 export interface ApprovalExpiryBadgeProps {
@@ -85,7 +89,7 @@ export function ApprovalExpiryBadge({
         )}
       </span>
       <span className="text-xs font-normal leading-snug">{evaluation.message}</span>
-      {(evaluation.state === "expired" || evaluation.state === "expiring_soon" || evaluation.state === "missing") &&
+      {(evaluation.state === "expired" || evaluation.state === "expiring_soon" || evaluation.state === "missing" || evaluation.state === "invalid") &&
         renewalHref &&
         renewalLabel && (
           <Link

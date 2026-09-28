@@ -32,6 +32,35 @@ describe("evaluateApprovalExpiry", () => {
     const eval1 = evaluateApprovalExpiry({ approvedAt: new Date(NOW).toISOString(), expiresAt, hasApproval: true }, NOW);
     expect(eval1.state).toBe("expiring_soon");
   });
+
+  it("blocks an approval with an invalid timestamp and gives recovery guidance", () => {
+    const result = evaluateApprovalExpiry(
+      { approvedAt: "not-a-date", expiresAt: new Date(NOW + 86400000).toISOString(), hasApproval: true },
+      NOW,
+    );
+    expect(result.state).toBe("invalid");
+    expect(result.blocksExecution).toBe(true);
+    expect(result.message).toMatch(/verify the approval record/i);
+  });
+
+  it("blocks a future approval timestamp", () => {
+    const result = evaluateApprovalExpiry(
+      { approvedAt: new Date(NOW + 1000).toISOString(), hasApproval: true },
+      NOW,
+    );
+    expect(result.state).toBe("invalid");
+    expect(result.blocksExecution).toBe(true);
+  });
+
+  it("blocks expiry earlier than the approval time", () => {
+    const result = evaluateApprovalExpiry({
+      approvedAt: new Date(NOW).toISOString(),
+      expiresAt: new Date(NOW - 1000).toISOString(),
+      hasApproval: true,
+    }, NOW);
+    expect(result.state).toBe("invalid");
+    expect(result.label).toBe("Approval timestamps inconsistent");
+  });
 });
 
 describe("ApprovalExpiryBadge component", () => {
@@ -60,6 +89,13 @@ describe("ApprovalExpiryBadge component", () => {
     render(<ApprovalExpiryBadge approval={{ hasApproval: false }} now={NOW} />);
     expect(screen.getByTestId("approval-expiry-missing")).toBeInTheDocument();
     expect(screen.getByText(/Approval missing/)).toBeInTheDocument();
+  });
+
+  it("renders actionable feedback for an invalid approval timestamp", () => {
+    render(<ApprovalExpiryBadge approval={{ approvedAt: "bad-timestamp", hasApproval: true }} now={NOW} />);
+    expect(screen.getByTestId("approval-expiry-invalid")).toBeInTheDocument();
+    expect(screen.getByText(/could not be validated/i)).toBeInTheDocument();
+    expect(screen.getByTestId("approval-renewal-link")).toBeInTheDocument();
   });
 
   it("never shows private payroll values", () => {

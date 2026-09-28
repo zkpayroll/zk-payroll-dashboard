@@ -38,14 +38,9 @@ import CancelPayrollDialog from "./CancelPayrollDialog";
 import PayrollCancellationPanel from "./PayrollCancellationPanel";
 import { MissingProofWarning, ExpiredProofWarning } from "@/components/features/proofs/MissingProofWarning";
 import ApprovalExpiryBadge from "@/components/signing/ApprovalExpiryBadge";
+import { evaluateApprovalExpiry } from "@/lib/date/approvalExpiry";
 import BatchRootComparison from "@/components/features/reconciliation/BatchRootComparison";
 import { PayrollSubmissionStepper } from "@/components/stepper/PayrollSubmissionStepper";
-import { MissingProofWarning, ExpiredProofWarning } from "@/components/features/proofs/MissingProofWarning";
-import { ApprovalExpiryBadge } from "@/components/signing/ApprovalExpiryBadge";
-import BatchRootComparison from "@/components/features/reconciliation/BatchRootComparison";
-import PayrollCancellationPanel from "./PayrollCancellationPanel";
-
-
 
 import type { LucideIcon } from "lucide-react";
 const STATUS_ICONS: Record<string, LucideIcon> = {
@@ -133,15 +128,18 @@ export default function PayrollRunDetail({ run: propRun, proofReference, userRol
   const approvalInput = useMemo(() => {
     if (!run) return { hasApproval: false as const };
     const latest = run.approvalHistory?.[run.approvalHistory.length - 1];
-    const hasApproval = Boolean(run.approvalHistory && run.approvalHistory.length > 0) || Boolean(run.approvalStatus);
+    const normalizedStatus = (run.approvalStatus ?? "").toLowerCase();
+    const hasApproval = Boolean(run.approvalHistory && run.approvalHistory.length > 0) ||
+      ["approved", "expired", "revoked", "rejected"].includes(normalizedStatus);
     const approvedAt = latest?.approvedAt ?? null;
     let expiresAt: string | null = null;
-    if (latest?.approvedAt && run.approvalStatus === "approved") {
-      const d = new Date(latest.approvedAt);
+    const approvedAtMs = latest?.approvedAt ? Date.parse(latest.approvedAt) : Number.NaN;
+    if (Number.isFinite(approvedAtMs) && run.approvalStatus === "approved") {
+      const d = new Date(approvedAtMs);
       d.setDate(d.getDate() + 7);
       expiresAt = d.toISOString();
-    } else if (latest?.approvedAt && (run.approvalStatus as string) === "expired") {
-      const d = new Date(latest.approvedAt);
+    } else if (Number.isFinite(approvedAtMs) && (run.approvalStatus as string) === "expired") {
+      const d = new Date(approvedAtMs);
       d.setDate(d.getDate() - 1);
       expiresAt = d.toISOString();
     }
@@ -211,6 +209,7 @@ export default function PayrollRunDetail({ run: propRun, proofReference, userRol
   const txHash = run.transactionHash ?? run.txHash;
   const lockState = getPayrollLockState(run);
   const freshness = evaluateProofFreshness({ reference: proofReference });
+  const approvalState = evaluateApprovalExpiry(approvalInput);
   const lastUpdated = getPayrollLastUpdated(run);
 
   return (
@@ -315,13 +314,22 @@ export default function PayrollRunDetail({ run: propRun, proofReference, userRol
                 Execution blocked — proof expired
               </span>
             )}
-            {kind === "scheduled" && !lockState && !freshness.blocksExecution && freshness.state !== "missing" && (
+            {kind === "scheduled" && !lockState && !freshness.blocksExecution && freshness.state !== "missing" && approvalState.state !== "invalid" && (
               <Link
                 href="/payroll/execute"
                 className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors"
               >
                 Process payroll
               </Link>
+            )}
+            {kind === "scheduled" && !lockState && approvalState.state === "invalid" && (
+              <span
+                data-testid="execution-blocked-by-approval"
+                role="alert"
+                className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-gray-100 text-gray-500 text-sm font-medium cursor-not-allowed"
+              >
+                Execution blocked — approval needs attention
+              </span>
             )}
             {run.status === "pending" && (
               <button
