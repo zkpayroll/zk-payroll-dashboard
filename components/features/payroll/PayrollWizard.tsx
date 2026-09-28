@@ -45,6 +45,7 @@ import { PayrollRiskWarnings } from "./PayrollRiskWarnings";
 import { NoteHashPreview } from "@/components/payroll/NoteHashPreview";
 import { WalletReconnectRecoveryBanner } from "@/components/features/wallet/WalletReconnectRecoveryBanner";
 import { PayrollSubmissionStepper } from "@/components/stepper/PayrollSubmissionStepper";
+import TransactionFeeEstimate from "./TransactionFeeEstimate";
 import type { SubmissionStageKey } from "@/src/payroll/submissionProgress";
 import {
   findIneligibleEmployees,
@@ -997,6 +998,10 @@ function ConfirmStep({
     treasury: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",
   };
 
+  // Fee estimate calculation
+  const protocolFeePercent = 0.001; // 0.1%
+  const protocolFeeUSDC = Math.min(totalAmount * protocolFeePercent, 10);
+
   // #534 — surface which payroll instruction (policy version) governs this run.
   const savedPolicyVersion = usePayrollPolicyStore((st) => st.savedPolicy.version);
   const versionStatus = getInstructionVersionStatus(savedPolicyVersion, instructionVersion);
@@ -1392,21 +1397,24 @@ function ConfirmStep({
             <Wallet className="w-4 h-4 text-indigo-600" />
             Asset Summary
           </h4>
-          <div className="grid grid-cols-2 gap-y-2 text-sm pt-1">
-            <span className="text-gray-500">Net Salary Transfer</span>
-            <span className="font-semibold text-gray-800 text-right">
-              ${totalAmount.toLocaleString()} USDC
-            </span>
-
-            <span className="text-gray-500">Network Transaction Fee</span>
-            <span className="font-semibold text-gray-800 text-right">
-              ~0.0001 XLM (Free)
-            </span>
-
-            <span className="text-gray-500">Total Authorized Amount</span>
-            <span className="font-bold text-indigo-700 text-right">
-              ${totalAmount.toLocaleString()} USDC
-            </span>
+          <div className="space-y-3 pt-1">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Net Salary Transfer</span>
+              <span className="font-semibold text-gray-800">
+                ${totalAmount.toLocaleString()} USDC
+              </span>
+            </div>
+            <TransactionFeeEstimate
+              totalAmount={totalAmount}
+              employeeCount={selectedEmployees.length}
+              network="Stellar Testnet"
+            />
+            <div className="flex justify-between text-sm border-t pt-2">
+              <span className="text-gray-500">Total Authorized Amount</span>
+              <span className="font-bold text-indigo-700">
+                ${(totalAmount + protocolFeeUSDC).toLocaleString()} USDC
+              </span>
+            </div>
           </div>
         </div>
       </div>

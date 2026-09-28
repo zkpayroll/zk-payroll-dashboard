@@ -42,6 +42,7 @@ import ApprovalExpiryBadge from "@/components/signing/ApprovalExpiryBadge";
 import { evaluateApprovalExpiry } from "@/lib/date/approvalExpiry";
 import BatchRootComparison from "@/components/features/reconciliation/BatchRootComparison";
 import { PayrollSubmissionStepper } from "@/components/stepper/PayrollSubmissionStepper";
+import CacheFreshnessIndicator from "./CacheFreshnessIndicator";
 
 import type { LucideIcon } from "lucide-react";
 const STATUS_ICONS: Record<string, LucideIcon> = {
@@ -105,6 +106,14 @@ export default function PayrollRunDetail({ run: propRun, proofReference, userRol
 
   const [isLoading, setIsLoading] = useState(!propRun);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(new Date());
+
+  const handleRefresh = useCallback(async () => {
+    // Simulate data refresh
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    setLastRefreshedAt(new Date());
+    router.refresh();
+  }, [router]);
 
   useEffect(() => {
     if (propRun) {
@@ -375,6 +384,16 @@ export default function PayrollRunDetail({ run: propRun, proofReference, userRol
         {/* Approval expiry badge — visible before execution */}
         <div className="mt-4 flex flex-wrap items-center gap-2" aria-label="Approval expiry status">
           <ApprovalExpiryBadge approval={approvalInput} />
+        </div>
+
+        {/* Cache freshness indicator */}
+        <div className="mt-4">
+          <CacheFreshnessIndicator
+            lastRefreshedAt={lastRefreshedAt}
+            onRefresh={handleRefresh}
+            dataSourceLabel="Payroll run data"
+            isRefreshing={isLoading}
+          />
         </div>
       </header>
 

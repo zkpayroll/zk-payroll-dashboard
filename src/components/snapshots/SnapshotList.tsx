@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Clock,
   CheckCircle2,
@@ -10,6 +10,7 @@ import {
   EyeOff,
   FileSearch,
   Lock,
+  RefreshCw,
 } from "lucide-react";
 import {
   fetchSnapshots,
@@ -18,6 +19,7 @@ import {
 } from "@/lib/sdk/snapshots";
 import type { PayrollObligationSnapshot } from "@/lib/sdk/snapshots";
 import { SNAPSHOT_PRIVACY_NOTICE } from "@/lib/privacy/snapshots";
+import CacheFreshnessIndicator from "@/components/features/payroll/CacheFreshnessIndicator";
 
 type LoadState = "loading" | "loaded" | "error" | "empty";
 
@@ -170,6 +172,20 @@ export function SnapshotList({ snapshots: propSnapshots, initialState }: Snapsho
     initialState ?? (propSnapshots ? "loaded" : "loading"),
   );
   const [error, setError] = useState<string | null>(null);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(new Date());
+
+  const handleRefresh = useCallback(async () => {
+    setState("loading");
+    try {
+      const data = await fetchSnapshots();
+      setSnapshots(data);
+      setState(data.length === 0 ? "empty" : "loaded");
+      setLastRefreshedAt(new Date());
+    } catch {
+      setError("Failed to load obligation snapshots.");
+      setState("error");
+    }
+  }, []);
 
   useEffect(() => {
     if (propSnapshots) {
@@ -244,14 +260,23 @@ export function SnapshotList({ snapshots: propSnapshots, initialState }: Snapsho
 
   return (
     <section aria-labelledby="snapshot-list-heading" className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 id="snapshot-list-heading" className="text-sm font-semibold text-gray-900">
-          Obligation snapshots ({snapshots?.length ?? 0})
-        </h2>
-        <span className="text-xs text-gray-500 flex items-center gap-1.5">
-          <EyeOff className="h-3 w-3" aria-hidden="true" />
-          Salary values encrypted
-        </span>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center justify-between w-full sm:w-auto">
+          <h2 id="snapshot-list-heading" className="text-sm font-semibold text-gray-900">
+            Obligation snapshots ({snapshots?.length ?? 0})
+          </h2>
+          <span className="text-xs text-gray-500 flex items-center gap-1.5">
+            <EyeOff className="h-3 w-3" aria-hidden="true" />
+            Salary values encrypted
+          </span>
+        </div>
+        <CacheFreshnessIndicator
+          lastRefreshedAt={lastRefreshedAt}
+          onRefresh={handleRefresh}
+          dataSourceLabel="Snapshots"
+          isRefreshing={state === "loading"}
+          variant="compact"
+        />
       </div>
 
       <ul className="space-y-3" data-testid="snapshot-list">

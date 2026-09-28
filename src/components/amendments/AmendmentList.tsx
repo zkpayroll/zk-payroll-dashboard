@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Clock,
   CheckCircle2,
@@ -10,11 +10,13 @@ import {
   EyeOff,
   FileSearch,
   Lock,
+  RefreshCw,
 } from "lucide-react";
 import { fetchAmendments, validateAmendmentPlan } from "@/lib/sdk/amendments";
 import type { SalaryCommitmentAmendment } from "@/lib/sdk/amendments";
 import { AMENDMENT_PRIVACY_NOTICE, formatCommitmentShort } from "@/lib/privacy/amendments";
 import { formatAsset } from "@/lib/sdk/amendments";
+import CacheFreshnessIndicator from "@/components/features/payroll/CacheFreshnessIndicator";
 
 type LoadState = "loading" | "loaded" | "error" | "empty";
 
@@ -170,6 +172,20 @@ export function AmendmentList({ amendments: propAmendments, initialState }: Amen
   );
   const [state, setState] = useState<LoadState>(initialState ?? (propAmendments ? "loaded" : "loading"));
   const [error, setError] = useState<string | null>(null);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(new Date());
+
+  const handleRefresh = useCallback(async () => {
+    setState("loading");
+    try {
+      const data = await fetchAmendments();
+      setAmendments(data);
+      setState(data.length === 0 ? "empty" : "loaded");
+      setLastRefreshedAt(new Date());
+    } catch {
+      setError("Failed to load amendments.");
+      setState("error");
+    }
+  }, []);
 
   useEffect(() => {
     if (propAmendments) {
@@ -263,14 +279,23 @@ export function AmendmentList({ amendments: propAmendments, initialState }: Amen
 
   return (
     <section aria-labelledby="amendment-list-heading" className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 id="amendment-list-heading" className="text-sm font-semibold text-gray-900">
-          Amendments ({amendments?.length ?? 0})
-        </h2>
-        <span className="text-xs text-gray-500 flex items-center gap-1.5">
-          <EyeOff className="h-3 w-3" aria-hidden="true" />
-          Salary values encrypted
-        </span>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center justify-between w-full sm:w-auto">
+          <h2 id="amendment-list-heading" className="text-sm font-semibold text-gray-900">
+            Amendments ({amendments?.length ?? 0})
+          </h2>
+          <span className="text-xs text-gray-500 flex items-center gap-1.5">
+            <EyeOff className="h-3 w-3" aria-hidden="true" />
+            Salary values encrypted
+          </span>
+        </div>
+        <CacheFreshnessIndicator
+          lastRefreshedAt={lastRefreshedAt}
+          onRefresh={handleRefresh}
+          dataSourceLabel="Amendments"
+          isRefreshing={state === "loading"}
+          variant="compact"
+        />
       </div>
 
       <ul className="space-y-3" data-testid="amendment-list">

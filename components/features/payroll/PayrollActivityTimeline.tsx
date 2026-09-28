@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   FileEdit,
   FileSearch,
@@ -13,6 +13,8 @@ import {
   History,
   RefreshCcw,
   ShieldAlert,
+  Copy,
+  Bell,
 } from "lucide-react";
 import {
   usePayrollAuditTrailStore,
@@ -39,12 +41,88 @@ const ACTION_CONFIG: Record<
   submission_failed: { icon: ShieldAlert,  colour: "text-red-600 bg-red-50 ring-red-100"        },
 };
 
+// ─── Duplicate detection ────────────────────────────────────────────────────────
+
+interface DuplicateEventGroup {
+  /** The action type that was duplicated */
+  action: PayrollApprovalActionType;
+  /** The payroll run ID where duplicates were found */
+  payrollRunId: string;
+  /** The duplicate events */
+  events: PayrollApprovalEvent[];
+  /** Time window in milliseconds within which events are considered duplicates */
+  timeWindowMs: number;
+}
+
+/**
+ * Detects duplicate events in the timeline.
+ * Events are considered duplicates if they have the same action, payrollRunId,
+ * and occur within a short time window (default 5 seconds).
+ */
+function detectDuplicateEvents(
+  events: PayrollApprovalEvent[],
+  timeWindowMs = 5000,
+): DuplicateEventGroup[] {
+  // Group events by action and payrollRunId
+  const groups = new Map<string, PayrollApprovalEvent[]>();
+  
+  for (const event of events) {
+    const key = `${event.action}:${event.payrollRunId}`;
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key)!.push(event);
+  }
+
+  const duplicateGroups: DuplicateEventGroup[] = [];
+
+  for (const [key, groupEvents] of groups.entries()) {
+    if (groupEvents.length < 2) continue;
+
+    // Sort by timestamp
+    groupEvents.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    // Find events within the time window
+    for (let i = 0; i < groupEvents.length - 1; i++) {
+      const current = groupEvents[i];
+      const next = groupEvents[i + 1];
+      const timeDiff = new Date(next.timestamp).getTime() - new Date(current.timestamp).getTime();
+
+      if (timeDiff <= timeWindowMs) {
+        // Found duplicates - collect all events in this cluster
+        const cluster = [current];
+        for (let j = i + 1; j < groupEvents.length; j++) {
+          const clusterDiff = new Date(groupEvents[j].timestamp).getTime() - new Date(current.timestamp).getTime();
+          if (clusterDiff <= timeWindowMs) {
+            cluster.push(groupEvents[j]);
+          } else {
+            break;
+          }
+        }
+
+        if (cluster.length >= 2) {
+          const [action, payrollRunId] = key.split(":");
+          duplicateGroups.push({
+            action: action as PayrollApprovalActionType,
+            payrollRunId,
+            events: cluster,
+            timeWindowMs,
+          });
+        }
+      }
+    }
+  }
+
+  return duplicateGroups;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatAbsolute(ts: string): string {
   return new Date(ts).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -160,6 +238,11 @@ interface PayrollActivityTimelineProps {
  *   by item.
  * - The `<section>` is labelled with `aria-labelledby`.
  * - Timestamps use `<time dateTime>` for machine-readable values.
+ *
+ * Duplicate Detection:
+ * - Warns when duplicate events are detected (same action, same payroll run,
+ *   within a short time window). This helps identify potential webhook
+ *   retries or UI double-submissions.
  */
 export function PayrollActivityTimeline({
   payrollRunId,
@@ -168,6 +251,7 @@ export function PayrollActivityTimeline({
   className = "",
 }: PayrollActivityTimelineProps) {
   const allEvents = usePayrollAuditTrailStore((s) => s.events);
+  const [dismissedDuplicates, setDismissedDuplicates] = useState<Set<string>>(new Set());
 
   const events: PayrollApprovalEvent[] = useMemo(() => {
     const filtered = payrollRunId
@@ -183,7 +267,27 @@ export function PayrollActivityTimeline({
     return maxEvents !== undefined ? filtered.slice(-maxEvents) : filtered;
   }, [allEvents, payrollRunId, maxEvents]);
 
+  // Detect duplicate events
+  const duplicateGroups = useMemo(
+    () => detectDuplicateEvents(events),
+    [events],
+  );
+
+  // Filter out dismissed duplicates
+  const activeDuplicateGroups = useMemo(
+    () => duplicateGroups.filter((group) => {
+      const key = `${group.action}:${group.payrollRunId}:${group.events[0].timestamp}`;
+      return !dismissedDuplicates.has(key);
+    }),
+    [duplicateGroups, dismissedDuplicates],
+  );
+
   const headingId = `pat-heading-${payrollRunId ?? "all"}`;
+
+  const handleDismissDuplicate = (group: DuplicateEventGroup) => {
+    const key = `${group.action}:${group.payrollRunId}:${group.events[0].timestamp}`;
+    setDismissedDuplicates((prev) => new Set(prev).add(key));
+  };
 
   return (
     <section
@@ -211,6 +315,57 @@ export function PayrollActivityTimeline({
           </span>
         )}
       </div>
+
+      {/* Duplicate warning banner */}
+      {activeDuplicateGroups.length > 0 && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4"
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-200 text-amber-800">
+              <Bell className="h-4 w-4" aria-hidden="true" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h4 className="text-sm font-semibold text-amber-950">
+                Duplicate Events Detected
+              </h4>
+              <p className="mt-1 text-sm text-amber-800">
+                {activeDuplicateGroups.length} duplicate event group{activeDuplicateGroups.length !== 1 ? "s" : ""} found. This may indicate webhook retries or double submissions.
+              </p>
+              <div className="mt-2 space-y-1">
+                {activeDuplicateGroups.map((group, idx) => (
+                  <div
+                    key={`${group.action}:${group.payrollRunId}:${group.events[0].timestamp}`}
+                    className="flex items-center justify-between text-xs bg-white p-2 rounded border border-amber-100"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-amber-900">
+                        {getActionLabel(group.action)}
+                      </span>
+                      <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded text-[10px] font-medium">
+                        {group.events.length} events
+                      </span>
+                      <span className="text-amber-600">
+                        within {(group.timeWindowMs / 1000).toFixed(1)}s
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDismissDuplicate(group)}
+                      aria-label={`Dismiss duplicate warning for ${getActionLabel(group.action)}`}
+                      className="p-1 text-amber-500 hover:text-amber-700 hover:bg-amber-100 rounded transition-colors"
+                    >
+                      <XCircle className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Empty state */}
       {events.length === 0 && (
