@@ -515,28 +515,75 @@ Not blocked, so ordinary operations stay writable: dates (`2026-09-25`), years
 />
 ```
 
+## Payroll Owner Transfer Review (#546)
+
+The payroll owner is the company admin wallet: it controls the treasury and signs payroll runs. `/settings/roles` now includes a **Transfer payroll ownership** review screen below the role directory.
+
+### Files
+
+- `src/payroll/ownerTransfer.ts`: pure validation (`reviewOwnerTransfer`), `maskWalletAddress`, `isValidStellarAccount`, and `buildOwnerTransferAuditEntry`
+- `components/features/settings/OwnerTransferReview.tsx`: the review screen (props-driven)
+- `components/features/settings/OwnerTransferReviewContainer.tsx`: supplies the current owner (company admin), role-directory candidates, and the in-flight run count
+
+### Flow
+
+1. Choose the new owner from the role directory (the current owner is excluded), or enter a wallet address.
+2. Review the current owner → new owner summary (masked addresses) and the consequences.
+3. Type `TRANSFER OWNERSHIP` and tick the acknowledgement.
+4. Submit. The request is recorded; the new owner must accept it from their wallet before it takes effect.
+
+### Blocking rules
+
+| Code | When |
+| --- | --- |
+| `no_candidate` | No new owner is chosen |
+| `invalid_address` | Not a valid Stellar account (`StrKey` checksum is verified) |
+| `same_as_current_owner` | The address already owns the payroll |
+| `runs_in_flight` | Any payroll run is still `pending`: the owner signs in-flight runs |
+| `confirmation_mismatch` | The phrase isn't typed exactly |
+| `not_acknowledged` | The loss-of-access checkbox isn't ticked |
+
+These are warnings, not blockers: the new owner has a read-only role (auditor or compliance reviewer), or the address is outside the role directory.
+
+### Privacy guarantees
+
+- Addresses are always shown masked (`GABCDE…WXYZ`). No payroll amounts appear on the screen, in messages, or in the audit entry.
+- `buildOwnerTransferAuditEntry` records only the action, both masked addresses, and a timestamp.
+- There is no backend endpoint yet: `onSubmit` receives the audit-safe entry for a future API or on-chain call.
+
+## #536 — Delegated Approver Management Panel
+
+**Goal:** Enable managing authorized delegated signers and surrogate approvers within the payroll approval workflow while strictly enforcing address validation, duplicate prevention, and zero exposure of sensitive financial values.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `stores/delegatedApprovers.ts` | Zustand store with `persist` middleware (`zk_delegated_approvers_store`). Holds delegated approvers list and CRUD actions. |
+| `lib/validation/delegatedApprover.ts` | Validation logic enforcing non-empty, valid format (Stellar `G...` or delegate identifier), and duplicate checking. |
+| `components/features/approvals/DelegatedApproverPanel.tsx` | React UI panel component for viewing, adding, and removing delegated approvers. |
+| `__tests__/components/DelegatedApproverPanel.test.tsx` | Unit and integration test suite covering rendering, add/remove actions, validation errors, and privacy guarantees. |
+
+### Validation Rules & Privacy Guarantees
+
+- **Empty Input:** Rejects empty or whitespace-only inputs (`"Approver address or identifier is required."`).
+- **Format Validation:** Validates against Stellar address format (`^G[A-Z0-9]{55}$`) or standard delegate identifier pattern (`^[a-zA-Z0-9_-]{3,64}$`).
+- **Duplicate Prevention:** Checks case-insensitive matches against existing approver list (`"Duplicate approver address or identifier already exists."`).
+- **Privacy Enforcement:** All error messages and UI controls omit sensitive payroll data (salaries, employee names, payment amounts).
+
 ## Test coverage summary
 
-| Issue | Test file | Happy path | Edge case |
-| --- | --- | --- | --- |
-| #530 | `payroll-run-notes-panel.test.tsx` | Admin adds, confirms, lists, and removes a note | Blocked sensitive note; over-length note; operator/auditor read-only; cancelled run locked; per-run scoping |
-| #530 | `payroll-run-notes-rule.test.ts` | Clean note validates and reports the remaining budget | Currency/bare-number/name/email/wallet/credential detection; date-shaped numbers not treated as amounts; length reported before privacy |
-| #526 | `import-reference-collision.test.tsx` | Validates reference collision and renders warning | Case-insensitive duplicate detection; salary privacy verified |
-| #527 | `preflight-blockers-mobile.test.tsx` | Renders mobile responsive flex layout (`flex-col sm:flex-row`) | High visibility critical blocker layout on narrow viewports |
-| #528 | `audit-amendment-export.test.tsx` | Exports safe amendment JSON/CSV metadata; opens modal | Ensures zero raw salary leaks in exported string data |
-| #525 | `role-aware-cancellation.test.tsx` | Admin & Operator can cancel; Auditor view is read-only | Disables cancellation dialog controls for unauthorized roles |
-| #470 | `payroll-run-progress.test.tsx` | Banner renders on resumable run; Resume/Discard work | Submitted run → no banner; null runId → no record |
-| #471 | `session-timeout-warning.test.tsx` | Banner at warning; modal at urgent; expired modal | Escalation re-surfaces dismissed warning; onExpired fires once |
-| #469 | `accessible-toast-announcements.test.tsx` | Success → polite; error → assertive | Repeat message debounce; store auto-clear at 3s |
-| #468 | `unsaved-changes-guard.test.tsx` | Clean form proceeds immediately; dirty opens dialog | Two sequential actions; beforeunload registered/removed |
-| #460 | `stale-data-refresh-indicator.test.tsx` | Banner/inline indicator appears when data exceeds threshold | Refresh in-flight disables button; error state handled gracefully |
-| #463 | `responsive-employee-table-controls.test.tsx` | Sort by column, search filtering, direction toggle | No results empty state, mobile sort selector |
-| #462 | `payroll-conflict-warning.test.tsx` | Conflict banner appears on concurrent update; reload fetches remote | Overwrite disabled until acknowledgement checked |
-| #455 | `period-finalization-dialog.test.tsx` | Dialog displays downstream impacts; confirms and closes period | Cancellation keeps period open; handles failure on confirm |
+| #510 | `payroll-preflight-results-screen.test.tsx` | Renders readiness score, blocker cards, warnings, passed checks, and dry-run summary | Disables execution button when blockers exist; enables fix actions and re-run dry run |
+| #509 | `payroll-amendment-history-panel.test.tsx` | Displays authorized amendment revision history, safe reason labels, and details drawer | Filters by status & search query; exports safe JSON/CSV metadata |
+| #514 | `payroll-cancellation-reason-selector.test.tsx` | Enforces selecting documented cancellation reason before confirming cancellation | Provides helper text and custom audit notes input; disables confirmation until reason selected |
+| #515 | `audit-grant-scope-details-drawer.test.tsx` | Displays auditor identity, expiry indicator, accessible scopes, restricted scopes, and masking tier | Triggers extend, revoke, and export scope callbacks |
+| #536 | `DelegatedApproverPanel.test.tsx` | Renders panel, adds valid approver, rejects duplicates/invalid inputs with clear error, removes approver, and enforces zero sensitive payroll data exposure |
 
 Run with:
 
 ```bash
 npm test
 ```
+
+
 

@@ -238,6 +238,29 @@ amounts, employee data, wallet addresses, proofs, or transaction hashes.
 
 ---
 
+### Delegated Approver Management
+
+Delegated approvers can act on behalf of primary approvers in high-value or multi-signer payroll workflows.
+
+#### Managing Delegated Approvers:
+
+1. Navigate to **Payroll** → **Approvals** (`/payroll/approvals`) or **Settings** → **Approvals** (`/settings/approvals`).
+2. Locate the **Delegated Approver Management** panel.
+3. To add a new delegated approver:
+   - Enter a valid Stellar wallet address (starting with `G`, 56 characters) or a delegate identifier (e.g., `delegate-finance-01`).
+   - Optionally enter a role description or label (e.g., `VP Finance Delegate`).
+   - Click **Add Delegated Approver**.
+4. Validation rules on add:
+   - Rejects empty or missing inputs.
+   - Rejects duplicate addresses or identifiers already assigned.
+   - Rejects invalid address format or unsupported identifiers.
+5. To remove an existing delegated approver, click **Remove** next to their entry.
+
+**Privacy Note:** Delegated approver error messages and controls display operational status only and never expose sensitive financial figures, salary details, or employee personal data.
+
+---
+
+
 ## Employee Management
 
 ### Adding Employees

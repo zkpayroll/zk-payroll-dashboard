@@ -64,6 +64,9 @@ import {
   getPayrollButtonAriaLabel,
 } from "@/components/ui/PayrollActionLoader";
 import type { PayrollLoadingPhase } from "@/components/ui/PayrollActionLoader";
+import { PayoutCountLimitIndicator } from "@/components/features/payroll/PayoutCountLimitIndicator";
+import { getPayoutLimitStatus } from "@/lib/payroll/payoutLimit";
+import { usePayrollPolicyStore } from "@/stores/payrollPolicy";
 
 const STEPS: { key: PayrollWizardStep; label: string }[] = [
   { key: "review", label: "Review" },
@@ -660,6 +663,10 @@ function ReviewStep({
   onNext: () => void;
   isWrongNetwork: boolean;
 }) {
+  // #542 — enforce the saved (active) capacity policy, not unsaved edits.
+  const maxBatchSize = usePayrollPolicyStore((st) => st.savedPolicy.capacity.maxBatchSize);
+  const payoutLimit = getPayoutLimitStatus(selectedEmployees.length, maxBatchSize);
+
   if (employeeIds.length === 0) {
     return (
       <div className="text-center py-8">
@@ -686,6 +693,7 @@ function ReviewStep({
         Review the employees and amounts included in this payroll run before
         generating the ZK proof.
       </p>
+      <PayoutCountLimitIndicator count={selectedEmployees.length} limit={maxBatchSize} />
       <DuplicateWarningPanel employees={selectedEmployees} />
       <InactiveEmployeeWarning
         employees={MOCK_EMPLOYEES}
@@ -708,7 +716,9 @@ function ReviewStep({
         <button
           type="button"
           onClick={onNext}
-          className="w-full sm:w-auto px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-1"
+          disabled={payoutLimit.blocking}
+          title={payoutLimit.blocking ? "Reduce payouts to the batch limit to continue" : undefined}
+          className="w-full sm:w-auto px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Continue
           <ArrowRight className="w-4 h-4" />
@@ -834,6 +844,19 @@ function ConfirmStep({
   const [confirmed, setConfirmed] = useState(false);
   const store = usePayrollWizardStore();
 
+  // #512 — the batch-size limit was enforced only in ReviewStep, which
+  // disables that step's Continue button. ConfirmStep is the step that
+  // actually signs and submits, and it had no such check, so the limit was
+  // bypassable: go Review → Back, change the selection, or arrive at Confirm
+  // by any other route, and an over-limit batch would sign. Enforcing it here
+  // as a blocker closes the gap, because the sign button is
+  // `disabled={state === "blocked"}` and `state` is derived from `blockers`.
+  //
+  // Same saved-policy read as ReviewStep (#542), so an unsaved edit to the
+  // capacity policy does not tighten the limit mid-run.
+  const maxBatchSize = usePayrollPolicyStore((st) => st.savedPolicy.capacity.maxBatchSize);
+  const payoutLimit = getPayoutLimitStatus(selectedEmployees.length, maxBatchSize);
+
   const { isProofNearingExpiration, treasuryBalanceOverride } = store;
   const treasuryBalance =
     treasuryBalanceOverride !== null && treasuryBalanceOverride !== undefined
@@ -920,6 +943,18 @@ function ConfirmStep({
       );
     }
 
+    // 6. Batch size limit (#512) — the guard that was only on the previous step.
+    // `batchesNeeded` is already computed by getPayoutLimitStatus, so the
+    // remediation is the same shape the Review step tells the user: split it,
+    // or raise the ceiling in Payroll Policy → Capacity.
+    if (payoutLimit.blocking) {
+      list.push(
+        `This run exceeds the ${payoutLimit.limit}-payout batch limit by ${
+          selectedEmployees.length - payoutLimit.limit
+        }. Split it into ${payoutLimit.batchesNeeded} batches, or raise the limit in Payroll Policy → Capacity.`,
+      );
+    }
+
     return list;
   }, [
     treasuryBalance,
@@ -928,6 +963,7 @@ function ConfirmStep({
     selectedEmployees,
     ineligibleEmployees,
     isSessionExpired,
+    payoutLimit,
   ]);
 
   const warnings = useMemo(() => {
@@ -1559,7 +1595,7 @@ function SubmitStep({
             aria-label={getPayrollButtonAriaLabel("Retry submission", "error")}
             title={
               isWrongNetwork
-                ? `Switch to ${EXPECTED_NETWORK} in your wallet`
+                ? `Switch to ${expectedNetwork} in your wallet`
                 : undefined
             }
             className="px-4 py-2 rounded-md bg-red-50 text-red-700 text-sm font-medium hover:bg-red-100 border border-red-200 transition-colors inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"

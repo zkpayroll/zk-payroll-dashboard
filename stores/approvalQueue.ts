@@ -3,6 +3,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { PayrollRun } from "@/types/models";
+import {
+  evaluateApprovalAction,
+  type ApprovalAction,
+  type ApprovalActionResult,
+} from "@/lib/payroll/approvalConflict";
 
 export interface ApprovalDraft extends PayrollRun {
   approvalStatus:
@@ -16,13 +21,47 @@ export interface ApprovalDraft extends PayrollRun {
 
 interface ApprovalQueueState {
   drafts: ApprovalDraft[];
-  approveDraft: (id: string, reviewerName: string, role: string, comment?: string) => void;
-  rejectDraft: (id: string, reviewerName: string, role: string, comment?: string) => void;
+  approveDraft: (id: string, reviewerName: string, role: string, comment?: string) => ApprovalActionResult;
+  rejectDraft: (id: string, reviewerName: string, role: string, comment?: string) => ApprovalActionResult;
   /** Comment is required — it tells the drafter exactly what to fix. */
-  requestCorrection: (id: string, reviewerName: string, role: string, comment: string) => void;
+  requestCorrection: (id: string, reviewerName: string, role: string, comment: string) => ApprovalActionResult;
   /** Simulates the drafter addressing feedback and putting the draft back in the queue. */
-  resubmitDraft: (id: string, submitterName: string, role: string, comment?: string) => void;
+  resubmitDraft: (id: string, submitterName: string, role: string, comment?: string) => ApprovalActionResult;
   addDraftForApproval: (draft: PayrollRun, notes?: string) => void;
+}
+
+/**
+ * Builds one of the four guarded mutations (#552).
+ *
+ * The gate is the whole point: every action used to be an unguarded
+ * `drafts.map` that matched on id and overwrote `approvalStatus`, so a second
+ * executive acting on a stale view of the queue silently discarded the first
+ * decision. Now a decision that does not match the state the reviewer saw is
+ * refused, nothing is written, and the caller gets a message naming the state
+ * and who got there first — no payroll values.
+ */
+function guardedUpdate(
+  drafts: ApprovalDraft[],
+  id: string,
+  reviewerName: string,
+  role: string,
+  action: ApprovalAction,
+  apply: (draft: ApprovalDraft, decidedAt: string) => ApprovalDraft,
+): { drafts: ApprovalDraft[]; result: ApprovalActionResult } {
+  const target = drafts.find((d) => d.id === id);
+  const result = evaluateApprovalAction(
+    target,
+    action,
+    reviewerName,
+    /* draftExists */ Boolean(target),
+  );
+  if (!result.ok) return { drafts, result };
+
+  const decidedAt = new Date().toISOString();
+  return {
+    drafts: drafts.map((d) => (d.id === id ? apply(d, decidedAt) : d)),
+    result,
+  };
 }
 
 const INITIAL_APPROVAL_DRAFTS: ApprovalDraft[] = [
@@ -64,98 +103,80 @@ const INITIAL_APPROVAL_DRAFTS: ApprovalDraft[] = [
 
 export const useApprovalQueueStore = create<ApprovalQueueState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       drafts: INITIAL_APPROVAL_DRAFTS,
-      approveDraft: (id, reviewerName, role, comment) =>
-        set((state) => ({
-          drafts: state.drafts.map((d) =>
-            d.id === id
-              ? {
-                  ...d,
-                  approvalStatus: "approved",
-                  status: "pending",
-                  approvalHistory: [
-                    ...(d.approvalHistory || []),
-                    {
-                      approvedBy: reviewerName,
-                      approvedAt: new Date().toISOString(),
-                      role,
-                      comment,
-                      action: "approved",
-                    },
-                  ],
-                }
-              : d,
-          ),
-        })),
-      rejectDraft: (id, reviewerName, role, comment) =>
-        set((state) => ({
-          drafts: state.drafts.map((d) =>
-            d.id === id
-              ? {
-                  ...d,
-                  approvalStatus: "rejected",
-                  status: "cancelled",
-                  approvalHistory: [
-                    ...(d.approvalHistory || []),
-                    {
-                      approvedBy: reviewerName,
-                      approvedAt: new Date().toISOString(),
-                      role,
-                      comment,
-                      action: "rejected",
-                    },
-                  ],
-                }
-              : d,
-          ),
-        })),
-      requestCorrection: (id, reviewerName, role, comment) =>
-        set((state) => ({
-          drafts: state.drafts.map((d) =>
-            d.id === id
-              ? {
-                  ...d,
-                  // Correction requests keep the run in "pending" (not cancelled) since
-                  // the drafter is expected to fix and resubmit rather than start over.
-                  approvalStatus: "correction_requested",
-                  status: "pending",
-                  approvalHistory: [
-                    ...(d.approvalHistory || []),
-                    {
-                      approvedBy: reviewerName,
-                      approvedAt: new Date().toISOString(),
-                      role,
-                      comment,
-                      action: "correction_requested",
-                    },
-                  ],
-                }
-              : d,
-          ),
-        })),
-      resubmitDraft: (id, submitterName, role, comment) =>
-        set((state) => ({
-          drafts: state.drafts.map((d) =>
-            d.id === id
-              ? {
-                  ...d,
-                  approvalStatus: "pending_executive_approval",
-                  status: "pending",
-                  approvalHistory: [
-                    ...(d.approvalHistory || []),
-                    {
-                      approvedBy: submitterName,
-                      approvedAt: new Date().toISOString(),
-                      role,
-                      comment: comment || "Corrections addressed; resubmitted for review",
-                      action: "resubmitted",
-                    },
-                  ],
-                }
-              : d,
-          ),
-        })),
+      approveDraft: (id, reviewerName, role, comment) => {
+        const { drafts, result } = guardedUpdate(
+          get().drafts, id, reviewerName, role, "approved",
+          (d, at) => ({
+            ...d,
+            approvalStatus: "approved",
+            status: "pending",
+            approvalHistory: [
+              ...(d.approvalHistory || []),
+              { approvedBy: reviewerName, approvedAt: at, role, comment, action: "approved" },
+            ],
+          }),
+        );
+        if (result.ok) set({ drafts });
+        return result;
+      },
+      rejectDraft: (id, reviewerName, role, comment) => {
+        const { drafts, result } = guardedUpdate(
+          get().drafts, id, reviewerName, role, "rejected",
+          (d, at) => ({
+            ...d,
+            approvalStatus: "rejected",
+            status: "cancelled",
+            approvalHistory: [
+              ...(d.approvalHistory || []),
+              { approvedBy: reviewerName, approvedAt: at, role, comment, action: "rejected" },
+            ],
+          }),
+        );
+        if (result.ok) set({ drafts });
+        return result;
+      },
+      requestCorrection: (id, reviewerName, role, comment) => {
+        const { drafts, result } = guardedUpdate(
+          get().drafts, id, reviewerName, role, "correction_requested",
+          // Correction requests keep the run in "pending" (not cancelled) since
+          // the drafter is expected to fix and resubmit rather than start over.
+          (d, at) => ({
+            ...d,
+            approvalStatus: "correction_requested",
+            status: "pending",
+            approvalHistory: [
+              ...(d.approvalHistory || []),
+              { approvedBy: reviewerName, approvedAt: at, role, comment, action: "correction_requested" },
+            ],
+          }),
+        );
+        if (result.ok) set({ drafts });
+        return result;
+      },
+      resubmitDraft: (id, submitterName, role, comment) => {
+        const { drafts, result } = guardedUpdate(
+          get().drafts, id, submitterName, role, "resubmitted",
+          (d, at) => ({
+            ...d,
+            approvalStatus: "pending_executive_approval",
+            status: "pending",
+            approvalHistory: [
+              ...(d.approvalHistory || []),
+              {
+                approvedBy: submitterName,
+                approvedAt: at,
+                role,
+                comment: comment || "Corrections addressed; resubmitted for review",
+                action: "resubmitted",
+              },
+            ],
+          }),
+        );
+        if (result.ok) set({ drafts });
+        return result;
+      },
       addDraftForApproval: (draft, notes) =>
         set((state) => ({
           drafts: [
