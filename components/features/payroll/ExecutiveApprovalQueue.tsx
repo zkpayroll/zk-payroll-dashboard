@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { useApprovalQueueStore, type ApprovalDraft } from "@/stores/approvalQueue";
+import type {
+  ApprovalActionResult,
+  ApprovalConflictDetail,
+} from "@/lib/payroll/approvalConflict";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +30,34 @@ export function ExecutiveApprovalQueue() {
   const [selectedDraft, setSelectedDraft] = useState<ApprovalDraft | null>(null);
   const [comment, setComment] = useState("");
   const [correctionErrorId, setCorrectionErrorId] = useState<string | null>(null);
+  // #552 — set when a decision is refused because the draft no longer holds
+  // the state this reviewer was looking at (someone else acted first).
+  const [conflict, setConflict] = useState<ApprovalConflictDetail | null>(null);
+
+  /**
+   * Applies a decision and reports a conflict instead of silently overwriting.
+   *
+   * The store returns the gate's verdict. On conflict the row is left alone and
+   * the reviewer keeps their comment and selection, because the fix is to
+   * reload and re-read the payroll — not to retype what they had already
+   * written.
+   */
+  const applyDecision = (
+    act: () => ApprovalActionResult,
+    resetSelection: boolean,
+  ) => {
+    const result = act();
+    if (!result.ok) {
+      setConflict(result.conflict);
+      return;
+    }
+    setConflict(null);
+    if (resetSelection) {
+      setSelectedDraft(null);
+      setComment("");
+      setCorrectionErrorId(null);
+    }
+  };
 
   const filteredDrafts = drafts.filter((d) => {
     if (filter === "pending") return d.approvalStatus === "pending_executive_approval";
@@ -41,17 +73,17 @@ export function ExecutiveApprovalQueue() {
   const currentComment = (draft: ApprovalDraft) => (selectedDraft?.id === draft.id ? comment : "");
 
   const handleApprove = (draft: ApprovalDraft) => {
-    approveDraft(draft.id, "Executive Admin", "Admin", comment || "Approved for execution");
-    setSelectedDraft(null);
-    setComment("");
-    setCorrectionErrorId(null);
+    applyDecision(
+      () => approveDraft(draft.id, "Executive Admin", "Admin", comment || "Approved for execution"),
+      true,
+    );
   };
 
   const handleReject = (draft: ApprovalDraft) => {
-    rejectDraft(draft.id, "Executive Admin", "Admin", comment || "Rejected during executive review");
-    setSelectedDraft(null);
-    setComment("");
-    setCorrectionErrorId(null);
+    applyDecision(
+      () => rejectDraft(draft.id, "Executive Admin", "Admin", comment || "Rejected during executive review"),
+      true,
+    );
   };
 
   const handleRequestCorrection = (draft: ApprovalDraft) => {
@@ -60,14 +92,14 @@ export function ExecutiveApprovalQueue() {
       setCorrectionErrorId(draft.id);
       return;
     }
-    requestCorrection(draft.id, "Executive Admin", "Admin", trimmed);
-    setSelectedDraft(null);
-    setComment("");
-    setCorrectionErrorId(null);
+    applyDecision(
+      () => requestCorrection(draft.id, "Executive Admin", "Admin", trimmed),
+      true,
+    );
   };
 
   const handleResubmit = (draft: ApprovalDraft) => {
-    resubmitDraft(draft.id, "Payroll Drafter", "Operator");
+    applyDecision(() => resubmitDraft(draft.id, "Payroll Drafter", "Operator"), false);
   };
 
   return (
@@ -140,6 +172,34 @@ export function ExecutiveApprovalQueue() {
           All ({drafts.length})
         </button>
       </div>
+
+{/* #552 — a decision was refused because the payroll moved on. */}
+{conflict && (
+  <div
+    role="alert"
+    aria-live="assertive"
+    data-testid="approval-conflict-banner"
+    className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-300 rounded-lg text-sm"
+  >
+    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+    <div className="min-w-0">
+      <p className="font-medium text-amber-900">
+        Approval conflict — nothing was changed
+      </p>
+      <p className="text-amber-800 mt-0.5 break-words">{conflict.message}</p>
+      <p className="text-amber-700 mt-1 text-xs">
+        Current state: {conflict.currentStatusLabel}
+        {conflict.decidedAt
+          ? ` · recorded ${new Date(conflict.decidedAt).toLocaleString()}`
+          : ""}
+      </p>
+      <p className="text-amber-700 mt-2 text-xs">
+        Your comment has been kept. Reload the queue to review the current
+        state before deciding again.
+      </p>
+    </div>
+  </div>
+)}
 
       {filteredDrafts.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 border border-dashed rounded-xl">

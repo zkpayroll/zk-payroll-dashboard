@@ -844,6 +844,19 @@ function ConfirmStep({
   const [confirmed, setConfirmed] = useState(false);
   const store = usePayrollWizardStore();
 
+  // #512 — the batch-size limit was enforced only in ReviewStep, which
+  // disables that step's Continue button. ConfirmStep is the step that
+  // actually signs and submits, and it had no such check, so the limit was
+  // bypassable: go Review → Back, change the selection, or arrive at Confirm
+  // by any other route, and an over-limit batch would sign. Enforcing it here
+  // as a blocker closes the gap, because the sign button is
+  // `disabled={state === "blocked"}` and `state` is derived from `blockers`.
+  //
+  // Same saved-policy read as ReviewStep (#542), so an unsaved edit to the
+  // capacity policy does not tighten the limit mid-run.
+  const maxBatchSize = usePayrollPolicyStore((st) => st.savedPolicy.capacity.maxBatchSize);
+  const payoutLimit = getPayoutLimitStatus(selectedEmployees.length, maxBatchSize);
+
   const { isProofNearingExpiration, treasuryBalanceOverride } = store;
   const treasuryBalance =
     treasuryBalanceOverride !== null && treasuryBalanceOverride !== undefined
@@ -930,6 +943,18 @@ function ConfirmStep({
       );
     }
 
+    // 6. Batch size limit (#512) — the guard that was only on the previous step.
+    // `batchesNeeded` is already computed by getPayoutLimitStatus, so the
+    // remediation is the same shape the Review step tells the user: split it,
+    // or raise the ceiling in Payroll Policy → Capacity.
+    if (payoutLimit.blocking) {
+      list.push(
+        `This run exceeds the ${payoutLimit.limit}-payout batch limit by ${
+          selectedEmployees.length - payoutLimit.limit
+        }. Split it into ${payoutLimit.batchesNeeded} batches, or raise the limit in Payroll Policy → Capacity.`,
+      );
+    }
+
     return list;
   }, [
     treasuryBalance,
@@ -938,6 +963,7 @@ function ConfirmStep({
     selectedEmployees,
     ineligibleEmployees,
     isSessionExpired,
+    payoutLimit,
   ]);
 
   const warnings = useMemo(() => {
