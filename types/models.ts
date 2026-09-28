@@ -156,6 +156,10 @@ export interface PayrollTransaction {
     action?: "approved" | "rejected" | "correction_requested" | "resubmitted";
   }>;
   txHash?: string;
+  /** Settlement reference used for receipt lookup; absent until confirmed. */
+  receiptId?: string | null;
+  /** Account sequence reported by the network for this execution, when available. */
+  confirmationNonce?: string | null;
   isArchived?: boolean;
   /**
    * Reconciliation outcome for run-derived history rows (#284). Absent when

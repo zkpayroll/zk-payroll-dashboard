@@ -21,6 +21,7 @@ import { MOCK_EMPLOYEES, MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import type { PayrollRun, ProofReference } from "@/types/models";
 import type { UserRole } from "@/types";
 import PayrollRunNotesPanel from "@/components/features/payroll/PayrollRunNotesPanel";
+import { ExecutionConfirmationNonceStatus } from "@/components/features/payroll/ExecutionConfirmationNonceStatus";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ProofFreshnessBadge from "@/components/features/proofs/ProofFreshnessBadge";
 import { evaluateProofFreshness } from "@/lib/formatting/proofFreshness";
@@ -229,6 +230,25 @@ export default function PayrollRunDetail({ run: propRun, proofReference, userRol
       {/* Submission progress stepper (issue #295): lifecycle stages derived
           from run state only — no amounts, proofs, or hashes rendered. */}
       <PayrollSubmissionStepper input={{ source: "run", run }} compact />
+
+      {(txHash || run.status === "verified") && (
+        <ExecutionConfirmationNonceStatus
+          nonce={run.confirmationNonce}
+          status={run.status === "verified" ? "confirmed" : "pending"}
+        />
+      )}
+
+      {run.reconciliationStatus === "partial" && (
+        <section aria-label="Partial batch failure recovery" className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <h2 className="text-sm font-semibold text-amber-900">Partial batch recovery</h2>
+          <p className="mt-1 text-sm text-amber-800">
+            {Math.max(0, run.reconciliationDetails?.processedCount ?? 0)} of {run.reconciliationDetails?.totalCount ?? run.employeeCount} payouts have been reconciled. Review the remaining items before attempting recovery.
+          </p>
+          <Link href="/payroll/reconciliation" className="mt-3 inline-flex text-sm font-medium text-amber-900 underline underline-offset-2">
+            Review reconciliation details
+          </Link>
+        </section>
+      )}
 
       {lockState && (
         <div

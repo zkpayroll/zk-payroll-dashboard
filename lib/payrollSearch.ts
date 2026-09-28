@@ -38,6 +38,7 @@ export function matchesPayrollSearch(tx: PayrollTransaction, query: string): boo
     tx.id,
     tx.status,
     tx.txHash ?? "",
+    tx.receiptId ?? (tx.status === "verified" ? `rcpt_${tx.id}` : ""),
     formatRunPeriod(tx),
     RECONCILIATION_STATUS_LABELS[reconciliationStatus],
     reconciliationStatus,

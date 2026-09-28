@@ -37,6 +37,7 @@ import {
   MOCK_TREASURY_BALANCE,
 } from "@/lib/api/mockData";
 import PayrollReceipt from "./PayrollReceipt";
+import { ExecutionConfirmationNonceStatus } from "./ExecutionConfirmationNonceStatus";
 import PayrollApprovalAuditTrail from "./PayrollApprovalAuditTrail";
 import { usePayrollAuditTrailStore } from "@/stores/payrollAuditTrail";
 import ApprovalHistoryDrawer from "./ApprovalHistoryDrawer";
@@ -1620,12 +1621,15 @@ function SubmitStep({
       />
 
       {status === "success" && (
-        <PayrollReceipt
-          totalAmount={totalAmount}
-          employeeCount={employeeCount}
-          transactionHash={transactionHash}
-          onReset={onReset}
-        />
+        <>
+          <ExecutionConfirmationNonceStatus status="unavailable" />
+          <PayrollReceipt
+            totalAmount={totalAmount}
+            employeeCount={employeeCount}
+            transactionHash={transactionHash}
+            onReset={onReset}
+          />
+        </>
       )}
 
       {status === "error" && (

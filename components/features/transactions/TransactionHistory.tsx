@@ -43,8 +43,7 @@ import {
 } from "lucide-react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { MOCK_TRANSACTIONS, MOCK_EMPLOYEES } from "@/lib/api/mockData";
-import type { PayrollTransaction, ReconciliationOutcome } from "@/types";
-import type { PayrollTransaction, PayrollRun } from "@/types";
+import type { PayrollTransaction, PayrollRun, ReconciliationOutcome } from "@/types";
 import TransactionDetailDrawer from "./TransactionDetailDrawer";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -347,15 +346,6 @@ function TransactionHistoryInner({
     return results;
   }, [filters, mode]);
 
-  const activeFilterCount = [
-    !!filters.search.trim(),
-    filters.status !== "all",
-    filters.reconciliation !== "all",
-    !!filters.employee,
-    !!filters.dateFrom,
-    !!filters.dateTo,
-    !!filters.payrollRun,
-  ].filter(Boolean).length;
   // #284: quick filters apply on top of the search/panel result so their
   // faceted counts describe the list the user is actually looking at.
   const filtered = useMemo(
@@ -367,6 +357,7 @@ function TransactionHistoryInner({
     [
       !!filters.search.trim(),
       filters.status !== "all",
+      filters.reconciliation !== "all",
       !!filters.employee,
       !!filters.dateFrom,
       !!filters.dateTo,
@@ -585,7 +576,7 @@ function TransactionHistoryInner({
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, search: e.target.value }))
                 }
-                placeholder="Search run id, period, tx hash, status, reconciliation..."
+                placeholder="Search run id, receipt reference, period, tx hash, status..."
                 className="w-full pl-3 pr-8 py-1.5 rounded-md border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
               />
               {filters.search && (
