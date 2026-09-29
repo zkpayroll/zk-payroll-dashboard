@@ -11,9 +11,10 @@ import {
   ArrowDown,
   Search,
   X,
+  Loader2,
+  UserCheck,
 } from "lucide-react";
 
-import { Users, Loader2, UserPlus, Upload, RotateCcw, UserCheck } from "lucide-react"
 import { useEmployeeStore } from "@/stores/employees";
 import { MOCK_EMPLOYEES } from "@/lib/api/mockData";
 import type { Employee } from "@/types";

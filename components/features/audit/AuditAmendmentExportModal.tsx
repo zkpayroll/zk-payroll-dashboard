@@ -73,9 +73,9 @@ export function AuditAmendmentExportModal({
 
           {/* Export Format Options */}
           <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
+            <span className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
               Export Format
-            </label>
+            </span>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"

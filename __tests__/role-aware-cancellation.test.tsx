@@ -7,7 +7,10 @@ import type { PayrollRun } from "@/types/models";
 
 const mockCancelledRun: PayrollRun = {
   id: "run_001",
-  period: "2025-06",
+  companyId: "company_001",
+  timestamp: "2025-06-01T00:00:00Z",
+  proof: "0xproof",
+  employeeIds: ["emp_1", "emp_2"],
   status: "cancelled",
   totalAmount: 10000,
   employeeCount: 2,

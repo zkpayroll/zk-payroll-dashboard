@@ -50,7 +50,6 @@ export function PayrollInstructionVersionBadge({
       title={status.detail ?? undefined}
       aria-label={`Payroll instructions ${status.label}. ${status.detail}`}
       className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold cursor-help ${pill}`}
-      tabIndex={0}
     >
       <Info className={`h-3 w-3 ${icon}`} aria-hidden="true" />
       <span className="font-mono">{status.label}</span>

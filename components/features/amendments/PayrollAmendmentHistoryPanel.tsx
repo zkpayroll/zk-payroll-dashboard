@@ -241,7 +241,7 @@ export function PayrollAmendmentHistoryPanel({
 
               {amendment.reason && (
                 <p className="text-xs text-gray-700 italic border-l-2 border-indigo-400 pl-2 py-0.5">
-                  "{amendment.reason}"
+                  &ldquo;{amendment.reason}&rdquo;
                 </p>
               )}
 

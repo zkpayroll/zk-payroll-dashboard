@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Dashboard Asset Availability Safety Check**: Operational readiness check verifying configured Stellar assets against allowlist criteria before payroll disbursements are initiated.
+  - Pure evaluation module `lib/assets/assetAvailabilitySafety.ts` with `evaluateAssetAvailabilitySafety`, asset symbol validation, and Stellar public key issuer verification
+  - Dashboard component `DashboardAssetAvailabilityCheck` rendering accessible available, warning, and blocked states with actionable remediation link to `/settings/assets`
+  - Zero financial data leakage: operates solely on asset symbols and public issuer keys without inspecting employee counts, disbursement amounts, or wallet balances
+  - Typed domain contracts in `types/assets.ts` with `AssetAvailabilitySafetyStatus` and `AssetAvailabilitySafetyResult`
+  - Comprehensive unit and component test suites in `__tests__/asset-availability-safety.test.ts` and `__tests__/dashboard-asset-availability.test.tsx`
+
 - **Organization Policy Migration Validation (#599)**: Validates an organization's
   payroll policy configuration against the current configuration schema before it is
   used for payroll or migrated.

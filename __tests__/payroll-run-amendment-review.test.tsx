@@ -18,6 +18,9 @@ const mockOriginalRun: PayrollRun = {
   totalAmount: 150000,
   employeeCount: 15,
   status: "verified",
+  employeeIds: ["emp_1"],
+  timestamp: "2025-03-01T10:00:00Z",
+  proof: "0xproof",
   createdAt: "2025-03-01T10:00:00Z",
   updatedAt: "2025-03-01T10:00:00Z",
 };

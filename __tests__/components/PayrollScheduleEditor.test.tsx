@@ -25,7 +25,7 @@ const SECOND_TEMPLATE: PayrollTemplate = {
   id: "tpl_second",
   name: "Biweekly Contractor Payroll",
   frequency: "biweekly",
-  dayOfMonth: null,
+  dayOfMonth: undefined,
   nextScheduled: "2025-01-20T09:00:00Z",
 };
 
@@ -44,7 +44,7 @@ describe("PayrollScheduleEditor", () => {
   it("shows an empty state when there are no active templates", () => {
     render(
       <PayrollScheduleEditor
-        templates={[{INACTIVE_TEMPLATE]}
+        templates={[INACTIVE_TEMPLATE]}
         locks={[]}
         runs={[]}
         initialViewDate={new Date(Date.UTC(2025, 0, 1))}
@@ -58,8 +58,8 @@ describe("PayrollScheduleEditor", () => {
     render(
       <PayrollScheduleEditor
         templates={[ACTIVE_TEMPLATE]}
-        locks={{}}
-        runs={{}}
+        locks={[]}
+        runs={[]}
         initialViewDate={new Date(Date.UTC(2025, 0, 1))}
       />,
     );
@@ -89,8 +89,8 @@ describe("PayrollScheduleEditor", () => {
     render(
       <PayrollScheduleEditor
         templates={[ACTIVE_TEMPLATE]}
-        locks={{}}
-        runs={{}}
+        locks={[]}
+        runs={[]}
         initialViewDate={new Date(Date.UTC(2025, 0, 1))}
       />,
     );
@@ -106,7 +106,7 @@ describe("PayrollScheduleEditor", () => {
   it("rejects a draft window where start is after end", () => {
     render(
       <PayrollScheduleEditor
-        templates={{ACTIVE_TEMPLATE]}
+        templates={[ACTIVE_TEMPLATE]}
         locks={[]}
         runs={[]}
         initialViewDate={new Date(Date.UTC(2025, 0, 1))}
@@ -124,8 +124,8 @@ describe("PayrollScheduleEditor", () => {
     render(
       <PayrollScheduleEditor
         templates={[ACTIVE_TEMPLATE]}
-        locks={{}}
-        runs={{}}
+        locks={[]}
+        runs={[]}
         initialViewDate={new Date(Date.UTC(2025, 0, 1))}
       />,
     );
@@ -170,7 +170,7 @@ describe("PayrollScheduleEditor", () => {
   it("allows adjacent windows that touch but do not overlap", () => {
     render(
       <PayrollScheduleEditor
-        templates={{ACTIVE_TEMPLATE}
+        templates={[ACTIVE_TEMPLATE]}
         locks={[]}
         runs={[]}
         initialViewDate={new Date(Date.UTC(2025, 0, 1))}
@@ -193,7 +193,7 @@ describe("PayrollScheduleEditor", () => {
   it("navigates between months without crashing", () => {
     render(
       <PayrollScheduleEditor
-        templates={{ACTIVE_TEMPLATE]}
+        templates={[ACTIVE_TEMPLATE]}
         locks={[]}
         runs={[]}
         initialViewDate={new Date(Date.UTC(2025, 0, 1))}
@@ -234,7 +234,7 @@ describe("PayrollScheduleEditor", () => {
 
     render(
       <PayrollScheduleEditor
-        templates={{ACTIVE_TEMPLATE]}
+        templates={[ACTIVE_TEMPLATE]}
         locks={locks}
         runs={[]}
         initialViewDate={new Date(Date.UTC(2025, 0, 1))}

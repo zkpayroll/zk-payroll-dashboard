@@ -1,7 +1,5 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Filter, X } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 import { Bookmark, Check, Filter, Pencil, Save, Trash2, X } from "lucide-react";
 import PayrollCalendar from "./PayrollCalendar";
@@ -9,9 +7,6 @@ import { MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import type { PayrollRun, ReconciliationOutcome } from "@/types/models";
 import { searchPayrollRuns } from "@/lib/payrollSearch";
 import { resolveReconciliationStatus } from "@/lib/reconciliation/status";
-
-type StatusFilter = "all" | "pending" | "verified" | "failed" | "cancelled";
-type OutcomeFilter = "all" | ReconciliationOutcome;
 import PayrollFilterEmptyState from "@/components/filters/PayrollFilterEmptyState";
 import type { ActivePayrollFilter } from "@/src/payroll/emptyState";
 import { RECONCILIATION_STATUS_LABELS } from "@/lib/reconciliation/status";
@@ -29,7 +24,7 @@ import { StaleDataIndicator } from "./StaleDataIndicator";
 import { useStaleDataRefresh } from "@/hooks/useStaleDataRefresh";
 
 type StatusFilter = "all" | "pending" | "verified" | "failed" | "cancelled";
-type OutcomeFilter = "all" | "pending" | "partial" | "complete" | "failed";
+type OutcomeFilter = "all" | ReconciliationOutcome;
 type SortField = "createdAt" | "status" | "id";
 type SortDirection = "asc" | "desc";
 
@@ -167,7 +162,6 @@ function PayrollHistory({ runs = MOCK_PAYROLL_RUNS }: PayrollHistoryProps) {
     if (filters.outcome !== "all") {
       results = results.filter(
         (r) => resolveReconciliationStatus(r) === filters.outcome,
-        (r) => r.reconciliationStatus === filters.outcome,
       );
     }
 

@@ -704,6 +704,48 @@ import { PeriodStatusFilter } from "@/components/payroll/PeriodStatusFilter";
 <PeriodStatusFilter periods={periods} onFilterChange={(status) => {}} />
 ```
 
+## Dashboard Asset Availability Safety Check
+
+**Goal:** Ensure that the organization has valid, supported Stellar assets configured for payroll disbursements before payroll creation or execution proceeds, providing early actionable feedback on the main dashboard without exposing sensitive financial values.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `types/assets.ts` | Domain types for asset availability safety status (`available`, `warning`, `blocked`), configuration items, and structured diagnostic results. |
+| `lib/assets/assetAvailabilitySafety.ts` | Pure evaluation rules (`evaluateAssetAvailabilitySafety`), Stellar code and issuer validation, and safety assertion (`assertAssetAvailabilitySafety`). |
+| `components/features/dashboard/DashboardAssetAvailabilityCheck.tsx` | Main dashboard safety check banner rendering available, warning, and blocked states with actionable remediation links. |
+| `__tests__/asset-availability-safety.test.ts` | Unit tests covering allowlist checks, code validation, issuer validation, duplicate detection, and assertion errors. |
+| `__tests__/dashboard-asset-availability.test.tsx` | Component test suite verifying available, blocked, and warning states, fallback resolution, action callbacks, and accessibility. |
+
+### Safety States
+
+| Status | Meaning | Action / Behavior |
+| --- | --- | --- |
+| `available` | At least one supported asset (USDC, XLM, EURC) is configured with valid specifications. | Displays green badge and confirmation of supported assets ready for payroll. |
+| `warning` | Supported assets are present, but unsupported, duplicate, or malformed asset configurations were detected. | Displays amber banner, lists supported assets ready for payroll, notes ignored unsupported assets or duplicates, and provides link to `/settings/assets`. |
+| `blocked` (`unavailable`) | No supported assets are configured (e.g. empty array, all unsupported, or invalid). | Blocks payroll creation, displays amber alert with blocker explanation, and links to `/settings/assets` for asset setup. |
+
+### Privacy Guarantees
+
+- Evaluates strictly asset identifiers (symbols and public issuer keys). Zero employee records, salary amounts, treasury balances, or private credentials are read or rendered.
+- Error messages and diagnostics name only asset codes and reason strings; no payroll amounts or secrets are ever leaked.
+
+### Usage
+
+```tsx
+import DashboardAssetAvailabilityCheck from "@/components/features/dashboard/DashboardAssetAvailabilityCheck";
+
+// Automatically uses configured assets or falls back to treasury store:
+<DashboardAssetAvailabilityCheck />
+
+// Or with explicit configured assets:
+<DashboardAssetAvailabilityCheck
+  configuredAssets={[{ code: "USDC" }, { code: "XLM" }]}
+  onConfigureClick={() => {}}
+/>
+```
+
 ## Test coverage summary
 
 | #510 | `payroll-preflight-results-screen.test.tsx` | Renders readiness score, blocker cards, warnings, passed checks, and dry-run summary | Disables execution button when blockers exist; enables fix actions and re-run dry run |
@@ -716,13 +758,12 @@ import { PeriodStatusFilter } from "@/components/payroll/PeriodStatusFilter";
 | #518 | `payroll-run-amendment-review.test.tsx` | Reviews proposed amendments non-destructively, preserves original payroll record intact, renders safe diff & stale/policy warning alerts |
 | #517 | `treasury-snapshot-activity-card.test.tsx` | Calculates coverage ratio & status badges, renders truncated Merkle digests & snapshot activity logs, triggers actionable deficit warnings |
 | #519 | `cancellable-data-refresh.test.tsx` | Manages AbortController signal, cancels in-flight refreshes, maintains consistent loading states, displays actionable privacy-safe feedback |
-
 | #605 | `blocked-execution-diagnostics.test.ts` | Validates ready states, treasury/proof/policy/approval/recipient/auth blockers, assertion errors, and privacy report formatting |
 | #453 | `payroll-period-status-filter.test.ts` / `payroll-period-status-filter-ui.test.tsx` | Filters the period list by draft/active/finalized/archived, falls back to all on unknown input, and renders an actionable empty state with no private payroll data |
+| Core | `asset-availability-safety.test.ts` / `dashboard-asset-availability.test.tsx` | Validates configured Stellar assets against allowlist, enforces format/issuer rules, flags duplicates & malformed entries, surfaces available/warning/blocked dashboard states |
 
 Run with:
 
 ```bash
 npm test
 ```
-

@@ -19,6 +19,9 @@ const mockAmendments: SalaryCommitmentAmendment[] = [
     nextCommitment: "0x22222222222222222222222222222222",
     approvalStatus: "approved",
     createdAt: "2025-06-01T10:00:00Z",
+    updatedAt: "2025-06-01T10:00:00Z",
+    employeeId: "emp_101",
+    requestedBy: "admin",
   },
 ];
 

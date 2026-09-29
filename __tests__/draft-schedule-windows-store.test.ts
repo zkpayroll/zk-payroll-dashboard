@@ -102,7 +102,7 @@ describe("useDraftScheduleWindowStore", () => {
       .getState()
       .upsertDraft({ templateId: "tpl_1", windowStart: "2025-01-05", windowEnd: "2025-01-15" });
 
-    expect(result.conflictsWith[0].id).toBe(existing.window.id);
+    expect(result.conflictsWith[0]).toBe(existing.window.id);
   });
 
   it("allows adjacent non-overlapping windows", () => {

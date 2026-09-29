@@ -196,13 +196,6 @@ export interface PayrollTransaction {
   confirmationNonce?: string | null;
   isArchived?: boolean;
   /**
-   * Reconciliation outcome for run-derived history rows (#284). Absent when
-   * the transaction has not been reconciled yet; the quick-filter toolbar
-   * treats a missing value as "does not match a specific reconciliation
-   * filter" rather than guessing. Mirrors `PayrollRun["reconciliationStatus"]`.
-   */
-  reconciliationStatus?: "pending" | "partial" | "complete" | "failed";
-  /**
    * Cancellation reason for run-derived history rows (#284). Mirrors
    * `PayrollRun["cancellationReason"]`.
    */
@@ -231,7 +224,7 @@ export interface PayrollRun extends PayrollTransaction {
   receiptId?: string | null;
   executedAt?: string | null;
   transactionHash?: string | null;
-  reconciliationStatus?: "pending" | "partial" | "complete" | "failed";
+  reconciliationStatus?: ReconciliationStatus;
   reconciliationDetails?: {
     processedCount: number;
     totalCount: number;

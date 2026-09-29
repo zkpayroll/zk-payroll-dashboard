@@ -76,11 +76,14 @@ function detectDuplicateEvents(
 
   const duplicateGroups: DuplicateEventGroup[] = [];
 
-  for (const [key, groupEvents] of groups.entries()) {
-    if (groupEvents.length < 2) continue;
+  groups.forEach((groupEvents, key) => {
+    if (groupEvents.length < 2) return;
 
     // Sort by timestamp
-    groupEvents.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    groupEvents.sort(
+      (a: PayrollApprovalEvent, b: PayrollApprovalEvent) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+    );
 
     // Find events within the time window
     for (let i = 0; i < groupEvents.length - 1; i++) {
@@ -111,7 +114,7 @@ function detectDuplicateEvents(
         }
       }
     }
-  }
+  });
 
   return duplicateGroups;
 }
@@ -444,9 +447,7 @@ export function RefreshablePayrollActivityTimeline(
   );
 }
 
-// tiny helper — avoids importing useState in the JSX above
+// tiny helper
 function useSafeToggle(): [number, React.Dispatch<React.SetStateAction<number>>] {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { useState } = require("react") as typeof import("react");
   return useState<number>(0);
 }

@@ -27,10 +27,8 @@ import type { PayrollRun } from "@/types/models";
 const resumePayrollSchema = z.object({
   reviewedAt: z.string().datetime({ message: "reviewedAt must be a valid ISO-8601 date-time" }),
   acknowledgedInterruption: z.literal(true, {
-    errorMap: () => ({
-      message:
-        "acknowledgedInterruption must be true — confirm you have reviewed the interrupted state.",
-    }),
+    message:
+      "acknowledgedInterruption must be true — confirm you have reviewed the interrupted state.",
   }),
   /** Optional operator note; must not contain raw salary figures. */
   note: z
@@ -174,7 +172,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
  * payroll figures.  We return `employeeCount` and run metadata only.
  */
 function sanitizeRun(run: PayrollRun): Omit<PayrollRun, "totalAmount"> & { totalAmount: never } {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { totalAmount: _omit, ...safe } = run;
+  const safe = { ...run };
+  delete (safe as Partial<PayrollRun>).totalAmount;
   return safe as Omit<PayrollRun, "totalAmount"> & { totalAmount: never };
 }
