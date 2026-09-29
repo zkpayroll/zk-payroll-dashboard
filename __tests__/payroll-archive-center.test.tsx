@@ -165,4 +165,15 @@ describe("PayrollArchiveCenter", () => {
     // After clicking, run state updates
     expect(useArchiveStore.getState().runs.find((r) => r.id === "arc_001")?.isArchived).toBe(false);
   });
+
+    it("shows archive eligibility for ready and disputed runs", () => {
+      render(<PayrollArchiveCenter />);
+
+      const readyRunCard = screen.getByTestId("archive-run-card-arc_001");
+      const disputedRunCard = screen.getByTestId("archive-run-card-arc_004");
+
+      expect(within(readyRunCard).getByText("Archived")).toBeInTheDocument();
+      expect(within(disputedRunCard).getByText("Blocked by dispute")).toBeInTheDocument();
+    });
+
 });
