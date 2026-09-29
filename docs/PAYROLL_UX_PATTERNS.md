@@ -577,21 +577,53 @@ These are warnings, not blockers: the new owner has a read-only role (auditor or
 
 ### Files
 
+## #520 — Pagination Safety Controls
+
+**Goal:** Prevent accidental over-fetching and show clear pagination boundaries in large payroll lists without exposing sensitive salary values or employee PII.
+
+### Files
+
 | File | Purpose |
 | --- | --- |
-| `lib/validation/payoutDestination.ts` | Pure validation rules (`validatePayoutDestinationChangeApproval`, `validatePayoutDestinationChangeRejection`, `validateDestinationAddress`). |
-| `src/payroll/payoutDestinationReview.ts` | Domain helpers (`evaluatePayoutDestinationChange`, reason code labels, masked evaluation). |
-| `components/review/WalletChangeReviewCard.tsx` | Interactive review card supporting single-employee drawer mode and dashboard-wide pending reviews overview. |
-| `components/review/PayoutDestinationChangeReview.tsx` | Convenient export of the review interface. |
-| `__tests__/payout-destination-change-review.test.tsx` | Unit and component tests covering approval validation, rejection constraints, masked rendering, and actionable error alerts. |
+| `src/payroll/paginationSafety.ts` | Pure validation and calculation rules (`calculatePaginationSafety`, `MAX_PAGE_SIZE = 100`). |
+| `components/payroll/PaginationSafetyControls.tsx` | Pagination UI component rendering safe range boundaries and over-fetch warning banners. |
+| `__tests__/payroll-pagination-safety.test.tsx` | Unit and component test suite covering standard pagination, over-fetch clamping, and out-of-bounds page handling. |
 
-### Validation Rules & Privacy Guarantees
+## #518 — Dashboard Support for Payroll Run Amendments
 
-- **Format Validation:** Destination addresses must start with `G` and consist of alphanumeric characters (12-56 characters).
-- **No Unchanged Addresses:** Blocks approval if the new destination is identical to the previous destination.
-- **Cooldown Lock Enforcement:** Blocks approval if the employee is currently subject to an active wallet rotation cooldown.
-- **Rejection Constraints:** Requires a non-empty explanation of at least 5 characters (maximum 300 characters).
-- **Privacy Enforcement:** All Stellar addresses are masked (`GDQP2K…4W37`). No salary figures, employee PII, or commitment hashes are displayed or logged in error messages.
+**Goal:** Allow authorized users to review amendment details alongside original payroll run metadata without overwriting or mutating the original payroll record.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `src/payroll/amendments.ts` | Domain helpers (`createPayrollRunAmendmentReview`, `assertOriginalRecordIntact`). |
+| `components/payroll/PayrollRunAmendmentReview.tsx` | Dashboard review component rendering immutable original record banner, proposed amendment details, safe diff, and action buttons. |
+| `__tests__/payroll-run-amendment-review.test.tsx` | Unit and component tests verifying record immutability, safe diff rendering, and stale/policy warning handling. |
+
+## #517 — Treasury Snapshot Activity Cards
+
+**Goal:** Display privacy-safe treasury health metrics and snapshot activity events on payroll operation views.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `src/treasury/snapshotActivity.ts` | Domain calculation rules (`calculateTreasurySnapshotHealth`, `formatMerkleRootShort`). |
+| `components/treasury/TreasurySnapshotActivityCard.tsx` | UI card displaying coverage ratios, status badges, Merkle root digests, and snapshot activity event logs. |
+| `__tests__/treasury-snapshot-activity-card.test.tsx` | Unit and component tests covering healthy metrics, funding deficit warnings, and event verification errors. |
+
+## #519 — Cancellable Data Refresh Actions
+
+**Goal:** Allow users to stop long-running refreshes while maintaining consistent loading states and zero financial data leaks.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `hooks/useCancellableDataRefresh.ts` | React hook managing `AbortController` signal, cancellation state, and privacy-safe status messages. |
+| `components/payroll/CancellableRefreshButton.tsx` | UI button displaying active refreshing indicator with a Cancel button. |
+| `__tests__/cancellable-data-refresh.test.tsx` | Unit and component tests for successful refresh, mid-flight cancellation, and error handling. |
 
 ## Test coverage summary
 
@@ -601,9 +633,14 @@ These are warnings, not blockers: the new owner has a read-only role (auditor or
 | #515 | `audit-grant-scope-details-drawer.test.tsx` | Displays auditor identity, expiry indicator, accessible scopes, restricted scopes, and masking tier | Triggers extend, revoke, and export scope callbacks |
 | #536 | `DelegatedApproverPanel.test.tsx` | Renders panel, adds valid approver, rejects duplicates/invalid inputs with clear error, removes approver, and enforces zero sensitive payroll data exposure |
 | #596 | `payout-destination-change-review.test.tsx` | Validates approval criteria, blocks invalid addresses / identical addresses / active cooldowns, validates rejection reasons, displays masked addresses, renders dashboard mode |
+| #520 | `payroll-pagination-safety.test.tsx` | Calculates safe pagination boundaries, clamps page size to MAX_PAGE_SIZE (100), handles empty lists & out-of-bounds pages, renders UI controls |
+| #518 | `payroll-run-amendment-review.test.tsx` | Reviews proposed amendments non-destructively, preserves original payroll record intact, renders safe diff & stale/policy warning alerts |
+| #517 | `treasury-snapshot-activity-card.test.tsx` | Calculates coverage ratio & status badges, renders truncated Merkle digests & snapshot activity logs, triggers actionable deficit warnings |
+| #519 | `cancellable-data-refresh.test.tsx` | Manages AbortController signal, cancels in-flight refreshes, maintains consistent loading states, displays actionable privacy-safe feedback |
 
 Run with:
 
 ```bash
 npm test
 ```
+
