@@ -54,4 +54,78 @@ describe("usePeriodCloseStore", () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain("already closed");
   });
+
+  describe("reopenPeriod", () => {
+    beforeEach(() => {
+      usePeriodCloseStore.getState().closePeriod(makeInputs());
+      expect(usePeriodCloseStore.getState().isClosed("tx_test")).toBe(true);
+    });
+
+    it("reopens a closed period with a valid reason", () => {
+      const result = usePeriodCloseStore.getState().reopenPeriod({
+        payrollRunId: "tx_test",
+        reason: "Missing employee adjustment discovered during post-close review.",
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.error).toBeNull();
+      expect(usePeriodCloseStore.getState().isClosed("tx_test")).toBe(false);
+    });
+
+    it("refuses to reopen a period that is not closed", () => {
+      usePeriodCloseStore.setState({ closedPayrollRunIds: [] });
+
+      const result = usePeriodCloseStore.getState().reopenPeriod({
+        payrollRunId: "tx_test",
+        reason: "Valid reopen reason with enough characters.",
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("not currently closed");
+    });
+
+    it("refuses to reopen with a reason shorter than 10 characters", () => {
+      const result = usePeriodCloseStore.getState().reopenPeriod({
+        payrollRunId: "tx_test",
+        reason: "short",
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("at least 10 characters");
+      expect(usePeriodCloseStore.getState().isClosed("tx_test")).toBe(true);
+    });
+
+    it("refuses to reopen with a reason longer than 500 characters", () => {
+      const longReason = "a".repeat(501);
+      const result = usePeriodCloseStore.getState().reopenPeriod({
+        payrollRunId: "tx_test",
+        reason: longReason,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("500 characters or fewer");
+      expect(usePeriodCloseStore.getState().isClosed("tx_test")).toBe(true);
+    });
+
+    it("trims whitespace before validating reason length", () => {
+      const result = usePeriodCloseStore.getState().reopenPeriod({
+        payrollRunId: "tx_test",
+        reason: "   short   ",
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("at least 10 characters");
+    });
+
+    it("allows a 500-character reason exactly", () => {
+      const exactReason = "a".repeat(500);
+      const result = usePeriodCloseStore.getState().reopenPeriod({
+        payrollRunId: "tx_test",
+        reason: exactReason,
+      });
+
+      expect(result.success).toBe(true);
+      expect(usePeriodCloseStore.getState().isClosed("tx_test")).toBe(false);
+    });
+  });
 });

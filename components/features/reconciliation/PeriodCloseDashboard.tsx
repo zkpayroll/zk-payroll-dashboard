@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, XCircle, Lock, Calendar } from "lucide-react";
+import { CheckCircle2, XCircle, Lock, Unlock, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import {
   MOCK_PAYROLL_RUNS,
@@ -14,6 +14,7 @@ import { buildPeriodCloseChecklist } from "@/lib/reconciliation/periodClose";
 import { usePeriodCloseStore } from "@/stores/periodClose";
 import EmptyState from "@/components/ui/EmptyState";
 import { PeriodFinalizationDialog } from "@/components/features/payroll/PeriodFinalizationDialog";
+import { PeriodReopenDialog } from "@/components/features/payroll/PeriodReopenDialog";
 import type { PayrollRun, PeriodCloseChecklistItem } from "@/types/models";
 
 function ChecklistRow({ item }: { item: PeriodCloseChecklistItem }) {
@@ -48,9 +49,11 @@ function ChecklistRow({ item }: { item: PeriodCloseChecklistItem }) {
 
 function PeriodCloseCard({ run }: { run: PayrollRun }) {
   const closePeriod = usePeriodCloseStore((s) => s.closePeriod);
+  const reopenPeriod = usePeriodCloseStore((s) => s.reopenPeriod);
   const isClosed = usePeriodCloseStore((s) => s.isClosed(run.id));
   const [error, setError] = useState<string | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false);
+  const [isReopenDialogOpen, setIsReopenDialogOpen] = useState(false);
 
   const checklist = useMemo(
     () =>
@@ -80,6 +83,22 @@ function PeriodCloseCard({ run }: { run: PayrollRun }) {
     setError(null);
     toast.success("Payroll period closed", {
       description: `${run.id} has been marked closed.`,
+    });
+  };
+
+  const handleConfirmedReopen = (reason: string) => {
+    const result = reopenPeriod({
+      payrollRunId: run.id,
+      reason,
+    });
+
+    if (!result.success) {
+      setError(result.error);
+      throw new Error(result.error ?? "Failed to reopen period.");
+    }
+    setError(null);
+    toast.success("Payroll period reopened", {
+      description: `${run.id} seal has been broken.`,
     });
   };
 
@@ -116,7 +135,7 @@ function PeriodCloseCard({ run }: { run: PayrollRun }) {
       {!isClosed && (
         <button
           type="button"
-          onClick={() => setIsDialogOpen(true)}
+          onClick={() => setIsCloseDialogOpen(true)}
           disabled={!checklist.canClose}
           className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 transition-colors"
         >
@@ -124,14 +143,36 @@ function PeriodCloseCard({ run }: { run: PayrollRun }) {
         </button>
       )}
 
-      {isDialogOpen && (
+      {isClosed && (
+        <button
+          type="button"
+          onClick={() => setIsReopenDialogOpen(true)}
+          className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 text-sm font-medium px-4 py-2 transition-colors"
+          data-testid={`reopen-btn-${run.id}`}
+        >
+          <Unlock className="w-4 h-4" aria-hidden="true" />
+          Reopen period
+        </button>
+      )}
+
+      {isCloseDialogOpen && (
         <PeriodFinalizationDialog
-          isOpen={isDialogOpen}
-          onClose={() => setIsDialogOpen(false)}
+          isOpen={isCloseDialogOpen}
+          onClose={() => setIsCloseDialogOpen(false)}
           onConfirm={handleConfirmedClose}
           periodId={run.id}
           employeeCount={run.employeeCount}
           totalAmount={run.totalAmount}
+        />
+      )}
+
+      {isReopenDialogOpen && (
+        <PeriodReopenDialog
+          isOpen={isReopenDialogOpen}
+          onClose={() => setIsReopenDialogOpen(false)}
+          onConfirm={handleConfirmedReopen}
+          periodId={run.id}
+          employeeCount={run.employeeCount}
         />
       )}
     </div>
