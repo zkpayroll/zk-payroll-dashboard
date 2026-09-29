@@ -650,6 +650,60 @@ These are warnings, not blockers: the new owner has a read-only role (auditor or
 - **Sanitized Reports:** Formatted diagnostic bundles omit private keys, mnemonics, or individual secrets.
 - **Actionable Remediation:** Each blocker carries a typed `remediation` with clear human-readable steps and action routes.
 
+## #453 — Payroll Period Status Filter
+
+**Goal:** Let payroll teams narrow the period list by the lifecycle status a
+period is currently in — `draft`, `active`, `finalized`, or `archived` —
+without exposing any private payroll values.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `src/payroll/periodStatusFilter.ts` | Pure status vocabulary, validation, counts, and filtering (`countPeriodsByStatus`, `filterPeriodsByStatus`, `normalizePeriodStatusFilter`). |
+| `components/payroll/PeriodStatusFilter.tsx` | Status filter options with live counts, the filtered period list, and an actionable empty state. |
+| `app/payroll/periods/page.tsx` | Route that renders the filter (`/payroll/periods`). |
+| `__tests__/payroll-period-status-filter.test.ts` | Filtering, validation, and privacy unit tests. |
+| `__tests__/payroll-period-status-filter-ui.test.tsx` | Component render, filter, empty-state, and privacy tests. |
+
+### Statuses
+
+| Status | Meaning |
+| --- | --- |
+| `draft` | Period is being prepared and is still editable. |
+| `active` | Period is open and payroll runs are in flight. |
+| `finalized` | Period has been closed and locked. |
+| `archived` | Period has been moved into the historical archive. |
+
+### Behaviour & failure handling
+
+- Selecting a status narrows the list and announces the result through a
+  `role="status"` summary that contains counts only.
+- An unknown filter value (e.g. a stale URL query) is normalised back to
+  `"all"` by `normalizePeriodStatusFilter`, so the list still renders instead
+  of throwing.
+- When no period matches, an actionable empty state offers **Show all
+  periods**, which resets the filter.
+
+### Privacy guarantees
+
+- Periods carry only lifecycle metadata (`id`, label, status, run count,
+  updated timestamp). No amounts, employee identifiers, wallet addresses,
+  proofs, or hashes are read or rendered.
+- Empty/error copy names only the status; it never echoes a payroll value.
+
+### Usage
+
+```tsx
+import { PeriodStatusFilter } from "@/components/payroll/PeriodStatusFilter";
+
+// Defaults to the safe demo fixture:
+<PeriodStatusFilter />
+
+// Or pass real periods and react to filter changes:
+<PeriodStatusFilter periods={periods} onFilterChange={(status) => {}} />
+```
+
 ## Test coverage summary
 
 | #510 | `payroll-preflight-results-screen.test.tsx` | Renders readiness score, blocker cards, warnings, passed checks, and dry-run summary | Disables execution button when blockers exist; enables fix actions and re-run dry run |
@@ -664,6 +718,7 @@ These are warnings, not blockers: the new owner has a read-only role (auditor or
 | #519 | `cancellable-data-refresh.test.tsx` | Manages AbortController signal, cancels in-flight refreshes, maintains consistent loading states, displays actionable privacy-safe feedback |
 
 | #605 | `blocked-execution-diagnostics.test.ts` | Validates ready states, treasury/proof/policy/approval/recipient/auth blockers, assertion errors, and privacy report formatting |
+| #453 | `payroll-period-status-filter.test.ts` / `payroll-period-status-filter-ui.test.tsx` | Filters the period list by draft/active/finalized/archived, falls back to all on unknown input, and renders an actionable empty state with no private payroll data |
 
 Run with:
 
