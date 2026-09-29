@@ -293,7 +293,7 @@ export function AmendmentList({ amendments: propAmendments, initialState }: Amen
           lastRefreshedAt={lastRefreshedAt}
           onRefresh={handleRefresh}
           dataSourceLabel="Amendments"
-          isRefreshing={state === "loading"}
+          isRefreshing={false}
           variant="compact"
         />
       </div>
