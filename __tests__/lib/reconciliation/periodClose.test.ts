@@ -170,4 +170,4 @@ describe("buildPeriodCloseChecklist", () => {
     expect(checklist.canClose).toBe(false);
     expect(checklist.items.filter((i) => !i.isSatisfied)).toHaveLength(4);
   });
-});
+})

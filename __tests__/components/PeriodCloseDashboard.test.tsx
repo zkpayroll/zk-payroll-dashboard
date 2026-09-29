@@ -25,6 +25,18 @@ describe("PeriodCloseDashboard", () => {
     usePeriodCloseStore.setState({ closedPayrollRunIds: [] });
   });
 
+  it("blocks closing a period when prerequisite checks fail", () => {
+    render(<PeriodCloseDashboard runs={[makeRun({ id: "tx_003" })]} />);
+
+    const card = screen.getByTestId("period-close-card-tx_003");
+    const closeBtn = within(card).getByText("Resolve blockers to close");
+    expect(closeBtn).toBeDisabled();
+
+    fireEvent.click(closeBtn);
+    expect(screen.queryByTestId("period-finalization-dialog")).not.toBeInTheDocument();
+    expect(within(card).queryByText("Closed")).not.toBeInTheDocument();
+  });
+
   it("shows an empty state when there are no payroll periods", () => {
     render(<PeriodCloseDashboard runs={[]} />);
     expect(screen.getByText("No payroll periods to reconcile")).toBeInTheDocument();

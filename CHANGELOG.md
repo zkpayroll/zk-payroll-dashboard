@@ -16,6 +16,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Zero compensation leakage: evaluates only policy ids, lifecycle statuses, and effective dates; salary amounts, employee identities, and payout destinations are absent from the domain contracts
   - Typed domain contracts in `types/compensation.ts` with `CompensationPolicyScheduleEntry`, `CompensationPolicyEffectiveDateCheck`, and `CompensationPolicyEffectiveDateResult`
   - Comprehensive unit and component test suites in `__tests__/compensation-policy-effective-date.test.ts` and `__tests__/dashboard-compensation-policy-effective-date.test.tsx`
+- **Dashboard Payment Instruction Duplicate Detection (#633)**: Detects, categorizes,
+  and explains duplicate payment instructions in payroll drafts or against historical
+  execution records in the dashboard layer.
+  - New validation and grouping engine in `lib/duplicateDetection.ts` identifying
+    duplicate instruction IDs (`instruction_id`), duplicate recipient assignments
+    (`recipient`), exact payment instruction matches (`exact_match`), destination wallet
+    address reuse across distinct employees (`address`), and collision against previously
+    executed instruction identifiers (`collision`)
+  - Domain re-export in `src/payroll/paymentInstructionDuplicate.ts` and `src/payroll/index.ts`
+  - Accessible, privacy-safe UI component `PaymentInstructionDuplicateWarning.tsx` (`role="alert"`)
+    rendering actionable remediation guidance, affected instruction chips, and masked Stellar addresses
+  - Backward compatibility in `DuplicateWarningPanel.tsx` supporting both legacy `Employee[]` inputs
+    and new `PaymentInstruction[]` batches
+  - Strict privacy protections ensuring Stellar addresses are masked (`GDQP2K…4W37`) and raw salary
+    figures are never leaked into error messages or alert banners
+  - Comprehensive unit and component tests in `__tests__/payment-instruction-duplicate-detection.test.tsx`
 
 - **Dashboard Asset Availability Safety Check**: Operational readiness check verifying configured Stellar assets against allowlist criteria before payroll disbursements are initiated.
   - Pure evaluation module `lib/assets/assetAvailabilitySafety.ts` with `evaluateAssetAvailabilitySafety`, asset symbol validation, and Stellar public key issuer verification

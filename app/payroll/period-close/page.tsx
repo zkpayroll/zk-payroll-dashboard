@@ -4,7 +4,12 @@ import PeriodCloseDashboard from "@/components/features/reconciliation/PeriodClo
 function PeriodClosePage() {
   return (
     <DashboardLayout>
-      <PeriodCloseDashboard />
+      <PeriodCloseDashboard
+        requirePrerequisiteChecks
+        onPrerequisiteError={(error) => {
+          console.error("Pay period closure prerequisite check failed:", error);
+        }}
+      />
     </DashboardLayout>
   );
 }

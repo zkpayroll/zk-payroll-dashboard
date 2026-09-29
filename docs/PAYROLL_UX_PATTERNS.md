@@ -838,6 +838,34 @@ assertCompensationPolicyEffectiveDate(policies, { referenceDate: "2026-09-29" })
 | #453 | `payroll-period-status-filter.test.ts` / `payroll-period-status-filter-ui.test.tsx` | Filters the period list by draft/active/finalized/archived, falls back to all on unknown input, and renders an actionable empty state with no private payroll data |
 | Core | `asset-availability-safety.test.ts` / `dashboard-asset-availability.test.tsx` | Validates configured Stellar assets against allowlist, enforces format/issuer rules, flags duplicates & malformed entries, surfaces available/warning/blocked dashboard states |
 | Core | `compensation-policy-effective-date.test.ts` / `dashboard-compensation-policy-effective-date.test.tsx` | Validates compensation policy effective dates, rejects roll-over dates & backdating, enforces single-active/duplicate/overlap rules, warns past the horizon, surfaces valid/warning/invalid dashboard states |
+| #633 | `payment-instruction-duplicate-detection.test.tsx` | Validates unique instructions, duplicate IDs, duplicate recipients, shared addresses, exact duplicates, historical collisions, masked addresses, and accessible alert UI |
+
+## Payment instruction duplicate detection (#633)
+
+**Goal:** Detect, categorize, and explain duplicate payment instructions within payroll drafts or against historical execution records to strengthen payroll correctness and prevent accidental double-payouts, while upholding strict zero-knowledge privacy guarantees.
+
+### Key Components & Modules
+
+| File | Purpose |
+| --- | --- |
+| `lib/duplicateDetection.ts` | Pure evaluation engine detecting duplicate instruction IDs, recipient duplications, exact duplicate disbursements, shared destination addresses, and collisions with previously executed instructions. |
+| `src/payroll/paymentInstructionDuplicate.ts` | Domain re-export module providing clean access for payroll features and review workflows. |
+| `components/features/payroll/PaymentInstructionDuplicateWarning.tsx` | Accessible alert component (`role="alert"`) presenting categorized duplicate issues with clear remediation steps, masked wallet addresses, and optional resolution triggers. |
+| `components/employees/DuplicateWarningPanel.tsx` | Dual-mode warning panel maintaining backward compatibility for employee lists (#366) while delegating payment instruction batches to the instruction detector (#633). |
+| `__tests__/payment-instruction-duplicate-detection.test.tsx` | Comprehensive test suite verifying success, failure, edge cases, privacy protections, and UI accessibility. |
+
+### Duplicate Categories & Behavior
+
+- **`instruction_id` (Blocking):** Multiple payment instructions share the same normalized instruction identifier. Remediation prompts assigning distinct identifiers.
+- **`recipient` (Blocking):** The same employee appears in multiple instructions within the same batch. Prompts consolidating multiple payouts or removing redundant entries.
+- **`exact_match` (Blocking):** Identical recipient, destination address, asset, and amount. Prevents double-transfer errors on-chain.
+- **`collision` (Blocking):** Instruction identifier or batch reference matches an already executed/confirmed payroll instruction from previous runs.
+- **`address` (Warning / Strict Blocking):** Destination Stellar address is assigned to multiple distinct employees. Warns operators to verify destination authenticity while allowing pooled/custodial setups when intentional.
+
+### Privacy Guarantees
+
+- **Masked Addresses:** Stellar public keys in error text and values are truncated (`GDQP2K…4W37`) to prevent address reconnaissance.
+- **Zero Salary Leaks:** Raw salary or payment amounts are never rendered in unformatted error headings or system log echoes.
 
 Run with:
 

@@ -976,3 +976,96 @@ export interface PayrollTriageException {
   /** Encrypted or redacted token for proof debugging */
   redactedProofDigest?: string;
 }
+
+/**
+ * Payment instruction in a payroll run or disbursement batch (#633).
+ *
+ * Represents an individual payment directive specifying recipient, destination,
+ * amount, and asset for on-chain settlement.
+ */
+export interface PaymentInstruction {
+  /** Unique instruction identifier or reference code (e.g. "INS-001"). */
+  id?: string;
+  /** Employee or recipient identifier (e.g. "emp_001"). */
+  employeeId: string;
+  /** Destination Stellar wallet address (e.g. G...). */
+  recipientAddress?: string;
+  /** Compatibility alias for recipientAddress. */
+  address?: string;
+  /** Compatibility alias for recipientAddress. */
+  walletAddress?: string;
+  /** Payout amount. */
+  amount?: number;
+  /** Compatibility alias for amount. */
+  salary?: number;
+  /** Payout asset code (e.g. "USDC", "XLM", "EURC"). Defaults to "USDC". */
+  asset?: string;
+  /** Compatibility alias for asset. */
+  assetCode?: string;
+  /** Non-sensitive recipient display name. */
+  name?: string;
+  /** Optional payment memo, batch reference, or cycle identifier. */
+  reference?: string;
+  /** Optional department or category tag. */
+  department?: string;
+  /** Optional metadata tags. */
+  metadata?: Record<string, unknown>;
+}
+
+export type PaymentInstructionDuplicateKind =
+  | "instruction_id"
+  | "recipient"
+  | "address"
+  | "exact_match"
+  | "collision";
+
+export interface PaymentInstructionDuplicateGroup {
+  kind: PaymentInstructionDuplicateKind;
+  /** The value that repeats (e.g. instruction id, recipientId, masked address, or signature). */
+  value: string;
+  /** Actionable error or warning message explaining the duplicate. */
+  message: string;
+  /** Specific guidance on how to fix this issue. */
+  actionableRemediation: string;
+  /** Whether this issue blocks payroll submission. */
+  isBlocking: boolean;
+  /** The affected instructions in the order they appear. */
+  instructions: PaymentInstruction[];
+}
+
+export interface PaymentInstructionDuplicateOptions {
+  /**
+   * Existing historical or confirmed instruction identifiers / references
+   * to check against for collision detection (e.g., from prior payroll runs).
+   */
+  existingInstructionIds?: string[];
+  /**
+   * Existing historical or confirmed batch references.
+   */
+  existingReferences?: string[];
+  /**
+   * When true, multiple instructions sharing the same destination address
+   * across different employees are treated as blocking errors rather than warnings.
+   * Default: false (warning).
+   */
+  strictAddressUniqueness?: boolean;
+  /**
+   * When true, permits multiple instructions for the same employeeId
+   * provided they disburse different assets (e.g. XLM + USDC).
+   * Default: false (same employeeId cannot appear more than once).
+   */
+  allowMultiAssetForSameRecipient?: boolean;
+}
+
+export interface PaymentInstructionValidationResult {
+  /** True when there are no blocking duplicate errors. */
+  isValid: boolean;
+  /** True when any duplicate (blocking or warning) is detected. */
+  hasDuplicates: boolean;
+  /** True when at least one blocking duplicate is present. */
+  isBlocking: boolean;
+  /** List of detected duplicate groups. */
+  duplicateGroups: PaymentInstructionDuplicateGroup[];
+  /** High-level summary of findings, or null if no duplicates. */
+  summaryMessage: string | null;
+}

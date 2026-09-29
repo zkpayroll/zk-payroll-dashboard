@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Wallet, Building2, Loader2 } from "lucide-react";
 import OverduePayrollAlertBanner from "@/components/features/payroll/OverduePayrollAlertBanner";
 import { useStellar } from "@/components/providers/StellarProvider";
@@ -19,12 +20,28 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import DashboardAssetAvailabilityCheck from "@/components/features/dashboard/DashboardAssetAvailabilityCheck";
 import PayoutScheduleCollisionPanel from "@/components/features/dashboard/PayoutScheduleCollisionPanel";
 import DashboardCompensationPolicyCheck from "@/components/features/dashboard/DashboardCompensationPolicyCheck";
+import PayPeriodClosureReadinessPanel from "@/components/features/dashboard/PayPeriodClosureReadinessPanel";
 import { MOCK_COMPANIES } from "@/lib/api/mockData";
+import { evaluatePayPeriodClosurePrerequisites } from "@/lib/payroll/payPeriodClosurePrerequisites";
 
 function DashboardHome() {
   const { isFreighterInstalled } = useStellar();
   const { isConnected, isLoading } = useWalletStore();
   const company = useCompanyStore((s) => s.company);
+
+  const closureReadiness = useMemo(() => {
+    if (!company) {
+      return null;
+    }
+    return evaluatePayPeriodClosurePrerequisites({
+      companyId: company.id,
+      treasuryBalance: MOCK_COMPANIES[0]?.treasury?.balance ?? 0,
+      pendingPayouts: 0,
+      unresolvedAlerts: 0,
+      hasUnsavedChanges: false,
+      periodStatus: "open",
+    });
+  }, [company]);
 
   if (isLoading) {
     return (
@@ -133,6 +150,9 @@ function DashboardHome() {
       <ErrorBoundary>
         <OverduePayrollAlertBanner />
         <SessionTimeoutBanner />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <PayPeriodClosureReadinessPanel readiness={closureReadiness} />
       </ErrorBoundary>
       <ErrorBoundary>
         <PinnedAlertsPanel alerts={sampleAlerts} tasks={sampleTasks} />
