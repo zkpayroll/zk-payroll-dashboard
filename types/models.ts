@@ -50,6 +50,16 @@ export interface CompanyContractConfig {
 export interface CompanyConfig extends Company {
   network: StellarNetwork;
   contracts: CompanyContractConfig;
+  /**
+   * Schema version of the organization policy configuration. Versions below
+   * {@link CURRENT_CONFIG_SCHEMA_VERSION} are considered legacy and must be
+   * migrated (validated via `validateCompanyConfigMigration`) before they are
+   * used for payroll.
+   *
+   * Optional for backward compatibility: configs without this field are
+   * treated as schema version 1 (see {@link DEFAULT_CONFIG_SCHEMA_VERSION}).
+   */
+  configSchemaVersion?: number;
   /** Optional token (SAC/asset) contract used for disbursements. */
   tokenContractId?: string;
   /** Optional audit/logging settings */
@@ -59,6 +69,30 @@ export interface CompanyConfig extends Company {
     requireAuditorApproval?: boolean;
   };
 }
+
+/**
+ * Schema version assumed for configs persisted before versioning was
+ * introduced (config created before `configSchemaVersion` existed).
+ */
+export const DEFAULT_CONFIG_SCHEMA_VERSION = 1;
+
+/** The newest organization policy schema version the dashboard understands. */
+export const CURRENT_CONFIG_SCHEMA_VERSION = 2;
+
+/** Incompatible policy combinations introduced in schema version 2. */
+export type ConfigSchemaV2Incompatibility =
+  | "audit-settings-on-public-network"
+  | "inactive-company";
+
+export const CONFIG_SCHEMA_V2_INCOMPATIBILITIES: Record<
+  ConfigSchemaV2Incompatibility,
+  string
+> = {
+  "audit-settings-on-public-network":
+    "Audit logging cannot be required on Stellar Mainnet (PUBLIC). Disable auditor approval or switch to TESTNET.",
+  "inactive-company":
+    "Inactive companies cannot hold a migrated (current) policy. Reactivate the company before migrating.",
+};
 
 export type HealthCheckKey =
   | "companySetup"

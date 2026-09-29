@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Organization Policy Migration Validation (#599)**: Validates an organization's
+  payroll policy configuration against the current configuration schema before it is
+  used for payroll or migrated.
+  - New `validateCompanyConfigMigration` API (`lib/company/policyMigration.ts`)
+    detecting schema version, migration eligibility, and already-current state
+  - New `configSchemaVersion` field on `CompanyConfig` (defaults to version 1 when
+    absent; current version is 2) with legacy-policy migration guardrails
+  - Actionable migration banner and per-issue messages in the Configuration Health
+    checker (Company Setup and Settings pages)
+  - Focused unit tests for valid, invalid, unsupported-version, and already-current
+    policy states
+
 - **Transaction Detail Drawer**: Comprehensive detail view for inspecting payroll transactions
   - View transaction summary with total amount and employee count
   - Display verification status with clear visual indicators and explanations
