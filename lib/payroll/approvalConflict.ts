@@ -42,6 +42,7 @@ export interface ApprovalConflictDetail {
     | "already_approved"
     | "already_rejected"
     | "awaiting_correction"
+    | "correction_expired"
     | "already_decided_by_you"
     | "not_awaiting_approval";
   /** The state the draft is actually in. */
@@ -129,6 +130,9 @@ function conflict(
       message = prior
         ? `${prior.approvedBy}${prior.role ? ` (${prior.role})` : ""} has already requested a correction on this payroll. Wait for it to be resubmitted before deciding.`
         : "A correction has already been requested on this payroll. Wait for it to be resubmitted before deciding.";
+      break;
+    case "correction_expired":
+      message = "The correction request has expired. Ask an executive to review the payroll and issue a new correction request.";
       break;
     case "already_decided_by_you":
       message = `You already recorded a decision on this payroll in this session. Reload the queue to see the current state.`;

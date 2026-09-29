@@ -17,7 +17,10 @@ export interface ApprovalDraft extends PayrollRun {
     | "correction_requested";
   requiresExecutiveReview: boolean;
   notes?: string;
+  correctionExpiresAt?: string;
 }
+
+export const CORRECTION_REQUEST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface ApprovalQueueState {
   drafts: ApprovalDraft[];
@@ -145,6 +148,7 @@ export const useApprovalQueueStore = create<ApprovalQueueState>()(
           (d, at) => ({
             ...d,
             approvalStatus: "correction_requested",
+            correctionExpiresAt: new Date(new Date(at).getTime() + CORRECTION_REQUEST_TTL_MS).toISOString(),
             status: "pending",
             approvalHistory: [
               ...(d.approvalHistory || []),
@@ -156,6 +160,31 @@ export const useApprovalQueueStore = create<ApprovalQueueState>()(
         return result;
       },
       resubmitDraft: (id, submitterName, role, comment) => {
+        const draft = get().drafts.find((item) => item.id === id);
+        const correctionRequestedAt = draft?.approvalHistory
+          ?.slice()
+          .reverse()
+          .find((entry) => entry.action === "correction_requested")?.approvedAt;
+        const correctionExpiresAt = draft?.correctionExpiresAt || (correctionRequestedAt
+          ? new Date(new Date(correctionRequestedAt).getTime() + CORRECTION_REQUEST_TTL_MS).toISOString()
+          : undefined);
+        if (
+          draft?.approvalStatus === "correction_requested" &&
+          correctionExpiresAt &&
+          new Date(correctionExpiresAt).getTime() <= Date.now()
+        ) {
+          return {
+            ok: false,
+            conflict: {
+              reason: "correction_expired",
+              currentStatus: "correction_requested",
+              currentStatusLabel: "Correction request expired",
+              attemptedAction: "resubmitted",
+              decidedAt: correctionExpiresAt,
+              message: "The correction request has expired. Ask an executive to review the payroll and issue a new correction request.",
+            },
+          };
+        }
         const { drafts, result } = guardedUpdate(
           get().drafts, id, submitterName, role, "resubmitted",
           (d, at) => ({

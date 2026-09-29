@@ -125,4 +125,41 @@ describe("Executive Approval Queue (Issue #218)", () => {
     expect(draft?.approvalHistory).toHaveLength(2);
     expect(draft?.approvalHistory?.[1].action).toBe("resubmitted");
   });
+
+  it("expires correction requests after seven days and blocks resubmission", () => {
+    const expiredAt = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
+    useApprovalQueueStore.setState({
+      drafts: [
+        {
+          id: "draft_expired",
+          companyId: "company_001",
+          timestamp: expiredAt,
+          createdAt: expiredAt,
+          totalAmount: 1000,
+          employeeCount: 1,
+          proof: "proof",
+          status: "pending",
+          approvalStatus: "correction_requested",
+          requiresExecutiveReview: true,
+          employeeIds: [],
+          approvalHistory: [{
+            approvedBy: "Executive Admin",
+            approvedAt: expiredAt,
+            role: "Admin",
+            comment: "Please review the payroll details",
+            action: "correction_requested",
+          }],
+        },
+      ],
+    });
+
+    render(<ExecutiveApprovalQueue />);
+    fireEvent.click(screen.getByText(/corrections requested/i));
+
+    expect(screen.getByText(/expired after seven days/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /resubmit for review/i })).toBeDisabled();
+    const result = useApprovalQueueStore.getState().resubmitDraft("draft_expired", "Drafter", "Operator");
+    expect(result).toMatchObject({ ok: false, conflict: { reason: "correction_expired" } });
+    expect(useApprovalQueueStore.getState().drafts[0].approvalStatus).toBe("correction_requested");
+  });
 });

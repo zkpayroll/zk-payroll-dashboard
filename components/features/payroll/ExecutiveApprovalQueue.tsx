@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useApprovalQueueStore, type ApprovalDraft } from "@/stores/approvalQueue";
+import { useEffect, useState } from "react";
+import { CORRECTION_REQUEST_TTL_MS, useApprovalQueueStore, type ApprovalDraft } from "@/stores/approvalQueue";
 import type {
   ApprovalActionResult,
   ApprovalConflictDetail,
@@ -21,6 +21,20 @@ import {
 import Link from "next/link";
 import DelegatedApproverPanel from "@/components/features/approvals/DelegatedApproverPanel";
 
+function correctionExpiry(draft: ApprovalDraft): number | null {
+  if (draft.correctionExpiresAt) {
+    const storedExpiry = new Date(draft.correctionExpiresAt).getTime();
+    return Number.isNaN(storedExpiry) ? null : storedExpiry;
+  }
+  const requestedAt = draft.approvalHistory
+    ?.slice()
+    .reverse()
+    .find((entry) => entry.action === "correction_requested")?.approvedAt;
+  if (!requestedAt) return null;
+  const requestedTime = new Date(requestedAt).getTime();
+  return Number.isNaN(requestedTime) ? null : requestedTime + CORRECTION_REQUEST_TTL_MS;
+}
+
 export function ExecutiveApprovalQueue() {
   const { drafts, approveDraft, rejectDraft, requestCorrection, resubmitDraft } =
     useApprovalQueueStore();
@@ -33,6 +47,12 @@ export function ExecutiveApprovalQueue() {
   // #552 — set when a decision is refused because the draft no longer holds
   // the state this reviewer was looking at (someone else acted first).
   const [conflict, setConflict] = useState<ApprovalConflictDetail | null>(null);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   /**
    * Applies a decision and reports a conflict instead of silently overwriting.
@@ -68,7 +88,10 @@ export function ExecutiveApprovalQueue() {
   });
 
   const pendingCount = drafts.filter((d) => d.approvalStatus === "pending_executive_approval").length;
-  const correctionsCount = drafts.filter((d) => d.approvalStatus === "correction_requested").length;
+  const correctionsCount = drafts.filter((d) =>
+    d.approvalStatus === "correction_requested" &&
+    (correctionExpiry(d) === null || correctionExpiry(d)! > now),
+  ).length;
 
   const currentComment = (draft: ApprovalDraft) => (selectedDraft?.id === draft.id ? comment : "");
 
@@ -212,6 +235,10 @@ export function ExecutiveApprovalQueue() {
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {filteredDrafts.map((draft) => (
+            (() => {
+              const expiry = draft.approvalStatus === "correction_requested" ? correctionExpiry(draft) : null;
+              const correctionExpired = expiry !== null && expiry <= now;
+              return (
             <div
               key={draft.id}
               className="bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow space-y-4"
@@ -237,7 +264,7 @@ export function ExecutiveApprovalQueue() {
                         : draft.approvalStatus === "approved"
                         ? "Approved for Signing"
                         : draft.approvalStatus === "correction_requested"
-                        ? "Awaiting Corrections from Drafter"
+                        ? correctionExpired ? "Correction Request Expired" : "Awaiting Corrections from Drafter"
                         : "Rejected"}
                     </span>
                   </div>
@@ -347,11 +374,13 @@ export function ExecutiveApprovalQueue() {
               {draft.approvalStatus === "correction_requested" && (
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t pt-3 bg-amber-50 -mx-5 -mb-5 px-5 py-3 rounded-b-xl">
                   <p className="text-xs text-amber-800">
-                    Corrections requested. The drafter should address the feedback above and
-                    resubmit for another review.
+                    {correctionExpired
+                      ? "This correction request expired after seven days. Ask an executive to issue a new request before resubmitting."
+                      : `Corrections requested. Address the feedback and resubmit before ${expiry ? new Date(expiry).toLocaleString() : "the request expires"}.`}
                   </p>
                   <Button
                     size="sm"
+                    disabled={correctionExpired}
                     className="bg-amber-600 hover:bg-amber-700 text-white text-xs shrink-0"
                     onClick={() => handleResubmit(draft)}
                   >
@@ -372,6 +401,8 @@ export function ExecutiveApprovalQueue() {
                 </div>
               )}
             </div>
+              );
+            })()
           ))}
         </div>
       )}
