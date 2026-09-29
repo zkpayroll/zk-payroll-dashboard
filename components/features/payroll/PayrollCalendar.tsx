@@ -20,6 +20,7 @@ import PayrollDetailSheet from "@/components/features/payroll/PayrollDetailSheet
 import PeriodLabelBadge from "@/components/features/payroll/PeriodLabelBadge";
 import {
   classifyRun,
+  detectCalendarOverlaps,
   formatPayrollDate,
   formatPayrollMonthYear,
   getCalendarMonthDays,
@@ -31,6 +32,7 @@ import {
   RUN_KIND_STYLES,
   sortRunsForSchedule,
   toDateKey,
+  type CalendarOverlap,
   type RunScheduleKind,
 } from "@/lib/payroll/scheduleUtils";
 
@@ -172,14 +174,58 @@ function NextUpHero({ run }: { run: PayrollRun }) {
   );
 }
 
+function OverlapWarningBanner({ overlaps }: { overlaps: CalendarOverlap[] }) {
+  if (overlaps.length === 0) return null;
+
+  return (
+    <div
+      role="alert"
+      aria-live="polite"
+      data-testid="payroll-calendar-overlap-warning"
+      className="flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900 shadow-sm sm:flex-row sm:items-start"
+    >
+      <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" aria-hidden="true" />
+      <div className="space-y-1.5">
+        <h3 className="text-sm font-semibold text-amber-950">
+          {overlaps.length === 1
+            ? "Scheduling overlap detected"
+            : `Scheduling overlaps detected on ${overlaps.length} days`}
+        </h3>
+        <ul className="space-y-1">
+          {overlaps.map((overlap) => {
+            const date = new Date(`${overlap.dateKey}T00:00:00.000Z`);
+            return (
+              <li key={overlap.dateKey} className="text-xs sm:text-sm text-amber-800">
+                <span className="font-medium">{formatPayrollDate(date)}</span>
+                {": "}
+                {overlap.runs.length} unresolved runs are scheduled for the same day
+                {overlap.sharedEmployeeIds.length > 0 && (
+                  <>
+                    {" "}
+                    and share {overlap.sharedEmployeeIds.length}{" "}
+                    {overlap.sharedEmployeeIds.length === 1 ? "employee" : "employees"} — review
+                    before processing to avoid a duplicate payment.
+                  </>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 function MonthCalendar({
   runsByDate,
   viewDate,
+  overlapDateKeys,
   onPrevMonth,
   onNextMonth,
 }: {
   runsByDate: Map<string, PayrollRun[]>;
   viewDate: Date;
+  overlapDateKeys: Set<string>;
   onPrevMonth: () => void;
   onNextMonth: () => void;
 }) {
@@ -235,6 +281,7 @@ function MonthCalendar({
             const dateKey = toDateKey(day);
             const dayRuns = runsByDate.get(dateKey) ?? [];
             const isToday = dateKey === todayKey;
+            const isOverlap = overlapDateKeys.has(dateKey);
             const dominantKind = getDominantRunKind(dayRuns);
             const intensity = getHeatmapIntensity(dayRuns);
             const heatBg = dominantKind
@@ -243,17 +290,24 @@ function MonthCalendar({
             const heatSummary = dayRuns.length
               ? `, ${dayRuns.length} run${dayRuns.length > 1 ? "s" : ""} (${dominantKind ? RUN_KIND_STYLES[dominantKind].label.toLowerCase() : "activity"})`
               : "";
+            const overlapSummary = isOverlap ? ", scheduling overlap" : "";
 
             return (
               <div
                 key={dateKey}
                 role="gridcell"
-                aria-label={`${formatPayrollDate(day)}${heatSummary}`}
-                title={dayRuns.length ? `${dayRuns.length} run${dayRuns.length > 1 ? "s" : ""} on ${formatPayrollDate(day)}` : undefined}
-                className={`aspect-square p-1 rounded-md border transition-colors ${
-                  isToday ? "border-indigo-300" : "border-transparent"
+                aria-label={`${formatPayrollDate(day)}${heatSummary}${overlapSummary}`}
+                title={dayRuns.length ? `${dayRuns.length} run${dayRuns.length > 1 ? "s" : ""} on ${formatPayrollDate(day)}${isOverlap ? " — scheduling overlap" : ""}` : undefined}
+                className={`relative aspect-square p-1 rounded-md border transition-colors ${
+                  isOverlap ? "border-amber-400 ring-1 ring-amber-300" : isToday ? "border-indigo-300" : "border-transparent"
                 } ${heatBg || (dayRuns.length === 0 ? "" : "bg-gray-50")}`}
               >
+                {isOverlap && (
+                  <AlertCircle
+                    className="absolute top-0.5 right-0.5 w-3 h-3 text-amber-600"
+                    aria-hidden="true"
+                  />
+                )}
                 <span
                   className={`block text-xs font-medium mb-0.5 ${
                     isToday ? "text-indigo-700" : "text-gray-700"
@@ -300,6 +354,10 @@ function MonthCalendar({
             <span className="w-2.5 h-2.5 rounded-full bg-red-500" aria-hidden="true" />
             Failed
           </span>
+          <span className="inline-flex items-center gap-1.5">
+            <AlertCircle className="w-3 h-3 text-amber-600" aria-hidden="true" />
+            Scheduling overlap
+          </span>
           <span className="inline-flex items-center gap-1.5 ml-auto text-gray-400">
             Darker = busier day
           </span>
@@ -336,6 +394,11 @@ function PayrollCalendar({ runs = MOCK_PAYROLL_RUNS }: PayrollCalendarProps) {
   const scheduledRuns = useMemo(
     () => runs.filter((r) => classifyRun(r) === "scheduled"),
     [runs],
+  );
+  const overlaps = useMemo(() => detectCalendarOverlaps(runs), [runs]);
+  const overlapDateKeys = useMemo(
+    () => new Set(overlaps.map((overlap) => overlap.dateKey)),
+    [overlaps],
   );
 
   const initialViewDate = nextUp ? getRunDate(nextUp) : new Date();
@@ -398,10 +461,13 @@ function PayrollCalendar({ runs = MOCK_PAYROLL_RUNS }: PayrollCalendarProps) {
 
       {nextUp && <NextUpHero run={nextUp} />}
 
+      <OverlapWarningBanner overlaps={overlaps} />
+
       <div className="hidden md:block">
         <MonthCalendar
           runsByDate={runsByDate}
           viewDate={viewDate}
+          overlapDateKeys={overlapDateKeys}
           onPrevMonth={() => shiftMonth(-1)}
           onNextMonth={() => shiftMonth(1)}
         />
