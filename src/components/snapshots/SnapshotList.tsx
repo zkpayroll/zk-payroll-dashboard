@@ -274,7 +274,7 @@ export function SnapshotList({ snapshots: propSnapshots, initialState }: Snapsho
           lastRefreshedAt={lastRefreshedAt}
           onRefresh={handleRefresh}
           dataSourceLabel="Snapshots"
-          isRefreshing={state === "loading"}
+          isRefreshing={false}
           variant="compact"
         />
       </div>
