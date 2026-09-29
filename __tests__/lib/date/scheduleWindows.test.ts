@@ -26,6 +26,7 @@ function makeTemplate(overrides: Partial<PayrollTemplate> = {}): PayrollTemplate
     createdBy: "test",
     ...overrides,
   };
+  }
 }
 
 function makeRun(overrides: Partial<PayrollRun> = {}): PayrollRun {

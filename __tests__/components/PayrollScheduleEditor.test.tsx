@@ -20,6 +20,15 @@ const ACTIVE_TEMPLATE: PayrollTemplate = {
   createdBy: "test",
 };
 
+const SECOND_TEMPLATE: PayrollTemplate = {
+  ...ACTIVE_TEMPLATE,
+  id: "tpl_second",
+  name: "Biweekly Contractor Payroll",
+  frequency: "biweekly",
+  dayOfMonth: null,
+  nextScheduled: "2025-01-20T09:00:00Z",
+};
+
 const INACTIVE_TEMPLATE: PayrollTemplate = {
   ...ACTIVE_TEMPLATE,
   id: "tpl_inactive",
@@ -35,7 +44,7 @@ describe("PayrollScheduleEditor", () => {
   it("shows an empty state when there are no active templates", () => {
     render(
       <PayrollScheduleEditor
-        templates={[INACTIVE_TEMPLATE]}
+        templates={[{INACTIVE_TEMPLATE]}
         locks={[]}
         runs={[]}
         initialViewDate={new Date(Date.UTC(2025, 0, 1))}
@@ -49,8 +58,8 @@ describe("PayrollScheduleEditor", () => {
     render(
       <PayrollScheduleEditor
         templates={[ACTIVE_TEMPLATE]}
-        locks={[]}
-        runs={[]}
+        locks={{}}
+        runs={{}}
         initialViewDate={new Date(Date.UTC(2025, 0, 1))}
       />,
     );
@@ -80,8 +89,8 @@ describe("PayrollScheduleEditor", () => {
     render(
       <PayrollScheduleEditor
         templates={[ACTIVE_TEMPLATE]}
-        locks={[]}
-        runs={[]}
+        locks={{}}
+        runs={{}}
         initialViewDate={new Date(Date.UTC(2025, 0, 1))}
       />,
     );
@@ -97,7 +106,7 @@ describe("PayrollScheduleEditor", () => {
   it("rejects a draft window where start is after end", () => {
     render(
       <PayrollScheduleEditor
-        templates={[ACTIVE_TEMPLATE]}
+        templates={{ACTIVE_TEMPLATE]}
         locks={[]}
         runs={[]}
         initialViewDate={new Date(Date.UTC(2025, 0, 1))}
@@ -115,8 +124,8 @@ describe("PayrollScheduleEditor", () => {
     render(
       <PayrollScheduleEditor
         templates={[ACTIVE_TEMPLATE]}
-        locks={[]}
-        runs={[]}
+        locks={{}}
+        runs={{}}
         initialViewDate={new Date(Date.UTC(2025, 0, 1))}
       />,
     );
@@ -132,10 +141,59 @@ describe("PayrollScheduleEditor", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/overlaps with/i);
   });
 
+  it("detects a collision between draft windows from different templates", () => {
+    render(
+      <PayrollScheduleEditor
+        templates={[ACTIVE_TEMPLATE, SECOND_TEMPLATE]}
+        locks={[]}
+        runs={[]}
+        initialViewDate={new Date(Date.UTC(2025, 0, 1))}
+      />,
+    );
+
+    const select = screen.getByLabelText(/recurring template/i) as HTMLSelectElement;
+
+    fireEvent.change(select, { target: { value: ACTIVE_TEMPLATE.id } });
+    fireEvent.change(screen.getByLabelText(/window start/i), { target: { value: "2025-03-01" } });
+    fireEvent.change(screen.getByLabelText(/window end/i), { target: { value: "2025-03-10" } });
+    fireEvent.click(screen.getByRole("button", { name: /save draft window/i }));
+
+    fireEvent.change(select, { target: { value: SECOND_TEMPLATE.id } });
+    fireEvent.change(screen.getByLabelText(/window start/i), { target: { value: "2025-03-05" } });
+    fireEvent.change(screen.getByLabelText(/window end/i), { target: { value: "2025-03-15" } });
+    fireEvent.click(screen.getByRole("button", { name: /save draft window/i }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/overlaps with/i);
+    expect(screen.getByRole("alert")).toHaveTextContent(/Monthly Engineering Payroll/i);
+  });
+
+  it("allows adjacent windows that touch but do not overlap", () => {
+    render(
+      <PayrollScheduleEditor
+        templates={{ACTIVE_TEMPLATE}
+        locks={[]}
+        runs={[]}
+        initialViewDate={new Date(Date.UTC(2025, 0, 1))}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/window start/i), { target: { value: "2025-04-01" } });
+    fireEvent.change(screen.getByLabelText(/window end/i), { target: { value: "2025-04-10" } });
+    fireEvent.click(screen.getByRole("button", { name: /save draft window/i }));
+
+    fireEvent.change(screen.getByLabelText(/window start/i), { target: { value: "2025-04-11" } });
+    fireEvent.change(screen.getByLabelText(/window end/i), { target: { value: "2025-04-20" } });
+    fireEvent.click(screen.getByRole("button", { name: /save draft window/i }));
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByText("2025-04-01 ‒ 2025-04-10")).toBeInTheDocument();
+    expect(screen.getByText("2025-04-11 → 2025-04-20")).toBeInTheDocument();
+  });
+
   it("navigates between months without crashing", () => {
     render(
       <PayrollScheduleEditor
-        templates={[ACTIVE_TEMPLATE]}
+        templates={{ACTIVE_TEMPLATE]}
         locks={[]}
         runs={[]}
         initialViewDate={new Date(Date.UTC(2025, 0, 1))}
@@ -176,7 +234,7 @@ describe("PayrollScheduleEditor", () => {
 
     render(
       <PayrollScheduleEditor
-        templates={[ACTIVE_TEMPLATE]}
+        templates={{ACTIVE_TEMPLATE]}
         locks={locks}
         runs={[]}
         initialViewDate={new Date(Date.UTC(2025, 0, 1))}

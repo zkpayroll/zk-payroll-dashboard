@@ -83,4 +83,59 @@ describe("useDraftScheduleWindowStore", () => {
 
     expect(useDraftScheduleWindowStore.getState().drafts).toHaveLength(0);
   });
+
+  it("rejects a draft window with an invalid range", () => {
+    const result = useDraftScheduleWindowStore
+      .getState()
+      .upsertDraft({ templateId: "tpl_1", windowStart: "2025-01-10", windowEnd: "2025-01-01" });
+
+    expect(result.success).toBe(false);
+    expect(useDraftScheduleWindowStore.getState().drafts).toHaveLength(0);
+  });
+
+  it("reports the conflicting window in the result", () => {
+    const existing = useDraftScheduleWindowStore
+      .getState()
+      .upsertDraft({ templateId: "tpl_1", windowStart: "2025-01-01", windowEnd: "2025-01-10" });
+
+    const result = useDraftScheduleWindowStore
+      .getState()
+      .upsertDraft({ templateId: "tpl_1", windowStart: "2025-01-05", windowEnd: "2025-01-15" });
+
+    expect(result.conflictsWith[0].id).toBe(existing.window.id);
+  });
+
+  it("allows adjacent non-overlapping windows", () => {
+    useDraftScheduleWindowStore.getState().upsertDraft({
+      templateId: "tpl_1",
+      windowStart: "2025-01-01",
+      windowEnd: "2025-01-10",
+    });
+
+    const result = useDraftScheduleWindowStore.getState().upsertDraft({
+      templateId: "tpl_1",
+      windowStart: "2025-01-11",
+      windowEnd: "2025-01-20",
+    });
+
+    expect(result.success).toBe(true);
+    expect(useDraftScheduleWindowStore.getState().drafts).toHaveLength(2);
+  });
+
+  it("allows overlapping windows for different templates", () => {
+    useDraftScheduleWindowStore.getState().upsertDraft({
+      templateId: "tpl_1",
+      windowStart: "2025-01-01",
+      windowEnd: "2025-01-10",
+    });
+
+    const result = useDraftScheduleWindowStore.getState().upsertDraft({
+      templateId: "tpl_2",
+      windowStart: "2025-01-05",
+      windowEnd: "2025-01-15",
+    });
+
+    expect(result.success).toBe(true);
+    expect(useDraftScheduleWindowStore.getState().drafts).toHaveLength(2);
+  });
 });

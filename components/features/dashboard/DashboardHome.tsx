@@ -17,6 +17,7 @@ import PinnedAlertsPanel from "@/components/features/dashboard/PinnedAlertsPanel
 import { SessionTimeoutBanner } from "@/components/features/dashboard/SessionTimeoutBanner";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import DashboardAssetAvailabilityCheck from "@/components/features/dashboard/DashboardAssetAvailabilityCheck";
+import PayoutScheduleCollisionPanel from "@/components/features/dashboard/PayoutScheduleCollisionPanel";
 import { MOCK_COMPANIES } from "@/lib/api/mockData";
 
 function DashboardHome() {
@@ -64,7 +65,7 @@ function DashboardHome() {
             className="w-5 h-5 text-amber-600 mt-0.5 shrink-0"
             aria-hidden="true"
           />
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w0">
             <p className="text-sm font-medium text-amber-800">
               Company setup required
             </p>
@@ -150,6 +151,12 @@ function DashboardHome() {
       <ErrorBoundary>
         <DashboardAssetAvailabilityCheck
           configuredAssets={MOCK_COMPANIES[0]?.treasury ? [{ code: "USDC" }, { code: "XLM" }] : []}
+        />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <PayoutScheduleCollisionPanel
+          templates={[]}
+          runs={[]}
         />
       </ErrorBoundary>
       <ErrorBoundary>

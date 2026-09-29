@@ -35,9 +35,26 @@ export interface Task {
   actionLabel?: string;
 }
 
+export interface PayoutSchedule {
+  id: string;
+  label: string;
+  scheduledAt: string;
+  amount?: string;
+  asset?: string;
+}
+
+export interface PayoutScheduleCollision {
+  id: string;
+  first: PayoutSchedule;
+  second: PayoutSchedule;
+  severity: AlertSeverity;
+  message: string;
+}
+
 interface PinnedAlertsPanelProps {
   alerts?: Alert[];
   tasks?: Task[];
+  payoutSchedules?: PayoutSchedule[];
   onDismissAlert?: (alertId: string) => void;
   onDismissTask?: (taskId: string) => void;
 }
@@ -45,6 +62,7 @@ interface PinnedAlertsPanelProps {
 export default function PinnedAlertsPanel({
   alerts = [],
   tasks = [],
+  payoutSchedules = [],
   onDismissAlert,
   onDismissTask,
 }: PinnedAlertsPanelProps) {
@@ -52,12 +70,20 @@ export default function PinnedAlertsPanel({
     new Set(),
   );
   const [dismissedTasks, setDismissedTasks] = useState<Set<string>>(new Set());
+  const [dismissedCollisions, setDismissedCollisions] = useState<Set<string>>(
+    new Set(),
+  );
 
   const visibleAlerts = alerts.filter(
     (alert) => !dismissedAlerts.has(alert.id) && alert.status !== "resolved",
   );
   const visibleTasks = tasks.filter(
     (task) => !dismissedTasks.has(task.id) && task.status !== "completed",
+  );
+
+  const detectedCollisions = detectPayoutScheduleCollisions(payoutSchedules);
+  const visibleCollisions = detectedCollisions.filter(
+    (collision) => !dismissedCollisions.has(collision.id),
   );
 
   const handleDismissAlert = (alertId: string) => {
@@ -68,6 +94,10 @@ export default function PinnedAlertsPanel({
   const handleDismissTask = (taskId: string) => {
     setDismissedTasks((prev) => new Set(prev).add(taskId));
     onDismissTask?.(taskId);
+  };
+
+  const handleDismissCollision = (collisionId: string) => {
+    setDismissedCollisions((prev) => new Set(prev).add(collisionId));
   };
 
   const getSeverityIcon = (severity: AlertSeverity) => {
@@ -129,7 +159,11 @@ export default function PinnedAlertsPanel({
     return `${diffDays} days ago`;
   };
 
-  if (visibleAlerts.length === 0 && visibleTasks.length === 0) {
+  if (
+    visibleAlerts.length === 0 &&
+    visibleTasks.length === 0 &&
+    visibleCollisions.length === 0
+  ) {
     return null;
   }
 
@@ -151,6 +185,54 @@ export default function PinnedAlertsPanel({
       </div>
 
       <div className="divide-y divide-gray-200">
+        {visibleCollisions.length > 0 && (
+          <div className="p-6 space-y-4">
+            <h3 className="text-sm font-medium text-gray-700">
+              Payout Schedule Collisions
+            </h3>
+            <div className="space-y-3">
+              {visibleCollisions.map((collision) => (
+                <div
+                  key={collision.id}
+                  className={`bg-gray-50 rounded-lg p-4 ${getSeverityBorder(collision.severity)}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5">
+                      {getSeverityIcon(collision.severity)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="text-sm font-medium text-gray-900">
+                          {collision.first.label} overlaps with{" "}
+                          {collision.second.label}
+                        </h4>
+                        <button
+                          onClick={() => handleDismissCollision(collision.id)}
+                          className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+                          aria-label="Dismiss payout schedule collision"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {collision.message}
+                      </p>
+                      <div className="flex items-center gap-4 mt-3">
+                        <span className="text-xs text-gray-500">
+                          {formatTimeAgo(collision.first.scheduledAt)}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {formatTimeAgo(collision.second.scheduledAt)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {visibleAlerts.length > 0 && (
           <div className="p-6 space-y-4">
             <h3 className="text-sm font-medium text-gray-700">Active Alerts</h3>
@@ -267,4 +349,47 @@ export default function PinnedAlertsPanel({
       </div>
     </section>
   );
+}
+
+export function detectPayoutScheduleCollisions(
+  schedules: PayoutSchedule[],
+  windowMs = 60 * 60 * 1000,
+): PayoutScheduleCollision[] {
+  const collisions: PayoutScheduleCollision[] = [];
+  const validSchedules = schedules
+    .map((schedule) => ({
+      schedule,
+      time: new Date(schedule.scheduledAt).getTime(),
+    }))
+    .filter(({ time }) => Number.isFinite(time))
+    .sort((a, b) => a.time - b.time);
+
+  for (let i = 0; i < validSchedules.length; i += 1) {
+    for (let j = i + 1; j < validSchedules.length; j += 1) {
+      const first = validSchedules[i];
+      const second = validSchedules[j];
+      const delta = second.time - first.time;
+
+      if (delta > windowMs) {
+        break;
+      }
+
+      const severity: AlertSeverity = delta === 0 ? "critical" : "warning";
+      const minutesApart = Math.round(delta / 60000);
+      const message =
+        delta === 0
+          ? `Both payouts are scheduled for the same time (${first.schedule.scheduledAt}).`
+          : `Payouts are scheduled ${minutesApart} minute${minutesApart === 1 ? "" : "s"} apart, which may exceed the treasury window.`;
+
+      collisions.push({
+        id: `${first.schedule.id}::${second.schedule.id}`,
+        first: first.schedule,
+        second: second.schedule,
+        severity,
+        message,
+      });
+    }
+  }
+
+  return collisions;
 }
