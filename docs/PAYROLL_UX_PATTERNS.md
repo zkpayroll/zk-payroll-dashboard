@@ -746,6 +746,82 @@ import DashboardAssetAvailabilityCheck from "@/components/features/dashboard/Das
 />
 ```
 
+## Dashboard Compensation Policy Effective-Date Validation
+
+**Goal:** Ensure every compensation policy revision takes effect on a valid, forward-only calendar date before any further compensation change is scheduled, surfacing actionable findings on the main dashboard without exposing compensation values.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `types/compensation.ts` | Domain types for compensation policy lifecycle status, the `CompensationPolicyScheduleEntry` input shape, findings, and evaluation options/results. |
+| `lib/compensation/compensationPolicyEffectiveDate.ts` | Pure evaluation rules (`evaluateCompensationPolicyEffectiveDate`), date helpers (`isIsoCalendarDate`, `normalizeReferenceDate`), and the safety assertion (`assertCompensationPolicyEffectiveDate`). |
+| `src/payroll/compensationPolicyEffectiveDate.ts` | Re-export shim so payroll code can import the rules through the `src/payroll` barrel. |
+| `components/features/dashboard/DashboardCompensationPolicyCheck.tsx` | Dashboard panel rendering valid, warning, and invalid states with per-finding remediation and the next effective date. |
+| `__tests__/compensation-policy-effective-date.test.ts` | Unit tests for every rule, malformed input, date edge cases, the assertion, and privacy guarantees. |
+| `__tests__/dashboard-compensation-policy-effective-date.test.tsx` | Component tests covering each rendered state, fallbacks, callbacks, and accessibility. |
+
+### Effective-Date Rules
+
+| # | Rule | Severity | Rationale |
+| --- | --- | --- | --- |
+| 1 | Policy revision needs a non-empty id of at most 64 characters. | error | Without a usable id, a revision's effective date cannot be tracked or audited. |
+| 2 | Effective date is required. | error | Payroll cannot tell when the revision's terms take effect. |
+| 3 | Effective date must be a real `YYYY-MM-DD` calendar day. | error | `Date.parse` silently rolls `2026-02-30` forward to March 2, which would shift payroll by two days unnoticed. |
+| 4 | Lifecycle status must be `draft`, `scheduled`, `active`, or `superseded`. | error | Ordering rules are meaningless without a known status. |
+| 5 | Pending (`draft` / `scheduled`) revisions may not be backdated. | error | Retroactive changes would rewrite payroll runs already committed on-chain. `active` and `superseded` revisions are exempt because they necessarily took effect in the past. |
+| 6 | At most one revision may be `active`. | error | An ambiguous "current" policy means payroll cannot determine which policy governs an open period. |
+| 7 | No two revisions may share an effective date. | error | The policy in force for that day would be ambiguous. |
+| 8 | Pending revisions may not take effect before the active revision. | error | Creates overlapping policy windows. |
+| 9 | Revisions beyond the scheduling horizon (default 400 days). | warning | The payroll engine cannot guarantee a change that far ahead will be honoured. Superseded revisions are exempt — there is nothing left to schedule. |
+
+### Validation States
+
+| Status | Meaning | Action / Behavior |
+| --- | --- | --- |
+| `valid` | Every revision has a real, forward-only, correctly ordered effective date. | Green panel, "Ready" badge, next effective date and countdown, no remediation link. |
+| `warning` | Dates are usable but an advisory applies (for example, beyond the scheduling horizon). | Amber panel, "Notice" badge, advisory list with a next step, scheduling still allowed. |
+| `invalid` | At least one revision cannot be scheduled as declared. | Amber panel, "Action Required" badge, every blocking finding with its remediation, link to `/settings/payroll-policy`. |
+
+### Error and Failure Handling
+
+- Malformed revisions are reported and skipped, so one bad row cannot hide the rest of the schedule. The healthy revisions are still listed and counted in `validPolicyCount`.
+- Untrusted policy input never throws. `evaluateCompensationPolicyEffectiveDate` is total over `unknown`; only a developer-supplied `referenceDate` that cannot be resolved throws `RangeError`, because an unusable reference date would silently invert every comparison.
+- The reference date and horizon are injectable (`referenceDate`, `maxHorizonDays`) so checks are deterministic and testable without touching the clock. An invalid horizon falls back to the 400-day default and raises an advisory rather than failing.
+- `assertCompensationPolicyEffectiveDate` throws `CompensationPolicyEffectiveDateError` with the full result attached, so callers can render every finding instead of only the first.
+
+### Privacy Guarantees
+
+- Evaluation reads only policy ids, lifecycle statuses, and effective dates. `CompensationPolicyScheduleEntry` deliberately has no amount, employee, or payout fields, so a consumer cannot leak compensation values through this module.
+- Findings interpolate only validated date strings and bounded policy ids; free-text compensation descriptions are never echoed.
+- The panel is wrapped in an `ErrorBoundary` in `DashboardHome`, so a malformed schedule can never take the dashboard down.
+
+### Usage
+
+```tsx
+import DashboardCompensationPolicyCheck from "@/components/features/dashboard/DashboardCompensationPolicyCheck";
+
+// Uses a relative demo schedule when no prop is supplied:
+<DashboardCompensationPolicyCheck />
+
+// Or with the real schedule; pass [] to exercise the "nothing scheduled" state:
+<DashboardCompensationPolicyCheck
+  policies={[
+    { id: "comp_current", effectiveDate: "2026-08-01", status: "active" },
+    { id: "comp_next", effectiveDate: "2026-10-15", status: "scheduled" },
+  ]}
+  onReviewClick={() => {}}
+/>
+```
+
+The same rules can gate a save path without rendering anything:
+
+```ts
+import { assertCompensationPolicyEffectiveDate } from "@/lib/compensation/compensationPolicyEffectiveDate";
+
+assertCompensationPolicyEffectiveDate(policies, { referenceDate: "2026-09-29" });
+```
+
 ## Test coverage summary
 
 | #510 | `payroll-preflight-results-screen.test.tsx` | Renders readiness score, blocker cards, warnings, passed checks, and dry-run summary | Disables execution button when blockers exist; enables fix actions and re-run dry run |
@@ -761,6 +837,7 @@ import DashboardAssetAvailabilityCheck from "@/components/features/dashboard/Das
 | #605 | `blocked-execution-diagnostics.test.ts` | Validates ready states, treasury/proof/policy/approval/recipient/auth blockers, assertion errors, and privacy report formatting |
 | #453 | `payroll-period-status-filter.test.ts` / `payroll-period-status-filter-ui.test.tsx` | Filters the period list by draft/active/finalized/archived, falls back to all on unknown input, and renders an actionable empty state with no private payroll data |
 | Core | `asset-availability-safety.test.ts` / `dashboard-asset-availability.test.tsx` | Validates configured Stellar assets against allowlist, enforces format/issuer rules, flags duplicates & malformed entries, surfaces available/warning/blocked dashboard states |
+| Core | `compensation-policy-effective-date.test.ts` / `dashboard-compensation-policy-effective-date.test.tsx` | Validates compensation policy effective dates, rejects roll-over dates & backdating, enforces single-active/duplicate/overlap rules, warns past the horizon, surfaces valid/warning/invalid dashboard states |
 
 Run with:
 

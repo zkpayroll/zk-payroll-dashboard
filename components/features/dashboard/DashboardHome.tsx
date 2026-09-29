@@ -18,6 +18,7 @@ import { SessionTimeoutBanner } from "@/components/features/dashboard/SessionTim
 import ErrorBoundary from "@/components/ErrorBoundary";
 import DashboardAssetAvailabilityCheck from "@/components/features/dashboard/DashboardAssetAvailabilityCheck";
 import PayoutScheduleCollisionPanel from "@/components/features/dashboard/PayoutScheduleCollisionPanel";
+import DashboardCompensationPolicyCheck from "@/components/features/dashboard/DashboardCompensationPolicyCheck";
 import { MOCK_COMPANIES } from "@/lib/api/mockData";
 
 function DashboardHome() {
@@ -158,6 +159,9 @@ function DashboardHome() {
           templates={[]}
           runs={[]}
         />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <DashboardCompensationPolicyCheck />
       </ErrorBoundary>
       <ErrorBoundary>
         <SystemStatus />

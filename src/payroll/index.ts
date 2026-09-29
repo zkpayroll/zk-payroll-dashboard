@@ -8,3 +8,4 @@ export * from "./ownerTransfer";
 export * from "./instructionVersion";
 export * from "./payoutDestinationReview";
 export * from "./assetAvailabilitySafety";
+export * from "./compensationPolicyEffectiveDate";
