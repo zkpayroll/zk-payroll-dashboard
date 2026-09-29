@@ -9,6 +9,23 @@ import {
   Suspense,
 } from "react";
 import { searchPayrollRuns } from "@/lib/payrollSearch";
+import { formatPeriodLabel } from "@/lib/date/periodLabel";
+import {
+  EMPTY_QUICK_FILTERS,
+  applyQuickFilters,
+  computeQuickFilterCounts,
+  countActiveQuickFilters,
+} from "@/src/payroll/quickFilters";
+import type { QuickFilterSelection } from "@/src/payroll/quickFilters";
+import PayrollQuickFilters from "@/components/filters/PayrollQuickFilters";
+import PayrollFilterEmptyState from "@/components/filters/PayrollFilterEmptyState";
+import {
+  SEARCH_CONSTRAINT_KEY,
+  formatSearchEcho,
+  quickFilterConstraints,
+  type ActivePayrollFilter,
+} from "@/src/payroll/emptyState";
+import type { QuickFilterGroup } from "@/src/payroll/quickFilters";
 import {
   ArrowUpRight,
   ArrowDownLeft,
@@ -26,13 +43,20 @@ import {
 } from "lucide-react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { MOCK_TRANSACTIONS, MOCK_EMPLOYEES } from "@/lib/api/mockData";
-import type { PayrollTransaction } from "@/types";
+import type { PayrollTransaction, PayrollRun, ReconciliationOutcome } from "@/types";
 import TransactionDetailDrawer from "./TransactionDetailDrawer";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { PayrollLockIndicator } from "@/components/ui/PayrollLockIndicator";
+import { ReconciliationStatusBadge } from "@/components/features/payroll/ReconciliationBadge";
+import {
+  RECONCILIATION_STATUS_LABELS,
+  resolveReconciliationStatus,
+} from "@/lib/reconciliation/status";
+import { SubmissionProgressCell } from "@/components/stepper/SubmissionProgressCell";
 
 type StatusFilter = "all" | "verified" | "pending" | "failed" | "cancelled";
+type ReconciliationFilter = "all" | ReconciliationOutcome;
 
 // Helper to determine lock state based on transaction
 function getLockState(
@@ -55,13 +79,16 @@ function getLockState(
 }
 
 interface Filters {
-  /** Free-text search across run id, period, tx hash and status (#167). */
+  /** Free-text search across visible run metadata and reconciliation status (#167). */
   search: string;
   status: StatusFilter;
+  reconciliation: ReconciliationFilter;
   employee: string;
   dateFrom: string;
   dateTo: string;
   payrollRun: string;
+  /** #284 one-click quick filters, applied after the fields above. */
+  quick: QuickFilterSelection;
 }
 
 interface SavedView {
@@ -74,11 +101,66 @@ interface SavedView {
 const initialFilters: Filters = {
   search: "",
   status: "all",
+  reconciliation: "all",
   employee: "",
   dateFrom: "",
   dateTo: "",
   payrollRun: "",
+  quick: { ...EMPTY_QUICK_FILTERS },
 };
+
+function normalizeFilters(filters: Partial<Filters>): Filters {
+  return { ...initialFilters, ...filters };
+}
+
+/**
+ * #464: active panel + quick filters as removable, label-only constraints for
+ * the filtered empty state. The employee name is deliberately not echoed back.
+ */
+function describeActiveFilters(filters: Filters): ActivePayrollFilter[] {
+  const active: ActivePayrollFilter[] = [];
+  if (filters.status !== "all") {
+    active.push({ key: "status", label: `Status: ${filters.status.charAt(0).toUpperCase()}${filters.status.slice(1)}` });
+  }
+  if (filters.reconciliation !== "all") {
+    active.push({
+      key: "reconciliation",
+      label: `Reconciliation: ${RECONCILIATION_STATUS_LABELS[filters.reconciliation]}`,
+    });
+  }
+  if (filters.employee.trim()) {
+    active.push({ key: "employee", label: "Employee filter" });
+  }
+  if (filters.dateFrom) {
+    active.push({ key: "dateFrom", label: `From: ${filters.dateFrom}` });
+  }
+  if (filters.dateTo) {
+    active.push({ key: "dateTo", label: `To: ${filters.dateTo}` });
+  }
+  if (filters.payrollRun.trim()) {
+    active.push({
+      key: "payrollRun",
+      label: `Run ID: ${formatSearchEcho(filters.payrollRun)}`,
+    });
+  }
+  return [...active, ...quickFilterConstraints(filters.quick)];
+}
+
+/** Reset the single constraint identified by `key`. */
+function removeFilter(filters: Filters, key: string): Filters {
+  if (key === SEARCH_CONSTRAINT_KEY) return { ...filters, search: "" };
+  if (key.startsWith("quick:")) {
+    const group = key.slice("quick:".length) as QuickFilterGroup;
+    return { ...filters, quick: { ...filters.quick, [group]: "all" } };
+  }
+  if (key === "status" || key === "reconciliation") {
+    return { ...filters, [key]: "all" };
+  }
+  if (key in initialFilters) {
+    return { ...filters, [key]: "" };
+  }
+  return filters;
+}
 
 function generateViewId(): string {
   return `sv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -99,6 +181,7 @@ function exportToCsv(rows: PayrollTransaction[]): string {
     "ID",
     "Date",
     "Status",
+    "Reconciliation",
     "Total Amount",
     "Employees",
     "Tx Hash",
@@ -109,6 +192,7 @@ function exportToCsv(rows: PayrollTransaction[]): string {
         tx.id,
         new Date(tx.createdAt).toLocaleDateString(),
         tx.status,
+        RECONCILIATION_STATUS_LABELS[resolveReconciliationStatus(tx)],
         `${tx.totalAmount.toLocaleString()}`,
         String(tx.employeeCount),
         tx.txHash ?? "N/A",
@@ -139,7 +223,7 @@ function TransactionHistoryInner({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const [filters, setFilters] = useState<Filters>(initialFilters);
+  const [filters, setFilters] = useState<Filters>(() => normalizeFilters(initialFilters));
   const [showFilters, setShowFilters] = useState(false);
   const [selectedTransaction, setSelectedTransaction] =
     useState<PayrollTransaction | null>(null);
@@ -216,7 +300,7 @@ function TransactionHistoryInner({
   const [editingViewId, setEditingViewId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
-  const filtered = useMemo(() => {
+  const filteredBase = useMemo(() => {
     let results = MOCK_TRANSACTIONS.filter((t) =>
       mode === "archived" ? t.isArchived : !t.isArchived,
     );
@@ -228,6 +312,12 @@ function TransactionHistoryInner({
 
     if (filters.status !== "all") {
       results = results.filter((t) => t.status === filters.status);
+    }
+
+    if (filters.reconciliation !== "all") {
+      results = results.filter(
+        (t) => resolveReconciliationStatus(t) === filters.reconciliation,
+      );
     }
 
     if (filters.dateFrom) {
@@ -256,14 +346,23 @@ function TransactionHistoryInner({
     return results;
   }, [filters, mode]);
 
-  const activeFilterCount = [
-    !!filters.search.trim(),
-    filters.status !== "all",
-    !!filters.employee,
-    !!filters.dateFrom,
-    !!filters.dateTo,
-    !!filters.payrollRun,
-  ].filter(Boolean).length;
+  // #284: quick filters apply on top of the search/panel result so their
+  // faceted counts describe the list the user is actually looking at.
+  const filtered = useMemo(
+    () => applyQuickFilters(filteredBase, filters.quick),
+    [filteredBase, filters.quick],
+  );
+
+  const activeFilterCount =
+    [
+      !!filters.search.trim(),
+      filters.status !== "all",
+      filters.reconciliation !== "all",
+      !!filters.employee,
+      !!filters.dateFrom,
+      !!filters.dateTo,
+      !!filters.payrollRun,
+    ].filter(Boolean).length + countActiveQuickFilters(filters.quick);
 
   const handleExport = () => {
     const csv = exportToCsv(filtered);
@@ -271,7 +370,22 @@ function TransactionHistoryInner({
     downloadCsv(csv, `payroll-history-${date}.csv`);
   };
 
+  const poolSize = useMemo(
+    () =>
+      MOCK_TRANSACTIONS.filter((t) =>
+        mode === "archived" ? t.isArchived : !t.isArchived,
+      ).length,
+    [mode],
+  );
+
+  const quickFilterCounts = useMemo(
+    () => computeQuickFilterCounts(filteredBase, filters.quick),
+    [filteredBase, filters.quick],
+  );
+
   const clearFilters = () => setFilters(initialFilters);
+
+  const activeFilters = useMemo(() => describeActiveFilters(filters), [filters]);
 
   // ── Saved views handlers ────────────────────────────────────
 
@@ -289,7 +403,14 @@ function TransactionHistoryInner({
   }, [savingName, filters, savedViews.length, setSavedViews]);
 
   const handleApplyView = useCallback((view: SavedView) => {
-    setFilters({ ...view.filters });
+    setFilters(normalizeFilters(view.filters));
+    setFilters((prev) => ({
+      ...initialFilters,
+      ...view.filters,
+      // Views saved before #284 have no quick-filter selection — treat as
+      // "no quick filters" instead of letting undefined crash the toolbar.
+      quick: view.filters.quick ?? { ...EMPTY_QUICK_FILTERS, ...prev.quick },
+    }));
     setShowSavedViews(false);
   }, []);
 
@@ -323,7 +444,8 @@ function TransactionHistoryInner({
 
   const hasFiltersApplied = activeFilterCount > 0;
   const currentView = savedViews.find(
-    (v) => JSON.stringify(v.filters) === JSON.stringify(filters),
+    (v) =>
+      JSON.stringify(normalizeFilters(v.filters)) === JSON.stringify(filters),
   );
 
   return (
@@ -454,7 +576,7 @@ function TransactionHistoryInner({
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, search: e.target.value }))
                 }
-                placeholder="Search run id, period, tx hash, status..."
+                placeholder="Search run id, receipt reference, period, tx hash, status..."
                 className="w-full pl-3 pr-8 py-1.5 rounded-md border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
               />
               {filters.search && (
@@ -515,7 +637,7 @@ function TransactionHistoryInner({
             id="filter-panel"
             role="region"
             aria-label="Filter transactions"
-            className="px-4 sm:px-6 py-4 bg-gray-50 border-b grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3"
+            className="px-4 sm:px-6 py-4 bg-gray-50 border-b grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
           >
             <div>
               <label
@@ -540,6 +662,32 @@ function TransactionHistoryInner({
                 <option value="pending">Pending</option>
                 <option value="failed">Failed</option>
                 <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+            <div>
+              <label
+                htmlFor="filter-reconciliation"
+                className="block text-xs font-medium text-gray-600 mb-1"
+              >
+                Reconciliation
+              </label>
+              <select
+                id="filter-reconciliation"
+                value={filters.reconciliation}
+                onChange={(e) =>
+                  setFilters((f) => ({
+                    ...f,
+                    reconciliation: e.target.value as ReconciliationFilter,
+                  }))
+                }
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              >
+                <option value="all">All reconciliation outcomes</option>
+                <option value="matched">Matched</option>
+                <option value="pending">Pending</option>
+                <option value="mismatched">Mismatched</option>
+                <option value="failed">Failed</option>
+                <option value="manually_reviewed">Manually reviewed</option>
               </select>
             </div>
             <div>
@@ -626,6 +774,15 @@ function TransactionHistoryInner({
             </div>
           </div>
         )}
+
+        {/* ── #284 Quick filters toolbar ──────────────────────────── */}
+        <PayrollQuickFilters
+          selection={filters.quick}
+          counts={quickFilterCounts}
+          totalCount={poolSize}
+          filteredCount={filtered.length}
+          onChange={(quick) => setFilters((f) => ({ ...f, quick }))}
+        />
 
         {/* ── Active filter bar with save button ──────────────────── */}
         {hasFiltersApplied && (
@@ -736,6 +893,13 @@ function TransactionHistoryInner({
                     scope="col"
                     className="px-6 py-3 text-xs font-medium text-gray-400 uppercase"
                   >
+                    Reconciliation
+                    Progress
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-xs font-medium text-gray-400 uppercase"
+                  >
                     Date
                   </th>
                   <th
@@ -762,6 +926,10 @@ function TransactionHistoryInner({
                       <div className="h-6 bg-gray-200 rounded-full w-14"></div>
                     </td>
                     <td className="px-6 py-4">
+                      <div className="h-6 bg-gray-200 rounded-full w-24"></div>
+                      <div className="h-2 bg-gray-200 rounded-full w-16"></div>
+                    </td>
+                    <td className="px-6 py-4">
                       <div className="h-4 bg-gray-200 rounded w-24"></div>
                     </td>
                     <td className="px-6 py-4">
@@ -772,22 +940,36 @@ function TransactionHistoryInner({
               </tbody>
             </table>
           </div>
+        ) : filtered.length === 0 ? (
+          <>
+            {/* #464: one empty state for both layouts that says why nothing
+                is listed and how to get runs back. */}
+            <PayrollFilterEmptyState
+              poolSize={poolSize}
+              search={filters.search}
+              filters={activeFilters}
+              noun={mode === "archived" ? "archived payrolls" : "transactions"}
+              noDataDescription={
+                mode === "archived"
+                  ? "No archived payroll runs found. Payroll runs are archived after they are completed and superseded."
+                  : "No transactions yet. Process a payroll run to populate the transaction history."
+              }
+              onRemoveFilter={(key) => setFilters((f) => removeFilter(f, key))}
+              onClearAll={clearFilters}
+            />
+            <div className="px-4 sm:px-6 py-3 border-t text-xs text-gray-500">
+              {`Showing 0 of ${poolSize} ${
+                mode === "archived" ? "archived payrolls" : "transactions"
+              }`}
+            </div>
+          </>
         ) : (
           <>
             <ul
               className="md:hidden divide-y divide-gray-100"
               aria-label="Payroll transactions"
             >
-              {filtered.length === 0 ? (
-                <li className="px-4 py-8 text-center text-sm text-gray-500">
-                  {hasFiltersApplied
-                    ? "No transactions match the current filters. Try broadening your filter criteria."
-                    : mode === "archived"
-                      ? "No archived payroll runs found. Payroll runs are archived after they are completed and superseded."
-                      : "No transactions yet. Process a payroll run to populate the transaction history."}
-                </li>
-              ) : (
-                filtered.map((tx) => (
+              {filtered.map((tx) => (
                   <li key={tx.id} className="px-4 py-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -813,11 +995,16 @@ function TransactionHistoryInner({
                           )}
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
-                          ${tx.totalAmount.toLocaleString()} ·{" "}
+                          <span className="font-medium text-gray-700">{formatPeriodLabel(tx)}</span> · ${tx.totalAmount.toLocaleString()} ·{" "}
                           {new Date(tx.createdAt).toLocaleDateString()}
                         </p>
                       </div>
-                      <StatusBadge status={tx.status} />
+                      <div className="flex flex-col items-end gap-2">
+                        <StatusBadge status={tx.status} />
+                        <ReconciliationStatusBadge
+                          status={resolveReconciliationStatus(tx)}
+                        />
+                      </div>
                     </div>
                     <div className="mt-3 flex gap-2">
                       <a
@@ -842,8 +1029,7 @@ function TransactionHistoryInner({
                       </button>
                     </div>
                   </li>
-                ))
-              )}
+              ))}
             </ul>
             <table className="hidden md:table w-full text-left">
               <caption className="sr-only">
@@ -879,6 +1065,13 @@ function TransactionHistoryInner({
                     scope="col"
                     className="px-6 py-3 text-xs font-medium text-gray-600 uppercase"
                   >
+                    Reconciliation
+                    Progress
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-xs font-medium text-gray-600 uppercase"
+                  >
                     Date
                   </th>
                   <th
@@ -890,21 +1083,7 @@ function TransactionHistoryInner({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200" aria-live="polite">
-                {filtered.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-6 py-8 text-center text-sm text-gray-500"
-                    >
-                      {hasFiltersApplied
-                        ? "No transactions match the current filters. Try broadening your filter criteria."
-                        : mode === "archived"
-                          ? "No archived payroll runs found. Payroll runs are archived after they are completed and superseded."
-                          : "No transactions yet. Process a payroll run to populate the transaction history."}
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((tx) => (
+                {filtered.map((tx) => (
                     <tr key={tx.id}>
                       <td className="px-6 py-4 flex items-center">
                         {tx.totalAmount > 0 ? (
@@ -938,8 +1117,21 @@ function TransactionHistoryInner({
                           </div>
                         )}
                       </td>
+                      <td className="px-6 py-4">
+                        <ReconciliationStatusBadge
+                          status={resolveReconciliationStatus(tx)}
+                        />
+                      </td>
+                      {/* Issue #295: compact lifecycle progress — state only,
+                          no amounts, proofs, or hashes rendered here. */}
+                      <td className="px-6 py-4">
+                        <SubmissionProgressCell
+                          input={{ source: "run", run: tx as PayrollRun }}
+                        />
+                      </td>
                       <td className="px-6 py-4 text-gray-600">
-                        {new Date(tx.createdAt).toLocaleDateString()}
+                        <div className="font-medium text-gray-900">{formatPeriodLabel(tx)}</div>
+                        <div className="text-xs text-gray-500">{new Date(tx.createdAt).toLocaleDateString()}</div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
@@ -966,20 +1158,14 @@ function TransactionHistoryInner({
                         </div>
                       </td>
                     </tr>
-                  ))
-                )}
+                ))}
               </tbody>
             </table>
 
             <div className="px-4 sm:px-6 py-3 border-t text-xs text-gray-500">
-              {(() => {
-                const poolSize = MOCK_TRANSACTIONS.filter((t) =>
-                  mode === "archived" ? t.isArchived : !t.isArchived,
-                ).length;
-                return `Showing ${filtered.length} of ${poolSize} ${
-                  mode === "archived" ? "archived payrolls" : "transactions"
-                }`;
-              })()}
+              {`Showing ${filtered.length} of ${poolSize} ${
+                mode === "archived" ? "archived payrolls" : "transactions"
+              }`}
             </div>
           </>
         )}

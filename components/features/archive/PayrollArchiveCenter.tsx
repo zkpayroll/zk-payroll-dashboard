@@ -53,17 +53,9 @@ export default function PayrollArchiveCenter() {
 
   const [copiedTxHash, setCopiedTxHash] = useState<string | null>(null);
 
-  const filteredRuns = useMemo(() => {
-    return getFilteredRuns();
-  }, [
-    runs,
-    searchQuery,
-    periodFilter,
-    assetFilter,
-    employerFilter,
-    statusFilter,
-    auditFilter,
-  ]);
+  const filteredRuns = getFilteredRuns();
+
+
 
   // Derived filter dropdown options
   const periods = useMemo(() => {

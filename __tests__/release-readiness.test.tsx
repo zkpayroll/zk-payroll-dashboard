@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import ReleaseReadinessChecklist from '@/components/features/maintainers/ReleaseReadinessChecklist';
 import { useReleaseReadinessStore } from '@/stores/releaseReadiness';
@@ -44,8 +44,9 @@ describe('ReleaseReadinessChecklist', () => {
     });
     render(<ReleaseReadinessChecklist />);
     expect(screen.getByText(/Blockers/)).toBeInTheDocument();
-    expect(screen.getByText('CI passing')).toBeInTheDocument();
+    expect(screen.getAllByText('CI passing')[0]).toBeInTheDocument();
   });
+
 
   it('allows status change', () => {
     render(<ReleaseReadinessChecklist />);

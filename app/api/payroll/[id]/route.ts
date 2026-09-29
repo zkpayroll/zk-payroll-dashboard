@@ -22,7 +22,13 @@ export async function OPTIONS(request: NextRequest) {
 export async function GET(request: NextRequest, { params }: RouteContext) {
   const payroll = MOCK_PAYROLL_RUNS.find((p: PayrollRun) => p.id === params.id);
   if (!payroll) return withCors(notFoundResponse("Payroll run"), request);
-  return withCors(successResponse(payroll), request);
+  // Ensure the response includes an updatedAt timestamp for display.
+  // If the mock data doesn't have one, fall back to createdAt or null.
+  const enrichedPayroll = {
+    ...payroll,
+    updatedAt: payroll.updatedAt ?? payroll.createdAt ?? null,
+  };
+  return withCors(successResponse(enrichedPayroll), request);
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteContext) {

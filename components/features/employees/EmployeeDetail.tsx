@@ -27,6 +27,8 @@ import { MOCK_EMPLOYEES, MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import type { Employee } from "@/types";
 import OnboardingBadge from "./OnboardingBadge";
 import EmptyState from "@/components/ui/EmptyState";
+import WalletChangeReviewCard from "@/components/review/WalletChangeReviewCard";
+import RecipientLockBadge from "./RecipientLockBadge";
 
 export interface EmployeeDetailDrawerProps {
   employee: Employee | null;
@@ -99,6 +101,7 @@ export function EmployeeDetailDrawer({ employee, isOpen, onClose }: EmployeeDeta
           </div>
 
           <div className="space-y-8">
+            <WalletChangeReviewCard employeeId={employee.id} employeeName={employee.name} />
             {/* Professional Info */}
             <section>
               <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Professional Information</h4>
@@ -141,9 +144,12 @@ export function EmployeeDetailDrawer({ employee, isOpen, onClose }: EmployeeDeta
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <Wallet className="w-3.5 h-3.5" /> Stellar Address
                   </div>
-                  <p className="text-xs font-mono break-all bg-gray-100 p-2 rounded text-gray-600">
-                    {employee.address}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-mono break-all bg-gray-100 p-2 rounded text-gray-600 flex-1">
+                      {employee.address}
+                    </p>
+                    <RecipientLockBadge employeeId={employee.id} employeeName={employee.name} />
+                  </div>
                 </div>
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -368,6 +374,7 @@ export default function EmployeeDetail({ employeeId }: { employeeId: string }) {
               </dd>
             </div>
           </dl>
+          <RecipientLockBadge employeeId={employee.id} employeeName={employee.name} variant="banner" />
         </div>
       </div>
 

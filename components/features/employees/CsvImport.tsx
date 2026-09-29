@@ -189,6 +189,7 @@ export default function CsvImport() {
     RowValidationError[]
   >([]);
   const [fileName, setFileName] = useState<string>("");
+  const [sourceColumns, setSourceColumns] = useState<string[]>([]);
   const [importingRow, setImportingRow] = useState<number | null>(null);
   const [importedIds, setImportedIds] = useState<Set<string>>(new Set());
   const [allImported, setAllImported] = useState(false);
@@ -203,6 +204,11 @@ export default function CsvImport() {
       const reader = new FileReader();
       reader.onload = () => {
         const text = reader.result as string;
+        const columns = (text.split(/\r?\n/, 1)[0] ?? "")
+          .split(",")
+          .map((column) => column.trim().toLowerCase())
+          .filter(Boolean);
+        setSourceColumns(columns);
         const rows = parseCsv(text);
 
         if (rows.length === 0) {
@@ -317,6 +323,7 @@ export default function CsvImport() {
     setParsedRows([]);
     setValidationErrors([]);
     setFileName("");
+    setSourceColumns([]);
     setImportedIds(new Set());
     setAllImported(false);
     if (fileInputRef.current) {
@@ -458,6 +465,26 @@ export default function CsvImport() {
               </p>
             </div>
           )}
+
+          <section
+            aria-label="Import source validation summary"
+            className="mx-4 my-3 rounded-md border border-gray-200 bg-gray-50 px-4 py-3 sm:mx-6"
+          >
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-700">
+              Source validation summary
+            </h4>
+            <p className="mt-1 text-xs text-gray-600">
+              {fileName}: {parsedRows.length} rows checked, {validRowCount} ready to import, {parsedRows.length - validRowCount} need attention.
+            </p>
+            <p className="mt-1 text-xs text-gray-600">
+              Required columns: {REQUIRED_COLUMNS.map((column) => `${column} ${sourceColumns.includes(column) ? "✓" : "missing"}`).join(" · ")}
+            </p>
+            {REQUIRED_COLUMNS.some((column) => !sourceColumns.includes(column)) && (
+              <p role="alert" className="mt-1 text-xs text-red-700">
+                The source is missing required columns. Correct the CSV headings before importing.
+              </p>
+            )}
+          </section>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left">

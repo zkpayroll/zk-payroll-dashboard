@@ -1,10 +1,10 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import PayrollExceptionsQueue from "@/components/features/payroll/PayrollExceptionsQueue";
+import PayrollExceptionTriage from "@/components/triage/PayrollExceptionTriage";
 
 function ExceptionsPage() {
   return (
     <DashboardLayout>
-      <PayrollExceptionsQueue />
+      <PayrollExceptionTriage />
     </DashboardLayout>
   );
 }

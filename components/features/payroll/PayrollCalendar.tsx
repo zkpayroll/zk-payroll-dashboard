@@ -15,7 +15,9 @@ import {
 import { MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import type { PayrollRun } from "@/types/models";
 import EmptyState from "@/components/ui/EmptyState";
+import { useHelpDrawer, HELP_CONTENT } from "@/stores/helpDrawer";
 import PayrollDetailSheet from "@/components/features/payroll/PayrollDetailSheet";
+import PeriodLabelBadge from "@/components/features/payroll/PeriodLabelBadge";
 import {
   classifyRun,
   formatPayrollDate,
@@ -79,6 +81,7 @@ function RunListItem({ run }: { run: PayrollRun }) {
             <span className="text-sm font-semibold text-gray-900">
               {formatPayrollDate(date)}
             </span>
+            <PeriodLabelBadge period={run} size="xs" variant="pill" />
             <RunBadge kind={kind} />
           </div>
           <p className="text-sm text-gray-600 mt-0.5">
@@ -109,6 +112,7 @@ function MobileRunListItem({ run, onSelect }: { run: PayrollRun; onSelect: (run:
             <span className="text-sm font-semibold text-gray-900">
               {formatPayrollDate(date)}
             </span>
+            <PeriodLabelBadge period={run} size="xs" variant="pill" />
             <RunBadge kind={kind} />
           </div>
           <p className="text-sm text-gray-600 mt-0.5">
@@ -137,11 +141,16 @@ function NextUpHero({ run }: { run: PayrollRun }) {
             <Clock className="w-5 h-5 text-yellow-700" aria-hidden="true" />
           </div>
           <div>
-            <p className="text-xl font-bold text-gray-900">{formatPayrollDate(date)}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xl font-bold text-gray-900">{formatPayrollDate(date)}</p>
+              <PeriodLabelBadge period={run} size="sm" variant="badge" />
+            </div>
             <p className="text-sm text-gray-600 mt-1">
               ${run.totalAmount.toLocaleString()} across {run.employeeCount} employees
             </p>
-            <RunBadge kind="scheduled" />
+            <div className="mt-1">
+              <RunBadge kind="scheduled" />
+            </div>
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 shrink-0">
@@ -174,9 +183,10 @@ function MonthCalendar({
   onPrevMonth: () => void;
   onNextMonth: () => void;
 }) {
-  const year = viewDate.getFullYear();
-  const month = viewDate.getMonth();
+  const year = viewDate.getUTCFullYear();
+  const month = viewDate.getUTCMonth();
   const days = getCalendarMonthDays(year, month);
+
   const todayKey = toDateKey(new Date());
 
   return (
@@ -249,7 +259,7 @@ function MonthCalendar({
                     isToday ? "text-indigo-700" : "text-gray-700"
                   }`}
                 >
-                  {day.getDate()}
+                  {day.getUTCDate()}
                 </span>
                 <div className="space-y-0.5">
                   {dayRuns.slice(0, 2).map((run) => {
@@ -302,6 +312,7 @@ function MonthCalendar({
 function PayrollCalendar({ runs = MOCK_PAYROLL_RUNS }: PayrollCalendarProps) {
   const [selectedRun, setSelectedRun] = useState<PayrollRun | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const { openHelp } = useHelpDrawer();
 
   const handleRunSelect = useCallback((run: PayrollRun) => {
     setSelectedRun(run);
@@ -329,12 +340,15 @@ function PayrollCalendar({ runs = MOCK_PAYROLL_RUNS }: PayrollCalendarProps) {
 
   const initialViewDate = nextUp ? getRunDate(nextUp) : new Date();
   const [viewDate, setViewDate] = useState(
-    () => new Date(initialViewDate.getFullYear(), initialViewDate.getMonth(), 1),
+    () => new Date(Date.UTC(initialViewDate.getUTCFullYear(), initialViewDate.getUTCMonth(), 1)),
   );
 
   const shiftMonth = (delta: number) => {
-    setViewDate((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+    setViewDate((current) =>
+      new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth() + delta, 1)),
+    );
   };
+
 
   if (runs.length === 0) {
     return (
@@ -355,6 +369,13 @@ function PayrollCalendar({ runs = MOCK_PAYROLL_RUNS }: PayrollCalendarProps) {
             action={{
               label: "Start first payroll run",
               href: "/payroll/execute",
+            }}
+            secondaryAction={{
+              label: "View payroll guide",
+              onClick: () => {
+                const content = HELP_CONTENT.payroll;
+                if (content) openHelp("payroll", content);
+              },
             }}
           />
         </div>
@@ -427,9 +448,12 @@ function PayrollCalendar({ runs = MOCK_PAYROLL_RUNS }: PayrollCalendarProps) {
                   >
                     <RunKindIcon kind={classifyRun(run)} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">
-                        {formatPayrollDate(getRunDate(run))}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-medium text-gray-900">
+                          {formatPayrollDate(getRunDate(run))}
+                        </p>
+                        <PeriodLabelBadge period={run} size="xs" variant="pill" />
+                      </div>
                       <p className="text-sm text-gray-500">
                         ${run.totalAmount.toLocaleString()} · {run.employeeCount} employees
                       </p>
@@ -459,9 +483,12 @@ function PayrollCalendar({ runs = MOCK_PAYROLL_RUNS }: PayrollCalendarProps) {
                   >
                     <RunKindIcon kind="scheduled" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">
-                        {formatPayrollDate(getRunDate(run))}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-medium text-gray-900">
+                          {formatPayrollDate(getRunDate(run))}
+                        </p>
+                        <PeriodLabelBadge period={run} size="xs" variant="pill" />
+                      </div>
                       <p className="text-sm text-gray-500">
                         ${run.totalAmount.toLocaleString()} · {run.employeeCount} employees
                       </p>

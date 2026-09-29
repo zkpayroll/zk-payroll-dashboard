@@ -1,4 +1,4 @@
-export type StellarNetwork = "TESTNET" | "PUBLIC";
+export type StellarNetwork = "TESTNET" | "PUBLIC" | "FUTURENET";
 
 export interface FreighterWalletInfo {
   publicKey: string;

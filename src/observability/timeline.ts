@@ -8,6 +8,7 @@ import { getEventsByCorrelationId } from "./emitter";
 
 const STAGE_LABELS: Record<PayrollStage, string> = {
   draft: "Draft Creation",
+  draft_updated: "Payroll Draft Updated",
   validation: "Payroll Validation",
   proof_setup: "ZK Proof Generation",
   wallet_signing: "Wallet Signing",
@@ -16,6 +17,7 @@ const STAGE_LABELS: Record<PayrollStage, string> = {
   failure: "Run Failure",
   retry: "Transaction Retry",
   reconciliation: "Payroll Reconciliation",
+  employer_onboarding: "Employer Onboarding",
 };
 
 /**
@@ -29,6 +31,8 @@ function formatStageSummary(event: PayrollEvent): string {
   switch (event.stage) {
     case "draft":
       return `${stageName}: Created initial payroll draft (${event.status})`;
+    case "draft_updated":
+      return `${stageName}: Draft details updated (${event.status})`;
     case "validation":
       return event.status === "failed"
         ? `${stageName}: Validation failed - ${event.payload.errorLabel || event.payload.errorCategory || "Validation Error"}`
@@ -53,6 +57,12 @@ function formatStageSummary(event: PayrollEvent): string {
       return `${stageName}: Attempting retry #${event.payload.retryCount || 1}`;
     case "reconciliation":
       return `${stageName}: Settlement audit completed (${event.status})`;
+    case "employer_onboarding":
+      return event.status === "failed"
+        ? `${stageName}: Onboarding step failed - ${event.payload.errorLabel || event.payload.errorCategory || "Onboarding Error"}`
+        : event.status === "succeeded"
+        ? `${stageName}: Employer onboarding completed (${event.payload.employerName ? String(event.payload.employerName) : "setup verified"})`
+        : `${stageName}: Employer onboarding ${event.status} (${event.payload.stepLabel || "configuration"})`;
     default:
       return `${stageName} [${statusStr}]`;
   }

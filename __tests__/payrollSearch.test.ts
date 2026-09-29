@@ -34,6 +34,12 @@ describe("matchesPayrollSearch", () => {
     expect(matchesPayrollSearch(base, "deadbeef")).toBe(true);
   });
 
+  it("matches on the visible reconciliation status", () => {
+    const mismatched = { ...base, reconciliationStatus: "mismatched" as const };
+    expect(matchesPayrollSearch(mismatched, "mismatched")).toBe(true);
+    expect(matchesPayrollSearch(mismatched, "manually reviewed")).toBe(false);
+  });
+
   it("matches on status", () => {
     expect(matchesPayrollSearch(base, "verified")).toBe(true);
     expect(matchesPayrollSearch(base, "failed")).toBe(false);

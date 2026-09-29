@@ -1,4 +1,8 @@
 import type { PayrollTransaction } from "@/types/models";
+import {
+  RECONCILIATION_STATUS_LABELS,
+  resolveReconciliationStatus,
+} from "@/lib/reconciliation/status";
 
 /**
  * Free-text search across payroll runs (issue #167).
@@ -12,12 +16,11 @@ import type { PayrollTransaction } from "@/types/models";
  * a value the table never displays produces results the user cannot explain.
  */
 
-/** Period label derived from a run's timestamp, e.g. "March 2026". */
+import { formatPeriodLabel } from "@/lib/date/periodLabel";
+
+/** Period label derived from a run's timestamp or period field, e.g. "March 2026". */
 export function formatRunPeriod(tx: Pick<PayrollTransaction, "createdAt" | "timestamp">): string {
-  const raw = tx.createdAt || tx.timestamp;
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  return formatPeriodLabel(tx, { fallback: "" });
 }
 
 /**
@@ -30,11 +33,15 @@ export function matchesPayrollSearch(tx: PayrollTransaction, query: string): boo
   const needle = query.trim().toLowerCase();
   if (!needle) return true;
 
+  const reconciliationStatus = resolveReconciliationStatus(tx);
   const haystacks = [
     tx.id,
     tx.status,
     tx.txHash ?? "",
+    tx.receiptId ?? (tx.status === "verified" ? `rcpt_${tx.id}` : ""),
     formatRunPeriod(tx),
+    RECONCILIATION_STATUS_LABELS[reconciliationStatus],
+    reconciliationStatus,
     // ISO date too, so "2026-03" works as well as "March 2026" — users paste
     // both, and supporting only one makes the box feel broken.
     (tx.createdAt || tx.timestamp || "").slice(0, 10),

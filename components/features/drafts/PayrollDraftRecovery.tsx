@@ -13,9 +13,11 @@ import {
   RotateCcw,
   CheckCircle2,
   XCircle,
+  UserRound,
 } from "lucide-react";
 import { usePayrollDraftsStore } from "@/stores/payrollDrafts";
 import type { PayrollDraft, DraftStatus } from "@/stores/payrollDrafts";
+import { resolveDraftOwnership } from "@/lib/payroll/draftOwnership";
 
 const STATUS_CONFIG: Record<DraftStatus, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
   draft: { label: "Draft", color: "text-blue-700", bg: "bg-blue-50 border-blue-200", icon: <FileText className="w-3.5 h-3.5" /> },
@@ -34,6 +36,10 @@ function DraftRow({ draft, onRecover, onDiscard, onDelete }: {
   const config = STATUS_CONFIG[draft.status];
   const isExpired = new Date(draft.expiresAt) < new Date();
   const hoursLeft = Math.max(0, Math.round((new Date(draft.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60)));
+  // #553: the draft store has always recorded lastSavedBy, but nothing
+  // rendered it — so "Recover" offered a draft with no hint of whose work it
+  // was. Owner identity only; never a salary, address or employee detail.
+  const ownership = resolveDraftOwnership(draft);
 
   return (
     <div className={`border rounded-lg p-4 transition-colors ${isExpired ? "opacity-60" : "hover:bg-muted/50"}`}>
@@ -45,6 +51,23 @@ function DraftRow({ draft, onRecover, onDiscard, onDelete }: {
               {config.icon}
               {config.label}
             </span>
+          </div>
+          <div
+            data-testid="draft-ownership"
+            className={`flex items-center gap-1.5 mt-1.5 text-xs ${ownership.isUnknown ? "text-amber-600" : "text-muted-foreground"}`}
+            title={ownership.isUnknown ? "No owner recorded for this draft" : `Last saved by ${ownership.owner}`}
+          >
+            {ownership.isUnknown ? (
+              <AlertTriangle className="w-3 h-3 shrink-0" />
+            ) : (
+              <UserRound className="w-3 h-3 shrink-0" />
+            )}
+            <span className="font-mono">
+              {ownership.isUnknown ? "Owner unknown" : `Last saved by ${ownership.owner}`}
+            </span>
+            {ownership.age && (
+              <span className="text-muted-foreground">&middot; {ownership.age}</span>
+            )}
           </div>
           <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
             <span>{draft.payPeriod}</span>
@@ -109,7 +132,11 @@ function DraftRow({ draft, onRecover, onDiscard, onDelete }: {
   );
 }
 
-export default function PayrollDraftRecovery() {
+export interface PayrollDraftRecoveryProps {
+  showLastUpdated?: boolean;
+}
+
+export default function PayrollDraftRecovery({ showLastUpdated }: PayrollDraftRecoveryProps = {}) {
   const {
     drafts,
     filterStatus,

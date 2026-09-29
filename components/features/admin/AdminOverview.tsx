@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Building2, Users, DollarSign, AlertTriangle, ArrowRight } from "lucide-react";
+import { Building2, Users, DollarSign, AlertTriangle, ArrowRight, ShieldCheck } from "lucide-react";
 import { useCompanyStore } from "@/stores/company";
 import { useEmployeeStore } from "@/stores/employees";
 import AdminActionQueue from "./AdminActionQueue";
@@ -123,6 +123,16 @@ export default function AdminOverview() {
           accent={pendingCount > 0 ? "yellow" : "green"}
           href="/payroll"
         />
+      </div>
+
+      <div className="flex justify-end">
+        <a
+          href="/settings/roles"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:underline"
+        >
+          <ShieldCheck className="h-4 w-4" aria-hidden />
+          View role directory <ArrowRight className="h-3 w-3" />
+        </a>
       </div>
 
       <div className="mt-6">

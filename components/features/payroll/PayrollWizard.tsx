@@ -23,21 +23,59 @@ import {
   History,
 } from "lucide-react";
 import { toast } from "sonner";
+import type { Employee } from "@/types/models";
+import DuplicateWarningPanel from "@/components/employees/DuplicateWarningPanel";
 import { usePayrollWizardStore } from "@/stores/payrollWizard";
 import { useWalletStore } from "@/stores/walletStore";
 import { useApprovalHistory } from "@/stores/approvalHistory";
 import { useSession } from "@/hooks/useSession";
-import { EXPECTED_NETWORK } from "@/components/providers/StellarProvider";
 import { IncidentBanner } from "@/components/ui/IncidentBanner";
-import { MOCK_COMPANIES, MOCK_EMPLOYEES, MOCK_PAYROLL_RUNS, MOCK_TREASURY_BALANCE } from "@/lib/api/mockData";
+import {
+  MOCK_COMPANIES,
+  MOCK_EMPLOYEES,
+  MOCK_PAYROLL_RUNS,
+  MOCK_TREASURY_BALANCE,
+} from "@/lib/api/mockData";
 import PayrollReceipt from "./PayrollReceipt";
+import { ExecutionConfirmationNonceStatus } from "./ExecutionConfirmationNonceStatus";
 import PayrollApprovalAuditTrail from "./PayrollApprovalAuditTrail";
 import { usePayrollAuditTrailStore } from "@/stores/payrollAuditTrail";
 import ApprovalHistoryDrawer from "./ApprovalHistoryDrawer";
 import { PayrollRiskWarnings } from "./PayrollRiskWarnings";
+import { NoteHashPreview } from "@/components/payroll/NoteHashPreview";
 import { WalletReconnectRecoveryBanner } from "@/components/features/wallet/WalletReconnectRecoveryBanner";
+import { PayrollSubmissionStepper } from "@/components/stepper/PayrollSubmissionStepper";
+import TransactionFeeEstimate from "./TransactionFeeEstimate";
+import type { SubmissionStageKey } from "@/src/payroll/submissionProgress";
+import {
+  findIneligibleEmployees,
+  formatIneligibleEmployees,
+} from "@/src/payroll/inactiveEmployees";
+import { InactiveEmployeeWarning } from "@/components/warnings/InactiveEmployeeWarning";
+import { useEnvironmentStore } from "@/stores/environment";
+import { ContractErrorHelpButton } from "@/components/features/errors/ContractErrorDrawer";
+import { MissingProofWarning } from "@/components/features/proofs/MissingProofWarning";
 import type { PayrollRun, PayrollWizardStep } from "@/types";
-import { trackEvent, mapErrorToType, bucketEmployeeCount } from "@/lib/telemetry";
+import {
+  trackEvent,
+  mapErrorToType,
+  bucketEmployeeCount,
+} from "@/lib/telemetry";
+import {
+  PayrollActionLoader,
+  getPayrollButtonAriaLabel,
+} from "@/components/ui/PayrollActionLoader";
+import type { PayrollLoadingPhase } from "@/components/ui/PayrollActionLoader";
+import { PayoutCountLimitIndicator } from "@/components/features/payroll/PayoutCountLimitIndicator";
+import { getPayoutLimitStatus } from "@/lib/payroll/payoutLimit";
+import { createPayrollDraftChecksum, matchesReviewedPayrollDraft } from "@/lib/payroll/draftChecksum";
+import PayerAccountStatus from "@/components/features/payroll/PayerAccountStatus";
+import { usePayrollPolicyStore } from "@/stores/payrollPolicy";
+import { PayrollInstructionVersionBadge } from "@/components/features/payroll/PayrollInstructionVersionBadge";
+import {
+  getDraftInstructionVersion,
+  getInstructionVersionStatus,
+} from "@/src/payroll/instructionVersion";
 
 const STEPS: { key: PayrollWizardStep; label: string }[] = [
   { key: "review", label: "Review" },
@@ -50,12 +88,39 @@ function stepIndex(step: PayrollWizardStep): number {
   return STEPS.findIndex((s) => s.key === step);
 }
 
+function getPeriodKey(dateLike?: string | null): string {
+  if (!dateLike) return "unknown";
+
+  const date = new Date(dateLike);
+  if (Number.isNaN(date.getTime())) return "unknown";
+
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
 function findConflictingRuns(employeeIds: string[]): PayrollRun[] {
   return MOCK_PAYROLL_RUNS.filter(
     (run) =>
       run.status === "pending" &&
       run.employeeIds.some((employeeId) => employeeIds.includes(employeeId)),
   );
+}
+
+function findDuplicateRunWarnings(employeeIds: string[]): PayrollRun[] {
+  if (employeeIds.length === 0) return [];
+
+  const selectedSet = new Set(employeeIds);
+  const currentPeriodKey = getPeriodKey(new Date().toISOString());
+
+  return MOCK_PAYROLL_RUNS.filter((run) => {
+    if (run.status !== "pending" && run.status !== "verified") return false;
+
+    const samePeriod = getPeriodKey(run.createdAt) === currentPeriodKey;
+    const employeeOverlap = run.employeeIds.some((employeeId) =>
+      selectedSet.has(employeeId),
+    );
+
+    return samePeriod || employeeOverlap;
+  });
 }
 
 function PayrollWizard() {
@@ -68,15 +133,19 @@ function PayrollWizard() {
     submissionStatus,
     submissionError,
     transactionHash,
+    instructionVersion,
     nextStep,
     prevStep,
+    goToStep,
     setEmployeeIds,
     setTotalAmount,
+    setProof,
     setProofStatus,
     setProofError,
     setSubmissionStatus,
     setSubmissionError,
     setTransactionHash,
+    setInstructionVersion,
     reset,
     hasDraft,
     restoreDraft,
@@ -88,10 +157,16 @@ function PayrollWizard() {
   const draftResolvedRef = useRef(false);
   const initialEventRecordedRef = useRef(false);
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
+  const [draftChecksumWarning, setDraftChecksumWarning] = useState<string | null>(null);
+  const reviewedDraftChecksum = useRef<string | null>(null);
 
   const walletPublicKey = useWalletStore((s) => s.publicKey) ?? "unknown";
   const addApprovalEvent = useApprovalHistory((s) => s.addEvent);
   const clearApprovalHistory = useApprovalHistory((s) => s.clearHistory);
+
+  // #534 — the saved policy governs the run; the wizard reads the saved
+  // policy (not unsaved edits), mirroring the payout limit indicator.
+  const savedPolicyVersion = usePayrollPolicyStore((st) => st.savedPolicy.version);
 
   useEffect(() => {
     if (
@@ -106,7 +181,8 @@ function PayrollWizard() {
 
   const { sessionState } = useSession();
   const network = useWalletStore((s) => s.network);
-  const isWrongNetwork = network !== EXPECTED_NETWORK;
+  const expectedNetwork = useEnvironmentStore((s) => s.getActiveProfileConfig().stellarNetwork);
+  const isWrongNetwork = network !== expectedNetwork;
   const isSessionExpired = sessionState === "expired";
 
   const selectedEmployees = useMemo(
@@ -124,6 +200,8 @@ function PayrollWizard() {
     setPayrollRunId(runId);
     setEmployeeIds(selected);
     setTotalAmount(MOCK_EMPLOYEES.reduce((sum, e) => sum + e.salary, 0));
+    // #534 — anchor this draft to the saved policy version it will execute under.
+    setInstructionVersion(getDraftInstructionVersion(usePayrollPolicyStore.getState().savedPolicy));
     draftResolvedRef.current = true;
     initialEventRecordedRef.current = true;
 
@@ -145,12 +223,19 @@ function PayrollWizard() {
     trackEvent("payroll_wizard_started", {
       employeeCountBucket: bucketEmployeeCount(selected.length),
     });
-  }, [setEmployeeIds, setTotalAmount, addApprovalEvent, walletPublicKey, logEvent]);
+  }, [
+    setEmployeeIds,
+    setTotalAmount,
+    setInstructionVersion,
+    addApprovalEvent,
+    walletPublicKey,
+    logEvent,
+  ]);
 
   const handleGenerateProof = useCallback(async () => {
     if (isWrongNetwork) {
       toast.error("Wrong network", {
-        description: `Switch your wallet to ${EXPECTED_NETWORK} to continue.`,
+        description: `Switch your wallet to ${expectedNetwork} to continue.`,
       });
       return;
     }
@@ -169,6 +254,7 @@ function PayrollWizard() {
     const success = Math.random() > 0.2;
     if (success) {
       setProofStatus("success");
+      setDraftChecksumWarning(null);
       if (payrollRunId) {
         logEvent({
           payrollRunId,
@@ -200,11 +286,7 @@ function PayrollWizard() {
           details: errMsg,
         });
       }
-      addApprovalEvent(
-        "proof_generation_failed",
-        walletPublicKey,
-        errMsg,
-      );
+      addApprovalEvent("proof_generation_failed", walletPublicKey, errMsg);
       trackEvent("payroll_proof_generation_completed", {
         success: false,
         error_type: mapErrorToType(errMsg),
@@ -213,15 +295,52 @@ function PayrollWizard() {
         description: "Circuit constraint mismatch.",
       });
     }
-  }, [setProofStatus, setProofError, nextStep, isWrongNetwork, addApprovalEvent, walletPublicKey, payrollRunId, logEvent, selectedEmployees.length, totalAmount]);
+  }, [
+    setProofStatus,
+    setProofError,
+    nextStep,
+    isWrongNetwork,
+    addApprovalEvent,
+    walletPublicKey,
+    payrollRunId,
+    logEvent,
+    selectedEmployees.length,
+    totalAmount,
+  ]);
 
   const handleSubmit = useCallback(async () => {
     if (isWrongNetwork) {
       toast.error("Wrong network", {
-        description: `Switch your wallet to ${EXPECTED_NETWORK} to continue.`,
+        description: `Switch your wallet to ${expectedNetwork} to continue.`,
       });
       return;
     }
+
+    let currentChecksum: string;
+    try {
+      currentChecksum = await createPayrollDraftChecksum(employeeIds, selectedEmployees, totalAmount);
+    } catch {
+      const message = "The reviewed payroll draft could not be validated. Return to review and refresh the payroll records before submitting.";
+      setProof(null);
+      setProofStatus("idle");
+      setProofError(null);
+      setDraftChecksumWarning(message);
+      goToStep("review");
+      toast.error("Payroll draft needs review", { description: message });
+      return;
+    }
+    if (!matchesReviewedPayrollDraft(reviewedDraftChecksum.current, currentChecksum)) {
+      const message = "This payroll draft changed after review. Review the updated draft and generate a fresh proof before submitting.";
+      reviewedDraftChecksum.current = null;
+      setProof(null);
+      setProofStatus("idle");
+      setProofError(null);
+      setDraftChecksumWarning(message);
+      goToStep("review");
+      toast.error("Payroll draft changed", { description: message });
+      return;
+    }
+    setDraftChecksumWarning(null);
 
     // Log wallet signing before submission
     if (payrollRunId) {
@@ -303,9 +422,57 @@ function PayrollWizard() {
           "Network timeout. The transaction may still be processing.",
       });
     }
-  }, [setSubmissionStatus, setSubmissionError, setTransactionHash, nextStep, isWrongNetwork, addApprovalEvent, walletPublicKey, employeeIds, totalAmount, payrollRunId, logEvent, selectedEmployees.length]);
+  }, [
+    setSubmissionStatus,
+    setSubmissionError,
+    setTransactionHash,
+    setProof,
+    setProofStatus,
+    setProofError,
+    nextStep,
+    goToStep,
+    isWrongNetwork,
+    addApprovalEvent,
+    walletPublicKey,
+    employeeIds,
+    totalAmount,
+    selectedEmployees,
+    payrollRunId,
+    logEvent,
+    selectedEmployees.length,
+  ]);
 
-  const handleReviewNext = useCallback(() => {
+  const handleReviewNext = useCallback(async () => {
+    try {
+      const nextChecksum = await createPayrollDraftChecksum(
+        employeeIds,
+        selectedEmployees,
+        totalAmount,
+      );
+      const changedSinceReview =
+        reviewedDraftChecksum.current !== null &&
+        !matchesReviewedPayrollDraft(reviewedDraftChecksum.current, nextChecksum);
+      reviewedDraftChecksum.current = nextChecksum;
+      if (changedSinceReview) {
+        setProof(null);
+        setProofStatus("idle");
+        setProofError(null);
+        setDraftChecksumWarning("This payroll draft changed since its previous review. Generate a fresh proof for the updated draft before submitting.");
+      } else {
+        setDraftChecksumWarning(null);
+      }
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : "Payroll draft could not be validated. Refresh the draft before continuing.";
+      reviewedDraftChecksum.current = null;
+      setProof(null);
+      setProofStatus("idle");
+      setProofError(null);
+      setDraftChecksumWarning(message);
+      toast.error("Payroll draft needs review", { description: message });
+      return;
+    }
     if (payrollRunId) {
       logEvent({
         payrollRunId,
@@ -316,7 +483,7 @@ function PayrollWizard() {
       });
     }
     nextStep();
-  }, [payrollRunId, logEvent, nextStep, selectedEmployees.length, totalAmount]);
+  }, [employeeIds, selectedEmployees, totalAmount, payrollRunId, logEvent, nextStep, setProof, setProofStatus, setProofError]);
 
   const handleReset = useCallback(() => {
     if (payrollRunId) {
@@ -329,15 +496,28 @@ function PayrollWizard() {
       });
     }
     reset();
+    reviewedDraftChecksum.current = null;
+    setDraftChecksumWarning(null);
     clearApprovalHistory();
   }, [payrollRunId, logEvent, reset, submissionStatus, clearApprovalHistory]);
 
   const idx = stepIndex(currentStep);
 
+  // Issue #295: progress stepper for the six submission lifecycle stages.
+  // Derives stage states from wizard state only — no payroll values flow in.
+  const stepperFailedStage: SubmissionStageKey | null = useMemo(() => {
+    if (currentStep === "proof" && proofStatus === "error") return "validation";
+    if (submissionStatus === "error") return "submission";
+    return null;
+  }, [currentStep, proofStatus, submissionStatus]);
+
   return (
     <section aria-labelledby="payroll-wizard-heading" className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 id="payroll-wizard-heading" className="text-lg font-semibold text-gray-900">
+        <h2
+          id="payroll-wizard-heading"
+          className="text-lg font-semibold text-gray-900"
+        >
           Execute Payroll
         </h2>
         <button
@@ -353,7 +533,7 @@ function PayrollWizard() {
       {isWrongNetwork && (
         <IncidentBanner
           variant="warning"
-          message={`Wallet network mismatch: your wallet is connected to ${network}, but this app requires ${EXPECTED_NETWORK}. Switch networks in your wallet to resume payroll actions.`}
+          message={`Wallet network mismatch: your wallet is connected to ${network}, but this app requires ${expectedNetwork}. Switch networks in your wallet to resume payroll actions.`}
         />
       )}
 
@@ -436,9 +616,26 @@ function PayrollWizard() {
         </div>
       )}
 
+      <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm">`n        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />`n        <div>`n          <p className="font-medium text-amber-800">Review the transaction fee before signing</p>`n          <p className="mt-1 text-amber-700">Your wallet displays the final network fee. Stop and review it if it exceeds your organization's approved fee ceiling.</p>`n        </div>`n      </div>`n`n      {/* Submission progress stepper (issue #295): lifecycle stages across
+          validation, approval, signing, submission, confirmation, and
+          reconciliation. State-only — renders no payroll values. */}
+      <PayrollSubmissionStepper
+        input={{
+          source: "wizard",
+          currentStep,
+          proofStatus,
+          submissionStatus,
+          failedStage: stepperFailedStage,
+        }}
+      />
+
       <nav
         aria-label="Payroll execution progress"
         className="flex items-center"
+        aria-busy={
+          (currentStep === "proof" && proofStatus === "generating") ||
+          (currentStep === "submit" && submissionStatus === "submitting")
+        }
       >
         {STEPS.map((step, i) => (
           <div key={step.key} className="flex items-center shrink-0">
@@ -475,6 +672,13 @@ function PayrollWizard() {
         ))}
       </nav>
 
+      {draftChecksumWarning && (
+        <div role="alert" data-testid="draft-checksum-warning" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-semibold">Payroll draft needs review</p>
+          <p className="mt-1">{draftChecksumWarning}</p>
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
         {currentStep === "review" && (
           <ReviewStep
@@ -502,6 +706,7 @@ function PayrollWizard() {
             selectedEmployees={selectedEmployees}
             totalAmount={totalAmount}
             conflictingRuns={conflictingRuns}
+            instructionVersion={instructionVersion}
             onBack={prevStep}
             onSubmit={handleSubmit}
             isWrongNetwork={isWrongNetwork}
@@ -518,6 +723,7 @@ function PayrollWizard() {
             onRetry={handleSubmit}
             onReset={handleReset}
             isWrongNetwork={isWrongNetwork}
+            expectedNetwork={expectedNetwork}
           />
         )}
       </div>
@@ -545,12 +751,21 @@ function ReviewStep({
   isWrongNetwork,
 }: {
   employeeIds: string[];
-  selectedEmployees: { id: string; name: string; salary: number }[];
+  selectedEmployees: Employee[];
   totalAmount: number;
   onStart: () => void;
   onNext: () => void;
   isWrongNetwork: boolean;
 }) {
+  // #542 — enforce the saved (active) capacity policy, not unsaved edits.
+  const maxBatchSize = usePayrollPolicyStore((st) => st.savedPolicy.capacity.maxBatchSize);
+  const payoutLimit = getPayoutLimitStatus(selectedEmployees.length, maxBatchSize);
+
+  // #534 — compare the draft's snapshotted version against the active policy.
+  const savedPolicyVersion = usePayrollPolicyStore((st) => st.savedPolicy.version);
+  const draftInstructionVersion = usePayrollWizardStore((st) => st.instructionVersion);
+  const versionStatus = getInstructionVersionStatus(savedPolicyVersion, draftInstructionVersion ?? null);
+
   if (employeeIds.length === 0) {
     return (
       <div className="text-center py-8">
@@ -577,6 +792,22 @@ function ReviewStep({
         Review the employees and amounts included in this payroll run before
         generating the ZK proof.
       </p>
+      <PayoutCountLimitIndicator count={selectedEmployees.length} limit={maxBatchSize} />
+      {/* #534 — which payroll instruction (policy version) governs this run. */}
+      {versionStatus.state !== "unconfigured" && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-500">Payroll instructions</span>
+          <PayrollInstructionVersionBadge
+            version={savedPolicyVersion}
+            draftVersion={draftInstructionVersion ?? null}
+          />
+        </div>
+      )}
+      <DuplicateWarningPanel employees={selectedEmployees} />
+      <InactiveEmployeeWarning
+        employees={MOCK_EMPLOYEES}
+        employeeIds={employeeIds}
+      />
       <div className="border rounded-lg divide-y">
         {selectedEmployees.map((emp) => (
           <div key={emp.id} className="px-4 py-3 flex justify-between">
@@ -594,7 +825,9 @@ function ReviewStep({
         <button
           type="button"
           onClick={onNext}
-          className="w-full sm:w-auto px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-1"
+          disabled={payoutLimit.blocking}
+          title={payoutLimit.blocking ? "Reduce payouts to the batch limit to continue" : undefined}
+          className="w-full sm:w-auto px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Continue
           <ArrowRight className="w-4 h-4" />
@@ -619,6 +852,14 @@ function ProofStep({
   onBack: () => void;
   isWrongNetwork: boolean;
 }) {
+  // Map wizard proof status to PayrollLoadingPhase
+  const phase: PayrollLoadingPhase =
+    status === "generating"
+      ? "generating"
+      : status === "error"
+        ? "error"
+        : "idle";
+
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-semibold text-gray-900">
@@ -630,12 +871,24 @@ function ProofStep({
         details.
       </p>
 
+      {/* Accessible loading / error state */}
+      <PayrollActionLoader
+        phase={phase}
+        actionLabel="Generating zero-knowledge proof"
+        errorMessage={
+          error
+            ? "Proof generation failed. Please retry. No payroll data has been submitted."
+            : undefined
+        }
+      />
+
       {status === "idle" && (
         <div className="text-center py-6">
           <button
             type="button"
             onClick={onGenerate}
             disabled={isWrongNetwork}
+            aria-label={getPayrollButtonAriaLabel("Generate Proof", phase)}
             title={
               isWrongNetwork ? "Switch to Testnet in Freighter" : undefined
             }
@@ -646,33 +899,21 @@ function ProofStep({
         </div>
       )}
 
-      {status === "generating" && (
-        <div className="text-center py-6 space-y-3">
-          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto" />
-          <p className="text-sm text-gray-600">
-            Generating ZK proof... This may take a few moments.
-          </p>
-          <div className="w-48 h-1.5 bg-gray-200 rounded-full mx-auto overflow-hidden">
-            <div
-              className="h-full bg-indigo-600 rounded-full animate-pulse"
-              style={{ width: "60%" }}
-            />
-          </div>
-        </div>
-      )}
-
       {status === "error" && (
-        <div className="text-center py-6 space-y-3">
-          <AlertCircle className="w-8 h-8 text-red-500 mx-auto" />
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
           <button
             type="button"
             onClick={onRetry}
+            aria-label={getPayrollButtonAriaLabel(
+              "Retry proof generation",
+              "error",
+            )}
             className="w-full sm:w-auto px-4 py-2 rounded-md bg-red-50 text-red-700 text-sm font-medium hover:bg-red-100 border border-red-200 transition-colors inline-flex justify-center items-center gap-1"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
+            <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
             Retry
           </button>
+          <ContractErrorHelpButton error={error} />
         </div>
       )}
 
@@ -691,9 +932,11 @@ function ProofStep({
 }
 
 function ConfirmStep({
+  employeeIds,
   selectedEmployees,
   totalAmount,
   conflictingRuns,
+  instructionVersion,
   onBack,
   onSubmit,
   isWrongNetwork,
@@ -703,6 +946,8 @@ function ConfirmStep({
   selectedEmployees: { id: string; name: string; salary: number }[];
   totalAmount: number;
   conflictingRuns: PayrollRun[];
+  /** Saved policy version snapshotted when this draft started (#534). */
+  instructionVersion: number | null | undefined;
   onBack: () => void;
   onSubmit: () => void;
   isWrongNetwork: boolean;
@@ -710,6 +955,19 @@ function ConfirmStep({
 }) {
   const [confirmed, setConfirmed] = useState(false);
   const store = usePayrollWizardStore();
+
+  // #512 — the batch-size limit was enforced only in ReviewStep, which
+  // disables that step's Continue button. ConfirmStep is the step that
+  // actually signs and submits, and it had no such check, so the limit was
+  // bypassable: go Review → Back, change the selection, or arrive at Confirm
+  // by any other route, and an over-limit batch would sign. Enforcing it here
+  // as a blocker closes the gap, because the sign button is
+  // `disabled={state === "blocked"}` and `state` is derived from `blockers`.
+  //
+  // Same saved-policy read as ReviewStep (#542), so an unsaved edit to the
+  // capacity policy does not tighten the limit mid-run.
+  const maxBatchSize = usePayrollPolicyStore((st) => st.savedPolicy.capacity.maxBatchSize);
+  const payoutLimit = getPayoutLimitStatus(selectedEmployees.length, maxBatchSize);
 
   const { isProofNearingExpiration, treasuryBalanceOverride } = store;
   const treasuryBalance =
@@ -740,6 +998,21 @@ function ConfirmStep({
     treasury: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",
   };
 
+  // Fee estimate calculation
+  const protocolFeePercent = 0.001; // 0.1%
+  const protocolFeeUSDC = Math.min(totalAmount * protocolFeePercent, 10);
+
+  // #534 — surface which payroll instruction (policy version) governs this run.
+  const savedPolicyVersion = usePayrollPolicyStore((st) => st.savedPolicy.version);
+  const versionStatus = getInstructionVersionStatus(savedPolicyVersion, instructionVersion);
+
+  // Drafts store ids only, so eligibility must be re-resolved against the
+  // current roster each time the draft is reviewed.
+  const ineligibleEmployees = useMemo(
+    () => findIneligibleEmployees(MOCK_EMPLOYEES, employeeIds),
+    [employeeIds],
+  );
+
   // Compute Blockers & Warnings
   const blockers = useMemo(() => {
     const list: string[] = [];
@@ -763,9 +1036,13 @@ function ConfirmStep({
       const fullEmp = MOCK_EMPLOYEES.find((e) => e.id === emp.id);
       return !fullEmp || fullEmp.status === "inactive" || !fullEmp.address;
     });
-    if (hasInvalidEmployees) {
+    if (hasInvalidEmployees || ineligibleEmployees.length > 0) {
       list.push(
-        "Payroll contains inactive or invalid employee data. Wallet signing cannot proceed.",
+        `Payroll contains inactive or invalid employee data${
+          ineligibleEmployees.length > 0
+            ? `: ${formatIneligibleEmployees(ineligibleEmployees)}`
+            : ""
+        }. Wallet signing cannot proceed.`,
       );
     }
 
@@ -781,16 +1058,51 @@ function ConfirmStep({
 
     // 5. Stale session check
     if (isSessionExpired) {
-      list.push("Your session has expired. Wallet signing cannot proceed with stale authentication. Please re-authenticate before submitting.");
+      list.push(
+        "Your session has expired. Wallet signing cannot proceed with stale authentication. Please re-authenticate before submitting.",
+      );
+    }
+
+    // 6. Batch size limit (#512) — the guard that was only on the previous step.
+    // `batchesNeeded` is already computed by getPayoutLimitStatus, so the
+    // remediation is the same shape the Review step tells the user: split it,
+    // or raise the ceiling in Payroll Policy → Capacity.
+    if (payoutLimit.blocking) {
+      list.push(
+        `This run exceeds the ${payoutLimit.limit}-payout batch limit by ${
+          selectedEmployees.length - payoutLimit.limit
+        }. Split it into ${payoutLimit.batchesNeeded} batches, or raise the limit in Payroll Policy → Capacity.`,
+      );
     }
 
     return list;
-  }, [treasuryBalance, totalAmount, store.proofStatus, selectedEmployees, isSessionExpired]);
+  }, [
+    treasuryBalance,
+    totalAmount,
+    store.proofStatus,
+    selectedEmployees,
+    ineligibleEmployees,
+    isSessionExpired,
+    payoutLimit,
+  ]);
 
   const warnings = useMemo(() => {
     const list: string[] = [];
 
-    // 1. Treasury buffer warning
+    // 1. Duplicate-run warning for similar payroll drafts in the current period
+    // or the same employee group. This is a non-blocking review signal because
+    // the goal is to catch likely duplicates without preventing users from
+    // continuing when they have intentionally re-run a cohort in the same cycle.
+    const similarRuns = findDuplicateRunWarnings(
+      selectedEmployees.map((employee) => employee.id),
+    );
+    if (similarRuns.length > 0) {
+      list.push(
+        `This payroll draft overlaps with ${similarRuns.length} existing run${similarRuns.length === 1 ? "" : "s"} in the same period or employee group (${similarRuns.map((run) => run.id).join(", ")}). Review before submitting to avoid a duplicate payroll.` ,
+      );
+    }
+
+    // 2. Treasury buffer warning
     if (
       treasuryBalance >= totalAmount &&
       treasuryBalance - totalAmount < 25000
@@ -800,14 +1112,14 @@ function ConfirmStep({
       );
     }
 
-    // 2. Proof expiration warning
+    // 3. Proof expiration warning
     if (store.proofStatus === "success" && isProofNearingExpiration) {
       list.push(
         "The generated ZK proof is nearing its expiration. Submit now or re-generate if delayed.",
       );
     }
 
-    // 3. Optional metadata warning
+    // 4. Optional metadata warning
     const hasMissingOptionalMetadata = selectedEmployees.some((emp) => {
       const fullEmp = MOCK_EMPLOYEES.find((e) => e.id === emp.id);
       return (
@@ -825,18 +1137,54 @@ function ConfirmStep({
       list.push(
         `Payroll draft conflict detected with ${conflictingRuns
           .map((run) => run.id)
-          .join(", ")}. Another admin is already preparing this employee batch.`,
+          .join(
+            ", ",
+          )}. Another admin is already preparing this employee batch.`,
       );
     }
 
     return list;
-  }, [treasuryBalance, totalAmount, store.proofStatus, isProofNearingExpiration, selectedEmployees, conflictingRuns]);
+  }, [
+    treasuryBalance,
+    totalAmount,
+    store.proofStatus,
+    isProofNearingExpiration,
+    selectedEmployees,
+    conflictingRuns,
+  ]);
 
   const state: "ready" | "warning" | "blocked" = useMemo(() => {
     if (blockers.length > 0) return "blocked";
     if (warnings.length > 0) return "warning";
     return "ready";
   }, [blockers, warnings]);
+
+  const reviewChecklist = [
+    {
+      label: "Employee records reviewed",
+      detail: `${selectedEmployees.length} employee${selectedEmployees.length === 1 ? "" : "s"} included in this run`,
+      status: selectedEmployees.length > 0 && !blockers.some((block) => block.includes("inactive or invalid"))
+        ? "complete"
+        : "blocked",
+    },
+    {
+      label: "Treasury balance verified",
+      detail: `$${treasuryBalance.toLocaleString()} available for a $${totalAmount.toLocaleString()} run`,
+      status: treasuryBalance >= totalAmount ? "complete" : "blocked",
+    },
+    {
+      label: "ZK proof verified",
+      detail: store.proofStatus === "success" ? "Proof commitment is ready for signing" : "Generate and verify a proof before submitting",
+      status: store.proofStatus === "success" ? "complete" : "blocked",
+    },
+    {
+      label: "Payroll conflicts checked",
+      detail: conflictingRuns.length > 0
+        ? `${conflictingRuns.length} overlapping draft${conflictingRuns.length === 1 ? "" : "s"} require attention`
+        : "No overlapping payroll drafts found",
+      status: conflictingRuns.length > 0 ? "blocked" : "complete",
+    },
+  ] as const;
 
   return (
     <div className="space-y-6">
@@ -851,7 +1199,12 @@ function ConfirmStep({
             the transaction.
           </p>
         </div>
-        <div className="shrink-0 flex items-center">
+        <div className="shrink-0 flex items-center gap-2">
+          {/* #534 — governing instruction version for this run. */}
+          <PayrollInstructionVersionBadge
+            version={savedPolicyVersion}
+            draftVersion={instructionVersion ?? null}
+          />
           {state === "ready" && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
               <ShieldCheck className="w-4 h-4 text-green-600" />
@@ -872,6 +1225,57 @@ function ConfirmStep({
           )}
         </div>
       </div>
+
+      <section
+        aria-labelledby="payroll-review-checklist-heading"
+        className="rounded-lg border border-gray-200 bg-gray-50/60 p-4 sm:p-5"
+      >
+        <div className="mb-3">
+          <h4
+            id="payroll-review-checklist-heading"
+            className="text-sm font-semibold text-gray-900"
+          >
+            Final review checklist
+          </h4>
+          <p className="mt-1 text-xs text-gray-600">
+            Confirm each item before you sign this payroll transaction.
+          </p>
+        </div>
+        <ul className="space-y-2" aria-label="Final payroll review checklist">
+          {reviewChecklist.map((item) => {
+            const isBlocked = item.status === "blocked";
+            return (
+              <li
+                key={item.label}
+                className={`flex items-start gap-3 rounded-md border bg-white p-3 ${
+                  isBlocked ? "border-red-200" : "border-green-200"
+                }`}
+              >
+                {isBlocked ? (
+                  <ShieldAlert
+                    className="mt-0.5 h-5 w-5 shrink-0 text-red-600"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <CheckCircle
+                    className="mt-0.5 h-5 w-5 shrink-0 text-green-600"
+                    aria-hidden="true"
+                  />
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900">{item.label}</p>
+                  <p className={`mt-0.5 break-words text-xs ${isBlocked ? "text-red-700" : "text-gray-600"}`}>
+                    {item.detail}
+                  </p>
+                </div>
+                <span className={`ml-auto shrink-0 text-xs font-semibold ${isBlocked ? "text-red-700" : "text-green-700"}`}>
+                  {isBlocked ? "Needs attention" : "Ready"}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
 
       {/* Dynamic Alerts */}
       {state === "ready" && (
@@ -929,6 +1333,10 @@ function ConfirmStep({
         </div>
       )}
 
+      {store.proofStatus !== "success" && (
+        <MissingProofWarning actionHref="/payroll/execute" actionLabel="Generate proof" />
+      )}
+
       {/* Operational Risk Warnings */}
       <PayrollRiskWarnings
         treasuryBalance={treasuryBalance}
@@ -941,15 +1349,16 @@ function ConfirmStep({
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
           <div className="flex-1">
-            <h4 className="text-sm font-semibold text-red-800">Draft conflict detected</h4>
+            <h4 className="text-sm font-semibold text-red-800">
+              Draft conflict detected
+            </h4>
             <p className="text-sm text-red-700 mt-0.5">
-              Another payroll draft is already tracking the selected employee batch. Resolve or discard the overlapping run before submitting.
+              Another payroll draft is already tracking the selected employee
+              batch. Resolve or discard the overlapping run before submitting.
             </p>
             <ul className="list-disc list-inside text-xs text-red-700 mt-2 space-y-1">
               {conflictingRuns.map((run) => (
-                <li key={run.id}>
-                  Run {run.id} is still pending review.
-                </li>
+                <li key={run.id}>Run {run.id} is still pending review.</li>
               ))}
             </ul>
           </div>
@@ -988,21 +1397,24 @@ function ConfirmStep({
             <Wallet className="w-4 h-4 text-indigo-600" />
             Asset Summary
           </h4>
-          <div className="grid grid-cols-2 gap-y-2 text-sm pt-1">
-            <span className="text-gray-500">Net Salary Transfer</span>
-            <span className="font-semibold text-gray-800 text-right">
-              ${totalAmount.toLocaleString()} USDC
-            </span>
-
-            <span className="text-gray-500">Network Transaction Fee</span>
-            <span className="font-semibold text-gray-800 text-right">
-              ~0.0001 XLM (Free)
-            </span>
-
-            <span className="text-gray-500">Total Authorized Amount</span>
-            <span className="font-bold text-indigo-700 text-right">
-              ${totalAmount.toLocaleString()} USDC
-            </span>
+          <div className="space-y-3 pt-1">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Net Salary Transfer</span>
+              <span className="font-semibold text-gray-800">
+                ${totalAmount.toLocaleString()} USDC
+              </span>
+            </div>
+            <TransactionFeeEstimate
+              totalAmount={totalAmount}
+              employeeCount={selectedEmployees.length}
+              network="Stellar Testnet"
+            />
+            <div className="flex justify-between text-sm border-t pt-2">
+              <span className="text-gray-500">Total Authorized Amount</span>
+              <span className="font-bold text-indigo-700">
+                ${(totalAmount + protocolFeeUSDC).toLocaleString()} USDC
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -1046,6 +1458,8 @@ function ConfirmStep({
           })}
         </div>
       </div>
+
+      <PayerAccountStatus />
 
       {/* Treasury and Proof details */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1166,6 +1580,11 @@ function ConfirmStep({
         </div>
       </div>
 
+      {/* Optional Note Hash Attachment */}
+      <NoteHashPreview
+        label="Attach Payroll Note Hash (Optional)"
+      />
+
       {/* Explicit Confirmation Checkbox */}
       <div className="bg-indigo-50/50 border border-indigo-150 rounded-lg p-4">
         <div className="flex items-start gap-3">
@@ -1177,7 +1596,10 @@ function ConfirmStep({
             disabled={state === "blocked"}
             className="w-4 h-4 text-indigo-600 border-gray-300 rounded mt-0.5 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
           />
-          <label htmlFor="confirm-checkbox" className="cursor-pointer select-none">
+          <label
+            htmlFor="confirm-checkbox"
+            className="cursor-pointer select-none"
+          >
             <span className="text-sm font-medium text-gray-900 block">
               Confirm Payroll Execution Summary
             </span>
@@ -1192,20 +1614,20 @@ function ConfirmStep({
       </div>
 
       {/* Navigation Buttons */}
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3 mb-4">
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3 mb-4">
         <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
         <div>
           <p className="text-sm font-medium text-amber-800">
             Irreversible Action
           </p>
           <p className="text-sm text-amber-700 mt-1">
-            Once submitted, this payroll transaction cannot be reversed. Please ensure all details are correct.
+            Once submitted, this payroll transaction cannot be reversed. Please
+            ensure all details are correct.
           </p>
         </div>
       </div>
 
       <div className="flex flex-col-reverse sm:flex-row sm:justify-between pt-4 border-t gap-3 sm:gap-0">
-
         <button
           type="button"
           onClick={onBack}
@@ -1217,7 +1639,12 @@ function ConfirmStep({
         <button
           type="button"
           onClick={onSubmit}
-          disabled={!confirmed || state === "blocked" || isWrongNetwork || isSessionExpired}
+          disabled={
+            !confirmed ||
+            state === "blocked" ||
+            isWrongNetwork ||
+            isSessionExpired
+          }
           title={
             isWrongNetwork
               ? "Switch to Testnet in Freighter"
@@ -1246,6 +1673,7 @@ function SubmitStep({
   onRetry,
   onReset,
   isWrongNetwork,
+  expectedNetwork,
 }: {
   status: "idle" | "submitting" | "success" | "error";
   error: string | null;
@@ -1255,59 +1683,67 @@ function SubmitStep({
   onRetry: () => void;
   onReset: () => void;
   isWrongNetwork: boolean;
+  expectedNetwork: string;
 }) {
+  const phase: PayrollLoadingPhase =
+    status === "submitting"
+      ? "submitting"
+      : status === "error"
+        ? "error"
+        : "idle";
+
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-semibold text-gray-900">Submission</h3>
 
-      {status === "submitting" && (
-        <div className="text-center py-8 space-y-3">
-          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto" />
-          <p className="text-sm text-gray-600">
-            Submitting payroll transaction to Stellar network...
-          </p>
-        </div>
-      )}
+      {/* Accessible loader covers submitting + error announcements */}
+      <PayrollActionLoader
+        phase={phase}
+        actionLabel="Submitting payroll transaction"
+        errorMessage={
+          error
+            ? "Submission failed. No funds have been moved. Review the details and retry when ready."
+            : undefined
+        }
+      />
 
       {status === "success" && (
-        <PayrollReceipt
-          totalAmount={totalAmount}
-          employeeCount={employeeCount}
-          transactionHash={transactionHash}
-          onReset={onReset}
-        />
+        <>
+          <ExecutionConfirmationNonceStatus status="unavailable" />
+          <PayrollReceipt
+            totalAmount={totalAmount}
+            employeeCount={employeeCount}
+            transactionHash={transactionHash}
+            onReset={onReset}
+          />
+        </>
       )}
 
       {status === "error" && (
-        <div className="text-center py-8 space-y-3">
-          <AlertCircle className="w-8 h-8 text-red-500 mx-auto" />
-          <h4 className="text-lg font-semibold text-red-700">
-            Submission Failed
-          </h4>
-          <p className="text-sm text-red-600">{error}</p>
-          <div className="flex flex-col sm:flex-row justify-center gap-3 mt-4">
-            <button
-              type="button"
-              onClick={onRetry}
-              disabled={isWrongNetwork}
-              title={
-                isWrongNetwork
-                  ? `Switch to ${EXPECTED_NETWORK} in your wallet`
-                  : undefined
-              }
-              className="px-4 py-2 rounded-md bg-red-50 text-red-700 text-sm font-medium hover:bg-red-100 border border-red-200 transition-colors inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Retry Submission
-            </button>
-            <button
-              type="button"
-              onClick={onReset}
-              className="w-full sm:w-auto px-4 py-2 rounded-md bg-gray-100 text-gray-700 text-sm font-medium hover:bg-gray-200 transition-colors inline-flex justify-center"
-            >
-              Start Over
-            </button>
-          </div>
+        <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onRetry}
+            disabled={isWrongNetwork}
+            aria-label={getPayrollButtonAriaLabel("Retry submission", "error")}
+            title={
+              isWrongNetwork
+                ? `Switch to ${expectedNetwork} in your wallet`
+                : undefined
+            }
+            className="px-4 py-2 rounded-md bg-red-50 text-red-700 text-sm font-medium hover:bg-red-100 border border-red-200 transition-colors inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+            Retry Submission
+          </button>
+          <button
+            type="button"
+            onClick={onReset}
+            className="w-full sm:w-auto px-4 py-2 rounded-md bg-gray-100 text-gray-700 text-sm font-medium hover:bg-gray-200 transition-colors inline-flex justify-center"
+          >
+            Start Over
+          </button>
+          <ContractErrorHelpButton error={error} />
         </div>
       )}
     </div>

@@ -4,7 +4,7 @@ import PayrollDraftRecovery from "@/components/features/drafts/PayrollDraftRecov
 function PayrollDraftsPage() {
   return (
     <DashboardLayout>
-      <PayrollDraftRecovery />
+      <PayrollDraftRecovery showLastUpdated />
     </DashboardLayout>
   );
 }
