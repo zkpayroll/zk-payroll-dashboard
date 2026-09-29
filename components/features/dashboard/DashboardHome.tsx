@@ -16,6 +16,8 @@ import OnboardingReadinessTracker from "@/components/features/employees/Onboardi
 import PinnedAlertsPanel from "@/components/features/dashboard/PinnedAlertsPanel";
 import { SessionTimeoutBanner } from "@/components/features/dashboard/SessionTimeoutBanner";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import DashboardAssetAvailabilityCheck from "@/components/features/dashboard/DashboardAssetAvailabilityCheck";
+import { MOCK_COMPANIES } from "@/lib/api/mockData";
 
 function DashboardHome() {
   const { isFreighterInstalled } = useStellar();
@@ -144,6 +146,11 @@ function DashboardHome() {
       </ErrorBoundary>
       <ErrorBoundary>
         <TreasuryBalanceSummaryCard />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <DashboardAssetAvailabilityCheck
+          configuredAssets={MOCK_COMPANIES[0]?.treasury ? [{ code: "USDC" }, { code: "XLM" }] : []}
+        />
       </ErrorBoundary>
       <ErrorBoundary>
         <SystemStatus />
