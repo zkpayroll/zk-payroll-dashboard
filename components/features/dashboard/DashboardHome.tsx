@@ -21,8 +21,10 @@ import DashboardAssetAvailabilityCheck from "@/components/features/dashboard/Das
 import PayoutScheduleCollisionPanel from "@/components/features/dashboard/PayoutScheduleCollisionPanel";
 import DashboardCompensationPolicyCheck from "@/components/features/dashboard/DashboardCompensationPolicyCheck";
 import PayPeriodClosureReadinessPanel from "@/components/features/dashboard/PayPeriodClosureReadinessPanel";
+import DashboardPayrollReferenceIntegrityPanel from "@/components/features/dashboard/DashboardPayrollReferenceIntegrityPanel";
 import { MOCK_COMPANIES } from "@/lib/api/mockData";
 import { evaluatePayPeriodClosurePrerequisites } from "@/lib/payroll/payPeriodClosurePrerequisites";
+import { evaluatePayrollReferenceIntegrity } from "@/lib/payroll/payrollReferenceIntegrity";
 
 function DashboardHome() {
   const { isFreighterInstalled } = useStellar();
@@ -40,6 +42,19 @@ function DashboardHome() {
       unresolvedAlerts: 0,
       hasUnsavedChanges: false,
       periodStatus: "open",
+    });
+  }, [company]);
+
+  const referenceIntegrity = useMemo(() => {
+    if (!company) {
+      return null;
+    }
+    return evaluatePayrollReferenceIntegrity({
+      companyId: company.id,
+      employees: [],
+      payrollRuns: [],
+      payoutTemplates: [],
+      treasuryAccountId: MOCK_COMPANIES[0]?.treasury?.accountId ?? null,
     });
   }, [company]);
 
@@ -155,6 +170,9 @@ function DashboardHome() {
         <PayPeriodClosureReadinessPanel readiness={closureReadiness} />
       </ErrorBoundary>
       <ErrorBoundary>
+        <DashboardPayrollReferenceIntegrityPanel result={referenceIntegrity} />
+      </ErrorBoundary>
+      <ErrorBoundary>
         <PinnedAlertsPanel alerts={sampleAlerts} tasks={sampleTasks} />
       </ErrorBoundary>
       <ErrorBoundary>
@@ -171,7 +189,7 @@ function DashboardHome() {
       </ErrorBoundary>
       <ErrorBoundary>
         <DashboardAssetAvailabilityCheck
-          configuredAssets={MOCK_COMPANIES[0]?.treasury ? [{ code: "USDC" }, { code: "XLM" }] : []}
+          configuredAssets={MOCK_COMPANIES[0]?.treasury ? [{ code: "USDC }, { code: "XLM" }] : []}
         />
       </ErrorBoundary>
       <ErrorBoundary>

@@ -92,7 +92,7 @@ export default function PayrollCreatePage() {
             <p className="font-medium text-gray-700 mb-1 flex items-center gap-1">
               <Shield className="w-3.5 h-3.5" /> Privacy & validation
             </p>
-            <p>Asset raw: <span className="font-mono">{assetRaw || "—"}</span> → <span className="font-mono font-medium">{result.normalized || "—"}</span> {result.isValid ? "✓" : `✗ ${result.validationError}`} {result.wasNormalized && <span className="text-amber-700">(trimmed/uppercased)</span>}</p>
+            <p>Asset raw: <span className="font-mono">{assetRaw || "—"}</span> → <span className="font-mono font-medium">{result.normalized || "—"}</span> {result.isValid ? "✓" : `✗ ${result.validationError}`} {result.wasNormalized && <span className="text-amber-700">(normalized)</span>}</p>
             <p>Batch ref: <span className="font-mono">{batchRef || "—"}</span> → <span className="font-mono font-medium">{batchValidation.normalized || "—"}</span> {batchValidation.isValid ? "✓ valid" : `✗ ${batchValidation.message}`}</p>
             <p>Description: <span className="font-mono">{description || "—"}</span> {descriptionValidation.isValid ? "✓ valid" : `✗ ${descriptionValidation.message}`}</p>
             <p className="text-gray-500 mt-1">Helper copy is shown under each field. Duplicates like <span className="font-mono">BATCH-2025-001</span> or <span className="font-mono">tx_001</span> are flagged before submission.</p>
@@ -134,7 +134,7 @@ export default function PayrollCreatePage() {
           <div className="pt-4 border-t text-xs text-gray-500">
             <h3 className="font-semibold text-gray-700">QA steps</h3>
             <ul className="list-disc pl-5 mt-1 space-y-1">
-              <li>Asset success: entering &quot; usdc &quot; shows warning &quot;Symbol was trimmed...&quot; and submits as &quot;USDC&quot;.</li>
+              <li>Asset success: entering &quot; usdc &quot; shows warning &quot;Symbol was trimmed...&quot; and submits as &quot;USDC,&quot;.</li>
               <li>Asset failure: entering &quot;!!!&quot; shows validation error &quot;must be 1-12 alphanumeric&quot;.</li>
               <li>Asset edge: entering &quot;TEST 123&quot; removes spaces and warns &quot;Spaces were removed&quot;.</li>
               <li>Batch ref success: entering &quot;BATCH-2025-042&quot; shows helper &quot;3–32 characters...&quot; and submits as-same with ✓.</li>
