@@ -76,6 +76,7 @@ import {
   getDraftInstructionVersion,
   getInstructionVersionStatus,
 } from "@/src/payroll/instructionVersion";
+import PayrollSubmissionSequenceWarning from "./PayrollSubmissionSequenceWarning";
 
 const STEPS: { key: PayrollWizardStep; label: string }[] = [
   { key: "review", label: "Review" },
@@ -732,6 +733,7 @@ function PayrollWizard() {
             onReset={handleReset}
             isWrongNetwork={isWrongNetwork}
             expectedNetwork={expectedNetwork}
+            proofStatus={proofStatus}
           />
         )}
       </div>
@@ -1682,6 +1684,7 @@ function SubmitStep({
   onReset,
   isWrongNetwork,
   expectedNetwork,
+  proofStatus,
 }: {
   status: "idle" | "submitting" | "success" | "error";
   error: string | null;
@@ -1692,6 +1695,7 @@ function SubmitStep({
   onReset: () => void;
   isWrongNetwork: boolean;
   expectedNetwork: string;
+  proofStatus: "idle" | "generating" | "success" | "error";
 }) {
   const phase: PayrollLoadingPhase =
     status === "submitting"
@@ -1703,6 +1707,14 @@ function SubmitStep({
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-semibold text-gray-900">Submission</h3>
+
+      <PayrollSubmissionSequenceWarning
+        currentStep="submit"
+        proofStatus={proofStatus}
+        submissionStatus={status}
+        transactionHash={transactionHash}
+        onReset={onReset}
+      />
 
       {/* Accessible loader covers submitting + error announcements */}
       <PayrollActionLoader
