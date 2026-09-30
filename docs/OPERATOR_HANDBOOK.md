@@ -114,6 +114,15 @@ Legacy `Complete` and `Partial` values should be treated as `Matched` and `Misma
 2. Review current balance
 3. Compare against upcoming payroll requirements
 
+#### Release a Payroll Reserve
+
+Reserve releases are validated against the current reserved balance and the
+matching payroll obligation. The dashboard blocks non-positive or non-finite
+amounts, stale obligations, asset mismatches, and amounts that exceed either
+limit. A partial release reduces the obligation by the released amount; the
+obligation is cleared only when its full amount is released. If validation
+fails, refresh the Treasury view and resolve the reported issue before retrying.
+
 #### Fund Treasury Wallet
 
 1. Calculate required amount for next payroll
@@ -259,7 +268,6 @@ Delegated approvers can act on behalf of primary approvers in high-value or mult
 **Privacy Note:** Delegated approver error messages and controls display operational status only and never expose sensitive financial figures, salary details, or employee personal data.
 
 ---
-
 
 ## Employee Management
 
