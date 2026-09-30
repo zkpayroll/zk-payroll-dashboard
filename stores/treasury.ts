@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { validateReserveRelease } from "@/lib/treasury/reserveReleaseValidation";
 
 export type AssetCode = string;
 
@@ -126,22 +127,42 @@ export const useTreasuryStore = create<TreasuryStore>()(
 
       releaseReservation: (assetCode, amount, obligationId) =>
         set((state) => {
-          const existing = state.balances[assetCode] ?? {
-            assetCode,
-            available: 0,
-            reserved: 0,
-            projected: 0,
-          };
+          const balance = state.balances[assetCode];
+          if (!balance) {
+            throw new Error(`Cannot release ${assetCode}: no treasury balance is available. Refresh the treasury and try again.`);
+          }
+          if (balance.assetCode !== assetCode) {
+            throw new Error(`Cannot release ${assetCode}: the stored treasury balance is tagged as ${balance.assetCode}. Refresh the treasury and try again.`);
+          }
+
+          const matchingObligations = state.obligations.filter((item) => item.id === obligationId);
+          if (matchingObligations.length !== 1) {
+            throw new Error("Cannot release this reservation because its payroll obligation could not be found uniquely. Refresh the treasury and try again.");
+          }
+          const [obligation] = matchingObligations;
+
+          const validation = validateReserveRelease(balance, amount, obligation);
+          if (validation.riskLevel === "blocked") {
+            throw new Error(validation.message);
+          }
+
+          const remainingObligationAmount = obligation.amount - amount;
           return {
             balances: {
               ...state.balances,
               [assetCode]: {
-                ...existing,
-                available: existing.available + amount,
-                reserved: Math.max(0, existing.reserved - amount),
+                ...balance,
+                available: balance.available + amount,
+                reserved: balance.reserved - amount,
               },
             },
-            obligations: state.obligations.filter((o) => o.id !== obligationId),
+            obligations: remainingObligationAmount === 0
+              ? state.obligations.filter((item) => item.id !== obligationId)
+              : state.obligations.map((item) =>
+                  item.id === obligationId
+                    ? { ...item, amount: remainingObligationAmount }
+                    : item,
+                ),
             lastUpdated: new Date().toISOString(),
           };
         }),
