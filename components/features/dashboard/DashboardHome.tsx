@@ -23,7 +23,8 @@ import DashboardCompensationPolicyCheck from "@/components/features/dashboard/Da
 import PayPeriodClosureReadinessPanel from "@/components/features/dashboard/PayPeriodClosureReadinessPanel";
 import DashboardPayrollReferenceIntegrityPanel from "@/components/features/dashboard/DashboardPayrollReferenceIntegrityPanel";
 import DashboardPayrollAdjustmentApprovalExpiryPanel from "@/components/features/dashboard/DashboardPayrollAdjustmentApprovalExpiryPanel";
-import { MICK_COMPANIES, MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
+import DashboardEmployeeEligibilityStatusCheck from "@/components/features/dashboard/DashboardEmployeeEligibilityStatusCheck";
+import { MOCK_COMPANIES, MOCK_PAYROLL_RUNS, MOCK_EMPLOYEES } from "@/lib/api/mockData";
 import { evaluatePayPeriodClosurePrerequisites } from "@/lib/payroll/payPeriodClosurePrerequisites";
 import { evaluatePayrollReferenceIntegrity } from "@/lib/payroll/payrollReferenceIntegrity";
 
@@ -213,6 +214,9 @@ function DashboardHome() {
           templates={[]}
           runs={[]}
         />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <DashboardEmployeeEligibilityStatusCheck employees={MOCK_EMPLOYEES} />
       </ErrorBoundary>
       <ErrorBoundary>
         <DashboardCompensationPolicyCheck />
