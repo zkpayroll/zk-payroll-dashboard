@@ -5,6 +5,7 @@
  *   Admin    – full dashboard access, admin-only routes, session API
  *   Operator – day-to-day payroll and employee operations (employee role)
  *   Auditor  – compliance and read-only access (employee role)
+ *   Payroll Operator – payroll execution permission validation
  *
  * Strategy
  *   - Session API: role assignment based on wallet public key
@@ -42,6 +43,12 @@ const employeeSession: SessionPayload = {
 const auditorSession: SessionPayload = {
   publicKey: EMPLOYEE_KEY,
   role: 'auditor',
+  expiresAt: Date.now() + 86_400_000,
+};
+
+const payrollOperatorSession: SessionPayload = {
+  publicKey: EMPLOYEE_KEY,
+  role: 'payroll-operator',
   expiresAt: Date.now() + 86_400_000,
 };
 
@@ -235,6 +242,16 @@ describe('Middleware route protection', () => {
     expect(res.status).toBe(200);
   });
 
+  it('allows payroll operator access to /payroll/execute', async () => {
+    const res = await runMiddleware('/payroll/execute', payrollOperatorSession);
+    expect(res.status).toBe(200);
+  });
+
+  it('redirects payroll operator away from admin-only /payroll/run', async () => {
+    const res = await runMiddleware('/payroll/run', payrollOperatorSession);
+    expect(res.status).toBe(307);
+  });
+
   it('redirects operator away from admin-only page /payroll/run', async () => {
     const res = await runMiddleware('/payroll/run', employeeSession);
     expect(res.status).toBe(307);
@@ -323,6 +340,33 @@ describe('CommandPalette role-based gating', () => {
     expect(screen.getByRole('button', { name: /go to dashboard home/i }));
     expect(screen.getByRole('button', { name: /go to employee directory/i }));
     expect(screen.getByRole('button', { name: /go to transaction history/i }));
+  });
+});
+
+// ── 3b. Payroll operator permission validation ──────────────────────────────
+
+describe('Payroll operator permission validation', () => {
+  it('grants payroll-operator role permission to execute payroll', () => {
+    const canExecutePayroll = (role: SessionPayload['role']) =>
+      role === 'admin' || role === 'operator' || role === 'payroll-operator';
+
+    expect(canExecutePayroll('payroll-operator')).toBe(true);
+    expect(canExecutePayroll('operator')).toBe(true);
+    expect(canExecutePayroll('admin')).toBe(true);
+  });
+
+  it('denies payroll execution to auditor role', () => {
+    const canExecutePayroll = (role: SessionPayload['role']) =>
+      role === 'admin' || role === 'operator' || role === 'payroll-operator';
+
+    expect(canExecutePayroll('auditor')).toBe(false);
+  });
+
+  it('denies payroll execution to unknown/undefined role', () => {
+    const canExecutePayroll = (role: SessionPayload['role'] | undefined) =>
+      role === 'admin' || role === 'operator' || role === 'payroll-operator';
+
+    expect(canExecutePayroll(undefined)).toBe(false);
   });
 });
 
