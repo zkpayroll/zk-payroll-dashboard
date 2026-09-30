@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlertCircle,
   AlertTriangle,
@@ -22,6 +22,8 @@ export interface Alert {
   createdAt: string;
   link?: string;
   actionLabel?: string;
+  /** ISO timestamp after which the alert should be hidden. */
+  expiresAt?: string;
 }
 
 export interface Task {
@@ -73,9 +75,18 @@ export default function PinnedAlertsPanel({
   const [dismissedCollisions, setDismissedCollisions] = useState<Set<string>>(
     new Set(),
   );
+  const [now, setNow] = useState<number>(() => Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(interval);
+  }, []);
 
   const visibleAlerts = alerts.filter(
-    (alert) => !dismissedAlerts.has(alert.id) && alert.status !== "resolved",
+    (alert) =>
+      !dismissedAlerts.has(alert.id) &&
+      alert.status !== "resolved" &&
+      !isAlertExpired(alert, now),
   );
   const visibleTasks = tasks.filter(
     (task) => !dismissedTasks.has(task.id) && task.status !== "completed",
@@ -349,6 +360,17 @@ export default function PinnedAlertsPanel({
       </div>
     </section>
   );
+}
+
+export function isAlertExpired(alert: Alert, nowMs: number = Date.now()): boolean {
+  if (!alert.expiresAt) {
+    return false;
+  }
+  const expiresAt = new Date(alert.expiresAt).getTime();
+  if (!Number.isFinite(expiresAt)) {
+    return false;
+  }
+  return expiresAt <= nowMs;
 }
 
 export function detectPayoutScheduleCollisions(

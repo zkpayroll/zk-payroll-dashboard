@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   UserCheck,
   UserPlus,
@@ -10,6 +10,8 @@ import {
   CheckCircle2,
   Copy,
   Check,
+  Clock,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +19,10 @@ import {
   type DelegatedApprover,
 } from "@/stores/delegatedApprovers";
 import { validateDelegatedApproverInput } from "@/lib/validation/delegatedApprover";
+
+const DEFAULT_APPROVAL_EXPIRY_MS = 24 * 60 * 60 * 1000;
+const EXPIRING_SOON_THRESHOLD_MS = 60 * 60 * 1000;
+const EXPIRY_CHECK_INTERVAL_MS = 30 * 1000;
 
 export interface DelegatedApproverPanelProps {
   /** Optional custom approvers list; defaults to Zustand store state if omitted. */
@@ -29,6 +35,12 @@ export interface DelegatedApproverPanelProps {
   title?: string;
   /** Optional description override. */
   description?: string;
+  /** Optional approval expiry window in milliseconds; defaults to 24 hours. */
+  approvalExpiryMs?: number;
+  /** Optional callback triggered when an approver's approval expires. */
+  onApprovalExpired?: (id: string) => void;
+  /** Optional callback triggered to renew an approver's approval window. */
+  onRenewApproval?: (id: string) => void;
 }
 
 export function maskAddress(address: string): string {
@@ -39,12 +51,59 @@ export function maskAddress(address: string): string {
   return trimmed;
 }
 
+export interface ApprovalExpiryState {
+  /** Whether the approval window has elapsed. */
+  isExpired: boolean;
+  /** Whether the approval is within the "expiring soon" threshold. */
+  isExpiringSoon: boolean;
+  /** Remaining time in milliseconds (0 when expired). */
+  remainingMs: number;
+  /** Human-readable remaining time, e.g. "2h 15m". */
+  remainingLabel: string;
+}
+
+export function getApprovalExpiryState(
+  addedAt: string | number | Date,
+  approvalExpiryMs: number = DEFAULT_APPROVAL_EXPIRY_MS,
+  now: number = Date.now(),
+): ApprovalExpiryState {
+  const addedTime = new Date(addedAt).getTime();
+  const safeExpiry =
+    Number.isFinite(approvalExpiryMs) && approvalExpiryMs > 0
+      ? approvalExpiryMs
+      : DEFAULT_APPROVAL_EXPIRY_MS;
+  const expiresAt = addedTime + safeExpiry;
+  const remainingMs = Math.max(0, expiresAt - now);
+  const isExpired = remainingMs <= 0;
+  const isExpiringSoon = !isExpired && remainingMs <= EXPIRING_SOON_THRESHOLD_MS;
+
+  return {
+    isExpired,
+    isExpiringSoon,
+    remainingMs,
+    remainingLabel: formatRemaining(remainingMs),
+  };
+}
+
+export function formatRemaining(remainingMs: number): string {
+  if (remainingMs <= 0) return "Expired";
+  const totalMinutes = Math.floor(remainingMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m`;
+  return "<1m";
+}
+
 export default function DelegatedApproverPanel({
   approvers: propApprovers,
   onAddApprover,
   onRemoveApprover,
   title = "Delegated Approver Management",
   description = "Manage authorized delegated signers and surrogate approvers for payroll runs.",
+  approvalExpiryMs = DEFAULT_APPROVAL_EXPIRY_MS,
+  onApprovalExpired,
+  onRenewApproval,
 }: DelegatedApproverPanelProps) {
   const store = useDelegatedApproversStore();
   const currentApprovers = propApprovers ?? store.approvers;
@@ -53,6 +112,7 @@ export default function DelegatedApproverPanel({
   const [labelInput, setLabelInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [now, setNow] = useState<number>(() => Date.now());
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,6 +155,27 @@ export default function DelegatedApproverPanel({
     }
   };
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, EXPIRY_CHECK_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!onApprovalExpired) return;
+    currentApprovers.forEach((approver) => {
+      const state = getApprovalExpiryState(
+        approver.addedAt,
+        approvalExpiryMs,
+        now,
+      );
+      if (state.isExpired) {
+        onApprovalExpired(approver.id);
+      }
+    });
+  }, [now, currentApprovers, approvalExpiryMs, onApprovalExpired]);
+
   const handleCopy = async (id: string, text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -103,6 +184,15 @@ export default function DelegatedApproverPanel({
     } catch {
       // Ignore copy failure
     }
+  };
+
+  const handleRenew = (approver: DelegatedApprover) => {
+    if (onRenewApproval) {
+      onRenewApproval(approver.id);
+    } else {
+      store.renewApproval(approver.id);
+    }
+    setNow(Date.now());
   };
 
   return (
@@ -118,6 +208,12 @@ export default function DelegatedApproverPanel({
         <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-lg text-xs text-indigo-700 font-medium">
           <ShieldCheck className="h-4 w-4 text-indigo-600" />
           <span>{currentApprovers.length} Delegated Approver(s)</span>
+        </div>
+        <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 px-3 py-1 rounded-lg text-xs text-amber-700 font-medium">
+          <Clock className="h-4 w-4 text-amber-600" />
+          <span>
+            Approvals expire after {formatRemaining(approvalExpiryMs)}
+          </span>
         </div>
       </div>
 
@@ -217,6 +313,14 @@ export default function DelegatedApproverPanel({
                 key={approver.id}
                 className="p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-gray-50/50 transition-colors"
               >
+                {(() => {
+                  const expiry = getApprovalExpiryState(
+                    approver.addedAt,
+                    approvalExpiryMs,
+                    now,
+                  );
+                  return (
+                    <>
                 <div className="space-y-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono text-xs font-semibold text-gray-900 bg-gray-100 px-2 py-0.5 rounded border">
@@ -240,6 +344,22 @@ export default function DelegatedApproverPanel({
                         <Copy className="h-3.5 w-3.5" />
                       )}
                     </button>
+                    {expiry.isExpired ? (
+                      <span className="text-[11px] font-semibold bg-red-50 text-red-700 px-2 py-0.5 rounded border border-red-200 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3 text-red-500" />
+                        Approval expired
+                      </span>
+                    ) : expiry.isExpiringSoon ? (
+                      <span className="text-[11px] font-semibold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200 flex items-center gap-1">
+                        <Clock className="h-3 w-3 text-amber-500" />
+                        Expires in {expiry.remainingLabel}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-medium bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-200 flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3 text-green-600" />
+                        Valid for {expiry.remainingLabel}
+                      </span>
+                    )}
                   </div>
                   <div className="text-[11px] text-gray-500 flex items-center gap-3">
                     <span>
@@ -248,6 +368,16 @@ export default function DelegatedApproverPanel({
                     {approver.addedBy && (
                       <span>Added by: {approver.addedBy}</span>
                     )}
+                    <span>
+                      Expires:{" "}
+                      {new Date(
+                        new Date(approver.addedAt).getTime() +
+                          (Number.isFinite(approvalExpiryMs) &&
+                          approvalExpiryMs > 0
+                            ? approvalExpiryMs
+                            : DEFAULT_APPROVAL_EXPIRY_MS),
+                      ).toLocaleString()}
+                    </span>
                   </div>
                 </div>
 
@@ -261,6 +391,21 @@ export default function DelegatedApproverPanel({
                   <Trash2 className="h-3.5 w-3.5 text-red-500" />
                   Remove
                 </Button>
+                {expiry.isExpired && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleRenew(approver)}
+                    className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 text-xs gap-1.5 shrink-0"
+                    aria-label={`Renew approval for ${approver.address}`}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5 text-indigo-500" />
+                    Renew Approval
+                  </Button>
+                )}
+                    </>
+                  );
+                })()}
               </div>
             ))}
           </div>

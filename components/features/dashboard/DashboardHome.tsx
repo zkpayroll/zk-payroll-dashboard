@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Wallet, Building2, Loader2 } from "lucide-react";
+import { Wallet, Building2, Loader2 } from "lucide/react";
 import OverduePayrollAlertBanner from "@/components/features/payroll/OverduePayrollAlertBanner";
 import { useStellar } from "@/components/providers/StellarProvider";
 import { useWalletStore } from "@/stores/walletStore";
@@ -22,7 +22,8 @@ import PayoutScheduleCollisionPanel from "@/components/features/dashboard/Payout
 import DashboardCompensationPolicyCheck from "@/components/features/dashboard/DashboardCompensationPolicyCheck";
 import PayPeriodClosureReadinessPanel from "@/components/features/dashboard/PayPeriodClosureReadinessPanel";
 import DashboardPayrollReferenceIntegrityPanel from "@/components/features/dashboard/DashboardPayrollReferenceIntegrityPanel";
-import { MOCK_COMPANIES } from "@/lib/api/mockData";
+import DashboardPayrollAdjustmentApprovalExpiryPanel from "@/components/features/dashboard/DashboardPayrollAdjustmentApprovalExpiryPanel";
+import { MICK_COMPANIES, MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import { evaluatePayPeriodClosurePrerequisites } from "@/lib/payroll/payPeriodClosurePrerequisites";
 import { evaluatePayrollReferenceIntegrity } from "@/lib/payroll/payrollReferenceIntegrity";
 
@@ -58,11 +59,21 @@ function DashboardHome() {
     });
   }, [company]);
 
+  const adjustmentApprovals = useMemo(() => {
+    return MOCK_PAYROLL_RUNS.filter((r) => r.status === "pending").map((r) => ({
+      id: r.id,
+      label: `Adjustment for ${r.id}`,
+      approvedAt: r.createdAt ?? null,
+      expiresAt: r.expiresAt ?? null,
+      hasApproval: Boolean(r.approvedAt),
+    }));
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-3">
         <Loader2
-          className="w-8 h-8 text-indigo-600 animate-spin"
+          className="w-8 h-text-indigo-600 animate-spin"
           aria-hidden="true"
         />
         <p className="text-sm text-gray-500">Connecting to wallet…</p>
@@ -171,6 +182,11 @@ function DashboardHome() {
       </ErrorBoundary>
       <ErrorBoundary>
         <DashboardPayrollReferenceIntegrityPanel result={referenceIntegrity} />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <DashboardPayrollAdjustmentApprovalExpiryPanel
+          approvals={adjustmentApprovals}
+        />
       </ErrorBoundary>
       <ErrorBoundary>
         <PinnedAlertsPanel alerts={sampleAlerts} tasks={sampleTasks} />
