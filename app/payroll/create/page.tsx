@@ -9,11 +9,110 @@ import { validateBatchReferenceWithDuplicateCheck } from "@/lib/validation/batch
 import DraftDescriptionInput from "@/components/payroll/DraftDescriptionInput";
 import { validateDraftDescription } from "@/lib/validation/draftDescription";
 import { MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
-import { Coins, Shield } from "lucide-react";
+import { Coins, Shield, UserCheck, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
 // Known batch references for duplicate guidance — demo uses mock run ids plus example refs
 const KNOWN_BATCH_REFERENCES = [...MOCK_PAYROLL_RUNS.map((r) => r.id), "BATCH-2025-001", "payroll_q1_2025"];
+
+/**
+ * Payroll operator permission model.
+ *
+ * The dashboard must validate that the current operator holds the
+ * `create:payroll` permission before allowing a draft batch to be
+ * created. This is a privacy-aware gate: we only expose the operator's
+ * role label and the missing permission, never salary or amount data.
+ */
+export type PayrollPermission = "create:payroll" | "view:payroll" | "approve:payroll";
+
+export type PayrollOperatorRole = "admin" | "operator" | "viewer" | "guest";
+
+export interface PayrollOperator {
+  id: string;
+  name: string;
+  role: PayrollOperatorRole;
+  permissions: PayrollPermission[];
+}
+
+/**
+ * Role → permission matrix used to derive effective permissions.
+ * Keeping this explicit makes the gate auditable and easy to test.
+ */
+export const ROLE_PERMISSIONS: Record<PayrollOperatorRole, PayrollPermission[]> = {
+  admin: ["create:payroll", "view:payroll", "approve:payroll"],
+  operator: ["create:payroll", "view:payroll"],
+  viewer: ["view:payroll"],
+  guest: [],
+};
+
+export interface PermissionCheckResult {
+  allowed: boolean;
+  operator: PayrollOperator;
+  required: PayrollPermission;
+  message: string;
+}
+
+/**
+ * Validate whether an operator may create a payroll batch.
+ *
+ * Returns an actionable message when denied so the UI can surface
+ * clear guidance to the operator without leaking sensitive data.
+ */
+export function validatePayrollOperatorPermission(
+  operator: PayrollOperator,
+  required: PayrollPermission = "create:payroll",
+): PermissionCheckResult {
+  if (!operator || typeof operator.id !== "string" || operator.id.trim().length === 0) {
+    return {
+      allowed: false,
+      operator,
+      required,
+      message: "No payroll operator is signed in. Sign in with an operator account to create a payroll batch.",
+    };
+  }
+
+  if (!operator.role || !(operator.role in ROLE_PERMISSIONS)) {
+    return {
+      allowed: false,
+      operator,
+      required,
+      message: `Unknown payroll role "${operator.role}". Contact an administrator to assign a valid role.`,
+    };
+  }
+
+  const effective = new Set([
+    ...(ROLE_PERMISSIONS[operator.role] ?? []),
+    ...(Array.isArray(operator.permissions) ? operator.permissions : []),
+  ]);
+
+  if (!effective.has(required)) {
+    return {
+      allowed: false,
+      operator,
+      required,
+      message: `Operator "${operator.name || operator.id}" with role "${operator.role}" lacks the "${required}" permission required to create a payroll batch.`,
+    };
+  }
+
+  return {
+    allowed: true,
+    operator,
+    required,
+    message: `Operator "${operator.name || operator.id}" is authorized to create payroll batches.`,
+  };
+}
+
+/**
+ * Default operator used by the dashboard when no explicit operator id
+ * is provided. This mirrors the demo auth session and keeps the flow
+ * working without a real backend.
+ */
+export const DEFAULT_PAYROLL_OPERATOR: PayrollOperator = {
+  id: "operator-demo-001",
+  name: "Demo Operator",
+  role: "operator",
+  permissions: [],
+};
 
 export default function PayrollCreatePage() {
   const [assetRaw, setAssetRaw] = useState("");
@@ -22,8 +121,25 @@ export default function PayrollCreatePage() {
   const [submitted, setSubmitted] = useState<{ asset: string; batchRef: string; description: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // The operator driving this dashboard session. In a live app this would
+  // come from the auth context; the default keeps the demo flow working.
+  const operator = DEFAULT_PAYROLL_OPERATOR;
+
+  const permissionCheck = useMemo(
+    () => validatePayrollOperatorPermission(operator, "create:payroll"),
+    [operator],
+  );
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Permission gate first: deny before any field work is done.
+    if (!permissionCheck.allowed) {
+      setError(permissionCheck.message);
+      setSubmitted(null);
+      return;
+    }
+
     const assetResult = normalizeAssetSymbol(assetRaw);
     if (!assetResult.isValid) {
       setError(assetResult.validationError);
@@ -62,7 +178,7 @@ export default function PayrollCreatePage() {
       <div className="max-w-2xl mx-auto space-y-6">
         <header className="bg-white rounded-lg shadow-sm p-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center">
+            <div className="w-11 h-10 rounded-full bg-indigo-50 flex items-center justify-center">
               <Coins className="w-5 h-5 text-indigo-600" />
             </div>
             <div>
@@ -71,6 +187,26 @@ export default function PayrollCreatePage() {
             </div>
           </div>
         </header>
+
+        <div data-testid="payroll-operator-permission" className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex items-center gap-2 text-sm">
+            {permissionCheck.allowed ? (
+              <>
+                <UserCheck className="w-4 h-4 text-green-600" />
+                <span className="text-gray-700">
+                  Operator: <span className="font-medium">{operator.name || operator.id}</span> (<span className="font-mono">{operator.role}</span>) — authorized to create payroll batches.
+                </span>
+              </>
+            ) : (
+              <>
+                <AlertTriangle className="w-4 h-4 text-red-600" />
+                <span className="text-red-700" data-testid="payroll-operator-denied">
+                  {permissionCheck.message}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} noValidate className="bg-white rounded-lg shadow-sm p-6 space-y-6">
           <AssetSymbolInput value={assetRaw} onChange={(raw) => setAssetRaw(raw)} />
@@ -92,9 +228,9 @@ export default function PayrollCreatePage() {
             <p className="font-medium text-gray-700 mb-1 flex items-center gap-1">
               <Shield className="w-3.5 h-3.5" /> Privacy & validation
             </p>
-            <p>Asset raw: <span className="font-mono">{assetRaw || "—"}</span> → <span className="font-mono font-medium">{result.normalized || "—"}</span> {result.isValid ? "✓" : `✗ ${result.validationError}`} {result.wasNormalized && <span className="text-amber-700">(normalized)</span>}</p>
-            <p>Batch ref: <span className="font-mono">{batchRef || "—"}</span> → <span className="font-mono font-medium">{batchValidation.normalized || "—"}</span> {batchValidation.isValid ? "✓ valid" : `✗ ${batchValidation.message}`}</p>
-            <p>Description: <span className="font-mono">{description || "—"}</span> {descriptionValidation.isValid ? "✓ valid" : `✗ ${descriptionValidation.message}`}</p>
+<p>Asset raw: <span className="font-mono">{assetRaw || "—"}</span> → <span className="font-mono font-medium">{result.normalized || "—"}</span> {result.isValid ? "✓" : `x● ${result.validationError}`} {result.wasNormalized && <span className="text-amber-700">(trimmed/uppercased)</span>}</p>
+            <p>Batch ref: <span className="font-mono">{batchRef || "—"}</span> → <span className="font-mono font-medium">{batchValidation.normalized || "—"}</span> {batchValidation.isValid ? "✓ valid" : `x● ${batchValidation.message}`}</p>
+            <p>Description: <span className="font-mono">{description || "—"}</span> {descriptionValidation.isValid ? "✓ valid" : `● ${descriptionValidation.message}`}</p>
             <p className="text-gray-500 mt-1">Helper copy is shown under each field. Duplicates like <span className="font-mono">BATCH-2025-001</span> or <span className="font-mono">tx_001</span> are flagged before submission.</p>
             {result.wasNormalized && <p className="text-amber-700 mt-1">Asset warning shown: symbol will be normalized before submission.</p>}
           </div>
@@ -118,7 +254,8 @@ export default function PayrollCreatePage() {
           <div className="flex gap-3">
             <button
               type="submit"
-              className="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors"
+              disabled={!permissionCheck.allowed}
+              className="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="payroll-create-submit"
             >
               Create draft batch
@@ -134,17 +271,20 @@ export default function PayrollCreatePage() {
           <div className="pt-4 border-t text-xs text-gray-500">
             <h3 className="font-semibold text-gray-700">QA steps</h3>
             <ul className="list-disc pl-5 mt-1 space-y-1">
-              <li>Asset success: entering &quot; usdc &quot; shows warning &quot;Symbol was trimmed...&quot; and submits as &quot;USDC,&quot;.</li>
+<li>Permission success: an operator with the <span className="font-mono">create:payroll</span> permission sees the green authorized banner and can submit.</li>
+              <li>Permission failure: a <span className="font-mono">viewer</span> or <span className="font-mono">guest</span> operator sees an actionable denied message and the submit button is disabled.</li>
+              <li>Permission edge: an operator with an unknown role or missing id gets a clear error instead of a silent failure.</li>
+              <li>Asset success: entering &quot; usdc &quot; shows warning &quot;Symbol was trimmed...&quot; and submits as &quot;USDC&quot;.</li>
               <li>Asset failure: entering &quot;!!!&quot; shows validation error &quot;must be 1-12 alphanumeric&quot;.</li>
               <li>Asset edge: entering &quot;TEST 123&quot; removes spaces and warns &quot;Spaces were removed&quot;.</li>
-              <li>Batch ref success: entering &quot;BATCH-2025-042&quot; shows helper &quot;3–32 characters...&quot; and submits as-same with ✓.</li>
+              <li>Batch ref success: entering &quot;BATCH-2025-042&quot; shows helper &quot;3″32 characters...&quot; and submits as-same with ✓.</li>
               <li>Batch ref failure (malformed): entering &quot;!!&quot; or &quot;a&quot; shows &quot;at least 3 characters&quot; / &quot;Invalid batch reference&quot;.</li>
               <li>Batch ref failure (duplicate): entering &quot;BATCH-2025-001&quot; or &quot;tx_001&quot; shows &quot;already in use&quot; — duplicate guidance.</li>
               <li>Batch ref edge: pasting &quot; BATCH 2025 001 &quot; trims whitespace before validation; lowercase &quot;batch-2025-001&quot; flagged as duplicate of existing uppercase variant.</li>
               <li>Description success: entering a valid string doesn&apos;t show any error.</li>
               <li>Description failure (PII): entering &quot;$5000&quot; shows warning about financial figures.</li>
               <li>Description failure (length): entering more than 255 chars shows length error.</li>
-              <li>Privacy: no salary or amount is logged or displayed here — only asset codes and reference IDs.</li>
+              <li>Privacy: no salary or amount is logged or displayed here — only asset codes, reference IDs, and operator role labels.</li>
             </ul>
           </div>
         </form>

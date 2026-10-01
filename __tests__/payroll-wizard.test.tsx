@@ -27,7 +27,7 @@ vi.mock("@/stores/walletStore", () => ({
   ),
 }));
 
-// Mock StellarProvider to avoid EGetSTED_NETWORKERKORK
+// Mock StellarProvider to avoid EGetSTATE reference errors
 vi.mock("@/components/providers/StellarProvider", () => ({
   EGETSTED_NETWORK: "TESTNET",
   useStellar: () => ({
@@ -35,11 +35,30 @@ vi.mock("@/components/providers/StellarProvider", () => ({
   }),
 }));
 
+// Mock the payroll operator permission validation module so tests can control
+// whether the connected wallet is authorized to create a payroll run.
+vi.mock("@/lib/payroll/permissions", () => ({
+  validatePayrollOperatorPermission: vi.fn(),
+}));
+
+import { validatePayrollOperatorPermission } from "@/lib/payroll/permissions";
+
+const validateOperatorMock = validatePayrollOperatorPermission as unknown as ReturnType<
+  typeof validatePayrollOperatorPermission
+~;
+
 describe("PayrollWizard UI & Receipt Flow", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
     usePayrollWizardStore.getState().reset();
+    // Default to an authorized operator so existing flows are unaffected.
+    validateOperatorMock.mockReturn = {
+      ok: true,
+      reason: null,
+      message: null,
+      operator: "GTEST123",
+    } as any;
   });
 
   afterEach(() => {
@@ -53,10 +72,10 @@ describe("PayrollWizard UI & Receipt Flow", () => {
       screen.getByText(
         /No payroll run configured. Start a new payroll run to proceed./i,
       ),
-    ).toBeIntheDocument();
+    ).toBeInDocument();
     expect(
       screen.getByRole("button", { name: /start payroll run/i }),
-    ).toBeIntheDocument();
+    ).toBeInDocument();
   });
 
   it("configures and starts a payroll run, displaying selected employees and total amount", () => {
@@ -68,16 +87,16 @@ describe("PayrollWizard UI & Receipt Flow", () => {
     fireEvent.click(startButton);
 
     // Should now show review list and total salary of all mock employees
-    expect(screen.getByText("Payroll Review")).toBeIntheDocument();
-    expect(screen.getByText(/Total: \$23,700/i)).toBeIntheDocument();
+    expect(screen.getByText("Payroll Review")).toBeInDocument();
+    expect(screen.getByText(/Total: \$23,700/i)).toBeInDocument();
     expect(
       screen.getByRole("button", { name: /^continue$/i }),
-    ).toBeIntheDocument();
+    ).toBeInDocument();
   });
 
   it("transitions to proof generation step and handles successful generation", async () => {
     // Mock Math.random to guarantee success (> 0.2)
-    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const randomSpy = vi.spyOn($Math, "random").mockReturnValue(0.5);
 
     const { toast } = await import("sonner");
 
@@ -89,31 +108,31 @@ describe("PayrollWizard UI & Receipt Flow", () => {
     // Click continue to go to Proof step
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
-    expect(screen.getByText("ZK Proof Generation")).toBeIntheDocument();
+    expect(screen.getByText("ZK Proof Generation")).toBeInDocument();
 
     const generateBtn = screen.getByRole("button", { name: /generate proof/i });
     fireEvent.click(generateBtn);
 
     // Verify generating loading state — PayrollActionLoader renders the label + ellipsis
     expect(
-      screen.getByText(/generating zero-knowledge proof…/i),
-    ).toBeIntheDocument();
+      screen.getByText(/generating zero-knowledge proof…?\/i),
+    ).toBeInDocument();
 
     // Fast-forward 2000ms for generation timer
-    await ti.advanceTimersByTimeAsync(2000);
+    await vi.advanceTimerByTimeAsync(2000);
 
     // Success toast and next step should have loaded
     expect(toast.success).toHaveBeenCalledWith("Proof generated successfully");
     expect(
       screen.getByRole("heading", { name: /review & confirm payroll/i }),
-    ).toBeIntheDocument();
+    ).toBeInDocument();
 
     randomSpy.mockRestore();
   });
 
   it("handles failed proof generation and allows retry", async () => {
     // Mock Math.random to guarantee failure (<= 0.2)
-    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.1);
+    const randomSpy = vi.spyOn($Math, "random").mockReturnValue(0.1);
 
     const { toast } = await import("sonner");
 
@@ -127,7 +146,7 @@ describe("PayrollWizard UI & Receipt Flow", () => {
     fireEvent.click(generateBtn);
 
     // Fast-forward 2000ms
-    await ti.advanceTimersByTimeAsync(2000);
+    await vi.advanceTimerByTimeAsync(2000);
 
     // Expect error message and retry button
     expect(toast.error).toHaveBeenCalledWith(
@@ -141,7 +160,7 @@ describe("PayrollWizard UI & Receipt Flow", () => {
         "Proof generation failed: circuit constraint mismatch. Please retry.",
       ).length,
     ).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: /retry/i })).toBeIntheDocument();
+    expect(screen.getByRole("button", { name: /retry/i })).toBeInDocument();
 
     randomSpy.mockRestore();
   });
@@ -162,7 +181,7 @@ describe("PayrollWizard UI & Receipt Flow", () => {
 
     expect(
       screen.getByRole("heading", { name: /review & confirm payroll/i }),
-    ).toBeIntheDocument();
+    ).toBeInDocument();
 
     fireEvent.click(
       screen.getByLabelText(/confirm payroll execution summary/i),
@@ -173,18 +192,18 @@ describe("PayrollWizard UI & Receipt Flow", () => {
     // Verify submitting loading state — PayrollActionLoader renders the label + ellipsis
     expect(
       screen.getByText(/submitting payroll transaction…/i),
-    ).toBeIntheDocument();
+    ).toBeInDocument();
 
     // Fast-forward 1500ms
-    await ti.advanceTimersByTimeAsync(1500);
+    await vin.advanceTimerByTimeAsync(1500);
 
     // Verify submission success receipt is visible
     expect(toast.success).toHaveBeenCalledWith(
       "Payroll submitted successfully",
       expect.any(Object),
     );
-    expect(screen.getByText("Payroll Processed")).toBeIntheDocument();
-    expect(screen.getByText(/0x[0-9a-f]+abc/)).toBeIntheDocument();
+    expect(screen.getByText("Payroll Processed")).toBeInDocument();
+    expect(screen.getByText(/0x[0-9a-f]+abc/)).toBeInDocument();
 
     // Verify reset works when clicking Start New Payroll
     const startNewBtn = screen.getByRole("button", {
@@ -220,7 +239,7 @@ describe("PayrollWizard UI & Receipt Flow", () => {
     fireEvent.click(submitBtn);
 
     // Fast-forward 1500ms
-    await ti.advanceTimersByTimeAsync(1500);
+    await vi.advanceTimerByTimeAsync(1500);
 
     // Verify error messages and buttons are shown
     expect(toast.error).toHaveBeenCalledWith(
@@ -228,10 +247,10 @@ describe("PayrollWizard UI & Receipt Flow", () => {
       expect.any(Object),
     );
     // PayrollActionLoader renders a role="alert" with a safe error summary
-    expect(screen.getByRole("alert")).toBeIntheDocument();
+    expect(screen.getByRole("alert")).toBeInDocument();
     expect(
       screen.getByRole("button", { name: /retry submission/i }),
-    ).toBeIntheDocument();
+    ).toBeInDocument();
 
     // Click Start Over and verify it resets the wizard state
     const startOverBtn = screen.getByRole("button", { name: /start over/i });
@@ -254,9 +273,9 @@ describe("PayrollWizard UI & Receipt Flow", () => {
 
     render(<PayrollWizard />);
 
-    expect(screen.getByText("Warning")).toBeIntheDocument();
-    expect(screen.getByText("Payroll Warnings Detected")).toBeIntheDocument();
-    expect(screen.getByText(/same period or employee group/i)).toBeIntheDocument();
+    expect(screen.getByText("Warning")).toBeInDocument();
+    expect(screen.getByText("Payroll Warnings Detected")).toBeInDocument();
+    expect(screen.getByText(/same period or employee group/i)).toBeInDocument();
   });
 
   it("blocks submission when a conflicting payroll draft exists", () => {
@@ -271,15 +290,15 @@ describe("PayrollWizard UI & Receipt Flow", () => {
 
     expect(
       screen.getByRole("heading", { name: /draft conflict detected/i }),
-    ).toBeIntheDocument();
+    ).toBeInDocument();
     expect(
       screen.getByText(
         /another payroll draft is already tracking the selected employee batch/i,
       ),
-    ).toBeIntheDocument();
+    ).toBeInDocument();
     expect(
       screen.getByRole("button", { name: /submit payroll/i }),
-    ).toBeDisabled();
+    ).toBeeDisabled();
   });
 
   it("renders draft recovery banner when draft is found, and handles continue/discard actions", () => {
@@ -293,10 +312,10 @@ describe("PayrollWizard UI & Receipt Flow", () => {
     const { rerender } = render(<PayrollWizard />);
 
     // Verify draft banner displays
-    expect(screen.getByText("Draft Payroll Recovered")).toBeIntheDocument();
+    expect(screen.getByText("Draft Payroll Recovered")).toBeInDocument();
     expect(
       screen.getByText(/2 employees selected, total amount: \$9,500/i),
-    ).toBeIntheDocument();
+    ).toBeInDocument();
 
     // Test Continue with draft dismisses banner
     const continueBtn = screen.getByRole("button", {
@@ -306,7 +325,7 @@ describe("PayrollWizard UI & Receipt Flow", () => {
 
     expect(
       screen.queryByText("Draft Payroll Recovered"),
-    ).not.toBeIntheDocument();
+    ).not.toBeInDocument();
 
     // Re-render draft state for Discard test
     usePayrollWizardStore.setState({
@@ -324,9 +343,74 @@ describe("PayrollWizard UI & Receipt Flow", () => {
 
     expect(
       screen.queryByText("Draft Payroll Recovered"),
-    ).not.toBeIntheDocument();
+    ).not.toBeInDocument();
     expect(usePayrollWizardStore.getState().employeeIds).toEqual([]);
     expect(usePayrollWizardStore.getState().totalAmount).toBe(0);
+  });
+
+  it("blocks starting a payroll run when the connected wallet is not an authorized operator", () => {
+    validateOperatorMock.mockReturn = {
+      ok: false,
+      reason: "not_authorized",
+      message: "Wallet is not authorized to create payroll runs.",
+      operator: "GTEST123",
+    } as any;
+
+    render(<PayrollWizard />);
+
+    const startButton = screen.getByRole("button", {
+      name: /start payroll run/i,
+    });
+    fireEvent.click(startButton);
+
+    expect(validateOperatorMock).toHaveBeenCalled();
+    expect(
+      screen.getByText(
+        /Wallet is not authorized to create payroll runs\./i,
+      ),
+    ).toBeInDocument();
+    // The wizard must not have advanced to the review step.
+    expect(screen.queryByText("Payroll Review")).not.toBeInDocument();
+    expect(usePayrollWizardStore.getState().currentStep).toBe("idle");
+  });
+
+  it("surfaces a connection error when the wallet is not connected during operator validation", () => {
+    validateOperatorMock.mockReturn = {
+      ok: false,
+      reason: "not_connected",
+      message: "Connect your wallet to create a payroll run.",
+      operator: null,
+    } as any;
+
+    render(<PayrollWizard />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /start payroll run/i }),
+    );
+
+    expect(
+      screen.getByText(/Connect your wallet to create a payroll run\./i),
+    ).toBeInDocument();
+    expect(usePayrollWizardStore.getState().currentStep).toBe("idle");
+  });
+
+  it("allows starting a payroll run for an authorized operator and passes the connected wallet", () => {
+    validateOperatorMock.mockReturn = {
+      ok: true,
+      reason: null,
+      message: null,
+      operator: "GTEST123",
+    } as any;
+
+    render(<PayrollWizard />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /start payroll run/i }),
+    );
+
+    expect(validateOperatorMock).toHaveBeenCalled();
+    expect(screen.getByText("Payroll Review")).toBeInDocument();
+    expect(usePayrollWizardStore.getState().currentStep).toBe("review");
   });
 
   it("validates payroll reference integrity and blocks submission for unknown employee references", () => {
