@@ -228,7 +228,7 @@ export default function PayrollCreatePage() {
             <p className="font-medium text-gray-700 mb-1 flex items-center gap-1">
               <Shield className="w-3.5 h-3.5" /> Privacy & validation
             </p>
-            <p>Asset raw: <span className="font-mono">{assetRaw || "—"}</span> → <span className="font-mono font-medium">{result.normalized || "—"}</span> {result.isValid ? "✓" : `x● ${result.validationError}`} {result.wasNormalized && <span className="text-amber-700">(trimmed/uppercased)</span>}</p>
+<p>Asset raw: <span className="font-mono">{assetRaw || "—"}</span> → <span className="font-mono font-medium">{result.normalized || "—"}</span> {result.isValid ? "✓" : `x● ${result.validationError}`} {result.wasNormalized && <span className="text-amber-700">(trimmed/uppercased)</span>}</p>
             <p>Batch ref: <span className="font-mono">{batchRef || "—"}</span> → <span className="font-mono font-medium">{batchValidation.normalized || "—"}</span> {batchValidation.isValid ? "✓ valid" : `x● ${batchValidation.message}`}</p>
             <p>Description: <span className="font-mono">{description || "—"}</span> {descriptionValidation.isValid ? "✓ valid" : `● ${descriptionValidation.message}`}</p>
             <p className="text-gray-500 mt-1">Helper copy is shown under each field. Duplicates like <span className="font-mono">BATCH-2025-001</span> or <span className="font-mono">tx_001</span> are flagged before submission.</p>
@@ -271,7 +271,7 @@ export default function PayrollCreatePage() {
           <div className="pt-4 border-t text-xs text-gray-500">
             <h3 className="font-semibold text-gray-700">QA steps</h3>
             <ul className="list-disc pl-5 mt-1 space-y-1">
-              <li>Permission success: an operator with the <span className="font-mono">create:payroll</span> permission sees the green authorized banner and can submit.</li>
+<li>Permission success: an operator with the <span className="font-mono">create:payroll</span> permission sees the green authorized banner and can submit.</li>
               <li>Permission failure: a <span className="font-mono">viewer</span> or <span className="font-mono">guest</span> operator sees an actionable denied message and the submit button is disabled.</li>
               <li>Permission edge: an operator with an unknown role or missing id gets a clear error instead of a silent failure.</li>
               <li>Asset success: entering &quot; usdc &quot; shows warning &quot;Symbol was trimmed...&quot; and submits as &quot;USDC&quot;.</li>

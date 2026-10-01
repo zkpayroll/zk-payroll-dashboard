@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Wallet, Building2, Loader2 } from "lucide-react";
+import { Wallet, Building2, Loader2 } from "lucide/react";
 import OverduePayrollAlertBanner from "@/components/features/payroll/OverduePayrollAlertBanner";
 import { useStellar } from "@/components/providers/StellarProvider";
 import { useWalletStore } from "@/stores/walletStore";
@@ -21,8 +21,12 @@ import DashboardAssetAvailabilityCheck from "@/components/features/dashboard/Das
 import PayoutScheduleCollisionPanel from "@/components/features/dashboard/PayoutScheduleCollisionPanel";
 import DashboardCompensationPolicyCheck from "@/components/features/dashboard/DashboardCompensationPolicyCheck";
 import PayPeriodClosureReadinessPanel from "@/components/features/dashboard/PayPeriodClosureReadinessPanel";
-import { MOCK_COMPANIES } from "@/lib/api/mockData";
+import DashboardPayrollReferenceIntegrityPanel from "@/components/features/dashboard/DashboardPayrollReferenceIntegrityPanel";
+import DashboardPayrollAdjustmentApprovalExpiryPanel from "@/components/features/dashboard/DashboardPayrollAdjustmentApprovalExpiryPanel";
+import DashboardEmployeeEligibilityStatusCheck from "@/components/features/dashboard/DashboardEmployeeEligibilityStatusCheck";
+import { MOCK_COMPANIES, MOCK_PAYROLL_RUNS, MOCK_EMPLOYEES } from "@/lib/api/mockData";
 import { evaluatePayPeriodClosurePrerequisites } from "@/lib/payroll/payPeriodClosurePrerequisites";
+import { evaluatePayrollReferenceIntegrity } from "@/lib/payroll/payrollReferenceIntegrity";
 
 function DashboardHome() {
   const { isFreighterInstalled } = useStellar();
@@ -43,11 +47,34 @@ function DashboardHome() {
     });
   }, [company]);
 
+  const referenceIntegrity = useMemo(() => {
+    if (!company) {
+      return null;
+    }
+    return evaluatePayrollReferenceIntegrity({
+      companyId: company.id,
+      employees: [],
+      payrollRuns: [],
+      payoutTemplates: [],
+      treasuryAccountId: MOCK_COMPANIES[0]?.treasury?.accountId ?? null,
+    });
+  }, [company]);
+
+  const adjustmentApprovals = useMemo(() => {
+    return MOCK_PAYROLL_RUNS.filter((r) => r.status === "pending").map((r) => ({
+      id: r.id,
+      label: `Adjustment for ${r.id}`,
+      approvedAt: r.createdAt ?? null,
+      expiresAt: r.expiresAt ?? null,
+      hasApproval: Boolean(r.approvedAt),
+    }));
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-3">
         <Loader2
-          className="w-8 h-8 text-indigo-600 animate-spin"
+          className="w-8 h-text-indigo-600 animate-spin"
           aria-hidden="true"
         />
         <p className="text-sm text-gray-500">Connecting to wallet…</p>
@@ -155,6 +182,14 @@ function DashboardHome() {
         <PayPeriodClosureReadinessPanel readiness={closureReadiness} />
       </ErrorBoundary>
       <ErrorBoundary>
+        <DashboardPayrollReferenceIntegrityPanel result={referenceIntegrity} />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <DashboardPayrollAdjustmentApprovalExpiryPanel
+          approvals={adjustmentApprovals}
+        />
+      </ErrorBoundary>
+      <ErrorBoundary>
         <PinnedAlertsPanel alerts={sampleAlerts} tasks={sampleTasks} />
       </ErrorBoundary>
       <ErrorBoundary>
@@ -171,7 +206,7 @@ function DashboardHome() {
       </ErrorBoundary>
       <ErrorBoundary>
         <DashboardAssetAvailabilityCheck
-          configuredAssets={MOCK_COMPANIES[0]?.treasury ? [{ code: "USDC" }, { code: "XLM" }] : []}
+          configuredAssets={MOCK_COMPANIES[0]?.treasury ? [{ code: "USDC }, { code: "XLM" }] : []}
         />
       </ErrorBoundary>
       <ErrorBoundary>
@@ -179,6 +214,9 @@ function DashboardHome() {
           templates={[]}
           runs={[]}
         />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <DashboardEmployeeEligibilityStatusCheck employees={MOCK_EMPLOYEES} />
       </ErrorBoundary>
       <ErrorBoundary>
         <DashboardCompensationPolicyCheck />

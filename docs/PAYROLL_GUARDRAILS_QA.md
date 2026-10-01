@@ -1,5 +1,25 @@
 # Payroll Guardrails — Behaviour & Repeatable QA
 
+## Payroll submission sequence warning (#564)
+
+**Where:** Payroll → Run Payroll → Submission (`PayrollWizard`).
+
+The submission screen validates that the preceding proof and confirmation
+sequence completed. If a stale or directly restored wizard state reaches
+submission without that sequence, it shows a privacy-safe warning and provides
+a **Return to payroll review** action. It does not display salary, employee,
+or wallet data. A normal submitting state and a completed submission with a
+transaction reference are unchanged.
+
+Repeatable QA:
+
+1. Complete review → proof → confirmation and submit; no sequence warning is
+   shown.
+2. Restore or set a submission state with no verified proof; the warning is
+   shown and **Return to payroll review** resets the flow.
+3. Confirm the warning text contains no payroll values, employee identifiers,
+   or wallet addresses.
+
 Operator-facing reference for the payroll guardrails added in #541–#544. Each
 section covers where the feature lives, how it behaves, what it guarantees
 about sensitive data, and repeatable manual QA steps (main path, edge case

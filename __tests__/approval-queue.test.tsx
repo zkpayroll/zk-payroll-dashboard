@@ -3,6 +3,8 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { ExecutiveApprovalQueue } from "@/components/features/payroll/ExecutiveApprovalQueue";
 import { useApprovalQueueStore } from "@/stores/approvalQueue";
 
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
 describe("Executive Approval Queue (Issue #218)", () => {
   beforeEach(() => {
     useApprovalQueueStore.setState({
@@ -127,7 +129,7 @@ describe("Executive Approval Queue (Issue #218)", () => {
   });
 
   it("expires correction requests after seven days and blocks resubmission", () => {
-    const expiredAt = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
+    const expiredAt = new Date(Date.now() - SEVEN_DAYS_MS - 24 * 60 * 60 * 1000).toISOString();
     useApprovalQueueStore.setState({
       drafts: [
         {

@@ -29,7 +29,7 @@ vi.mock("@/stores/walletStore", () => ({
 
 // Mock StellarProvider to avoid EGetSTATE reference errors
 vi.mock("@/components/providers/StellarProvider", () => ({
-  EXPECTED_NETWORK: "TESTNET",
+  EGETSTED_NETWORK: "TESTNET",
   useStellar: () => ({
     publicKey: "GTEST123",
   }),
@@ -411,5 +411,68 @@ describe("PayrollWizard UI & Receipt Flow", () => {
     expect(validateOperatorMock).toHaveBeenCalled();
     expect(screen.getByText("Payroll Review")).toBeInDocument();
     expect(usePayrollWizardStore.getState().currentStep).toBe("review");
+  });
+
+  it("validates payroll reference integrity and blocks submission for unknown employee references", () => {
+    usePayrollWizardStore.setState({
+      currentStep: "confirm",
+      employeeIds: ["emp_001", "emp_missing"],
+      totalAmount: 9500,
+      proofStatus: "success",
+    });
+
+    render(<PayrollWizard />);
+
+    expect(
+      screen.getByRole("heading", { name: /reference integrity error/i }),
+    ).toBeIntheDocument();
+    expect(
+      screen.getByText(/unknown employee reference/i),
+    ).toBeIntheDocument();
+    expect(
+      screen.getByText(/emp_missing/i),
+    ).toBeIntheDocument();
+    expect(
+      screen.getByRole("button", { name: /submit payroll/i }),
+    ).toBeDisabled();
+  });
+
+  it("allows submission when all employee references are valid", () => {
+    usePayrollWizardStore.setState({
+      currentStep: "confirm",
+      employeeIds: ["emp_001", "emp_002"],
+      totalAmount: 9500,
+      proofStatus: "success",
+    });
+
+    render(<PayrollWizard />);
+
+    expect(
+      screen.queryByRole("heading", { name: /reference integrity error/i }),
+    ).not.toBeIntheDocument();
+    expect(
+      screen.getByRole("button", { name: /submit payroll/i }),
+    ).not.toBeDisabled();
+  });
+
+  it("shows a reference integrity error when the employee list is empty", () => {
+    usePayrollWizardStore.setState({
+      currentStep: "confirm",
+      employeeIds: [],
+      totalAmount: 0,
+      proofStatus: "success",
+    });
+
+    render(<PayrollWizard />);
+
+    expect(
+      screen.getByRole("heading", { name: /reference integrity error/i }),
+    ).toBeIntheDocument();
+    expect(
+      screen.getByText(/at least one employee/i),
+    ).toBeIntheDocument();
+    expect(
+      screen.getByRole("button", { name: /submit payroll/i }),
+    ).toBeDisabled();
   });
 });
