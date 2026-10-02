@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Dashboard Treasury Liquidity Reserve Monitoring (#630)**: Dashboard card showing whether the treasury can fund the next payroll run and how the balance compares with a target reserve.
+  - Pure evaluation module `lib/treasury/liquidityReserve.ts` with `evaluateTreasuryLiquidityReserve`, returning the reserve ratio, payroll runs covered, shortfall, and amount below target; money math runs on 7-decimal integer base units rather than floats
+  - `Healthy` / `Low` / `Critical` statuses: at or above the target reserve, below target but covering the next run, and unable to cover the next run (with the shortfall amount)
+  - Target reserve configurable through `NEXT_PUBLIC_TREASURY_RESERVE_TARGET_PERCENT` (default `150`, minimum `100`); all thresholds live in the evaluation module
+  - Hook `useTreasuryLiquidityReserve` reading the treasury store through an injectable loader, with loading, error-with-retry, and stale-balance handling
+  - Component `TreasuryLiquidityReserveCard` mounted in `DashboardHome`, with explicit loading, error, no-scheduled-payroll, and stale states; status is conveyed by icon and text label as well as colour
+  - Negative, non-numeric, missing, or over-precise amounts are reported as errors and never as a healthy reserve
+  - Typed domain contracts in `types/treasury.ts`; feature notes in `docs/TREASURY_LIQUIDITY_RESERVE.md`
+  - Unit and component tests in `__tests__/treasury-liquidity-reserve.test.ts` and `__tests__/dashboard-treasury-liquidity-reserve.test.tsx`
 - **Dashboard Compensation Policy Effective-Date Validation**: Dashboard-layer check verifying that every compensation policy revision takes effect on a valid, forward-only calendar date before any further compensation change is scheduled.
   - Pure evaluation module `lib/compensation/compensationPolicyEffectiveDate.ts` with `evaluateCompensationPolicyEffectiveDate`, `assertCompensationPolicyEffectiveDate`, and injectable reference date / scheduling horizon for deterministic checks
   - Eight effective-date rules: required bounded policy id, required `YYYY-MM-DD` date, real calendar day (rejects roll-over dates such as `2026-02-30`), known lifecycle status, no backdating of pending revisions, single active revision, no duplicate effective dates, and no overlapping policy windows — plus a non-blocking scheduling-horizon advisory
@@ -71,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Dashboard home compile errors**: `DashboardHome` no longer fails to parse (unterminated `"USDC` string, `lucide/react` import, two malformed class names) and no longer imports three dashboard panels and two `lib/payroll` evaluators that were never added to the repository.
 - **Blocked-execution test mocks** (#605): Corrected all five `PayrollRun` object literals in `__tests__/blocked-execution-diagnostics.test.ts` that would have failed `tsc --noEmit` under `strict: true`:
   - Added missing required `PayrollTransaction` fields (`companyId`, `timestamp`, `createdAt`) to every mock.
   - Changed `status: "completed"` to `status: "verified"` — `"completed"` is not a member of the `"pending" | "verified" | "failed" | "cancelled"` union.

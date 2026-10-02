@@ -6,3 +6,4 @@ export * from "./policy";
 export * from "./assets";
 export * from "./compensation";
 
+export * from "./treasury";
