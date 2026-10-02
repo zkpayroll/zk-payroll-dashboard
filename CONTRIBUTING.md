@@ -26,6 +26,7 @@ npm run dev        # or: pnpm dev → http://localhost:3000
 | `NEXT_PUBLIC_SOROBAN_RPC_URL` | Yes | `https://soroban-testnet.stellar.org` | Soroban RPC matching network. |
 | `SESSION_SECRET` | Yes | 32+ random chars | `openssl rand -base64 32`. Short values throw at boot (`lib/env.ts`). |
 | `ADMIN_PUBLIC_KEY` | Yes | `G...` (56 chars) | Stellar public key of company admin (Freighter → Copy Address). |
+| `NEXT_PUBLIC_TREASURY_RESERVE_TARGET_PERCENT` | No | `150` | Target treasury reserve as a whole-number % of the next payroll run (min 100). See [docs/TREASURY_LIQUIDITY_RESERVE.md](docs/TREASURY_LIQUIDITY_RESERVE.md). |
 
 The defaults in `.env.example` already point to Stellar Testnet — just replace `SESSION_SECRET` and `ADMIN_PUBLIC_KEY` locally. Never commit `.env.local`. Validation lives in `lib/env.ts` and never logs secrets.
 

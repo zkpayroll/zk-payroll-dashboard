@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
-import { Wallet, Building2, Loader2 } from "lucide/react";
+import { Wallet, Building2, Loader2 } from "lucide-react";
 import OverduePayrollAlertBanner from "@/components/features/payroll/OverduePayrollAlertBanner";
 import { useStellar } from "@/components/providers/StellarProvider";
 import { useWalletStore } from "@/stores/walletStore";
@@ -11,6 +10,7 @@ import PayrollSummary from "@/components/features/payroll/PayrollSummary";
 import PeriodSummaryCard from "@/components/features/payroll/PeriodSummaryCard";
 import SystemStatus from "@/components/features/dashboard/SystemStatus";
 import TreasuryBalanceSummaryCard from "@/components/features/dashboard/TreasuryBalanceSummaryCard";
+import TreasuryLiquidityReserveCard from "@/components/features/dashboard/TreasuryLiquidityReserveCard";
 import QuickActions from "@/components/features/dashboard/QuickActions";
 import OnboardingChecklistPanel from "@/components/features/dashboard/OnboardingChecklistPanel";
 import OnboardingReadinessTracker from "@/components/features/employees/OnboardingReadinessTracker";
@@ -20,61 +20,19 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import DashboardAssetAvailabilityCheck from "@/components/features/dashboard/DashboardAssetAvailabilityCheck";
 import PayoutScheduleCollisionPanel from "@/components/features/dashboard/PayoutScheduleCollisionPanel";
 import DashboardCompensationPolicyCheck from "@/components/features/dashboard/DashboardCompensationPolicyCheck";
-import PayPeriodClosureReadinessPanel from "@/components/features/dashboard/PayPeriodClosureReadinessPanel";
-import DashboardPayrollReferenceIntegrityPanel from "@/components/features/dashboard/DashboardPayrollReferenceIntegrityPanel";
-import DashboardPayrollAdjustmentApprovalExpiryPanel from "@/components/features/dashboard/DashboardPayrollAdjustmentApprovalExpiryPanel";
 import DashboardEmployeeEligibilityStatusCheck from "@/components/features/dashboard/DashboardEmployeeEligibilityStatusCheck";
-import { MOCK_COMPANIES, MOCK_PAYROLL_RUNS, MOCK_EMPLOYEES } from "@/lib/api/mockData";
-import { evaluatePayPeriodClosurePrerequisites } from "@/lib/payroll/payPeriodClosurePrerequisites";
-import { evaluatePayrollReferenceIntegrity } from "@/lib/payroll/payrollReferenceIntegrity";
+import { MOCK_COMPANIES, MOCK_EMPLOYEES } from "@/lib/api/mockData";
 
 function DashboardHome() {
   const { isFreighterInstalled } = useStellar();
   const { isConnected, isLoading } = useWalletStore();
   const company = useCompanyStore((s) => s.company);
 
-  const closureReadiness = useMemo(() => {
-    if (!company) {
-      return null;
-    }
-    return evaluatePayPeriodClosurePrerequisites({
-      companyId: company.id,
-      treasuryBalance: MOCK_COMPANIES[0]?.treasury?.balance ?? 0,
-      pendingPayouts: 0,
-      unresolvedAlerts: 0,
-      hasUnsavedChanges: false,
-      periodStatus: "open",
-    });
-  }, [company]);
-
-  const referenceIntegrity = useMemo(() => {
-    if (!company) {
-      return null;
-    }
-    return evaluatePayrollReferenceIntegrity({
-      companyId: company.id,
-      employees: [],
-      payrollRuns: [],
-      payoutTemplates: [],
-      treasuryAccountId: MOCK_COMPANIES[0]?.treasury?.accountId ?? null,
-    });
-  }, [company]);
-
-  const adjustmentApprovals = useMemo(() => {
-    return MOCK_PAYROLL_RUNS.filter((r) => r.status === "pending").map((r) => ({
-      id: r.id,
-      label: `Adjustment for ${r.id}`,
-      approvedAt: r.createdAt ?? null,
-      expiresAt: r.expiresAt ?? null,
-      hasApproval: Boolean(r.approvedAt),
-    }));
-  }, []);
-
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-3">
         <Loader2
-          className="w-8 h-text-indigo-600 animate-spin"
+          className="w-8 h-8 text-indigo-600 animate-spin"
           aria-hidden="true"
         />
         <p className="text-sm text-gray-500">Connecting to wallet…</p>
@@ -110,7 +68,7 @@ function DashboardHome() {
             className="w-5 h-5 text-amber-600 mt-0.5 shrink-0"
             aria-hidden="true"
           />
-          <div className="flex-1 min-w0">
+          <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-amber-800">
               Company setup required
             </p>
@@ -179,17 +137,6 @@ function DashboardHome() {
         <SessionTimeoutBanner />
       </ErrorBoundary>
       <ErrorBoundary>
-        <PayPeriodClosureReadinessPanel readiness={closureReadiness} />
-      </ErrorBoundary>
-      <ErrorBoundary>
-        <DashboardPayrollReferenceIntegrityPanel result={referenceIntegrity} />
-      </ErrorBoundary>
-      <ErrorBoundary>
-        <DashboardPayrollAdjustmentApprovalExpiryPanel
-          approvals={adjustmentApprovals}
-        />
-      </ErrorBoundary>
-      <ErrorBoundary>
         <PinnedAlertsPanel alerts={sampleAlerts} tasks={sampleTasks} />
       </ErrorBoundary>
       <ErrorBoundary>
@@ -205,8 +152,11 @@ function DashboardHome() {
         <TreasuryBalanceSummaryCard />
       </ErrorBoundary>
       <ErrorBoundary>
+        <TreasuryLiquidityReserveCard />
+      </ErrorBoundary>
+      <ErrorBoundary>
         <DashboardAssetAvailabilityCheck
-          configuredAssets={MOCK_COMPANIES[0]?.treasury ? [{ code: "USDC }, { code: "XLM" }] : []}
+          configuredAssets={MOCK_COMPANIES[0]?.treasury ? [{ code: "USDC" }, { code: "XLM" }] : []}
         />
       </ErrorBoundary>
       <ErrorBoundary>
