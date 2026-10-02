@@ -5,7 +5,7 @@
  * on-chain while keeping the underlying human-readable note text private off-chain.
  */
 
-const HASH_REGEX = /^(0x)?[0-9a-fA-F]{64}$/;
+export const PAYROLL_NOTE_HASH_PATTERN = /^(0x)?[0-9a-fA-F]{64}$/;
 
 export interface NoteHashValidationResult {
   isValid: boolean;
@@ -51,7 +51,7 @@ export function validateNoteHash(hash: string): NoteHashValidationResult {
     };
   }
 
-  if (!HASH_REGEX.test(trimmed)) {
+  if (!PAYROLL_NOTE_HASH_PATTERN.test(trimmed)) {
     if (trimmed.startsWith("0x") && trimmed.length !== 66) {
       return {
         isValid: false,
@@ -76,6 +76,27 @@ export function validateNoteHash(hash: string): NoteHashValidationResult {
     isValid: true,
     normalizedHash,
   };
+}
+
+export type PayrollNoteHashVerificationResult =
+  | { status: "match"; actualHash: string }
+  | { status: "mismatch"; actualHash: string }
+  | { status: "invalid-hash" };
+
+/** Verify a note against the same trimmed-text SHA-256 format used by the note hasher. */
+export async function verifyPayrollNoteHash(
+  noteText: string,
+  expectedHash: string,
+): Promise<PayrollNoteHashVerificationResult> {
+  const validation = validateNoteHash(expectedHash);
+  if (!validation.isValid || !validation.normalizedHash) {
+    return { status: "invalid-hash" };
+  }
+
+  const actualHash = await generateNoteHash(noteText);
+  return actualHash === validation.normalizedHash
+    ? { status: "match", actualHash }
+    : { status: "mismatch", actualHash };
 }
 
 /**
