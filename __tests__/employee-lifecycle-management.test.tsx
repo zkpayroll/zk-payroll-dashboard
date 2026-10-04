@@ -113,20 +113,51 @@ describe("EmployeeLifecycleManager", () => {
 
   // ── 3. Edge case – offboarded employees ─────────────────────────────────
 
-  it("shows no action buttons for offboarded employees", () => {
+  it("shows Archive action for offboarded employees", () => {
     seedEmployees([
       employee({ id: "e1", name: "Offboarded Person", lifecycleStatus: "offboarded", isActive: false }),
     ]);
 
     render(<EmployeeLifecycleManager />);
 
-    expect(screen.getByText("No actions available")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /activate/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /suspend/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /offboard/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /archive offboarded person/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^activate /i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^suspend /i })).not.toBeInTheDocument();
   });
 
-  // ── 4. Search filtering ─────────────────────────────────────────────────
+  // ── 4. Happy-path archive and restore flow ─────────────────────────────
+
+  it("archives an offboarded employee and then restores them", async () => {
+    const user = userEvent.setup();
+    seedEmployees([employee({ id: "e1", name: "Alice", lifecycleStatus: "offboarded", isActive: false })]);
+
+    render(<EmployeeLifecycleManager />);
+
+    // Click Archive
+    await user.click(screen.getByRole("button", { name: /archive alice/i }));
+    expect(screen.getByText(/confirm archive/i)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/note/i), "Archiving inactive record");
+    await user.click(screen.getByRole("button", { name: /^archive$/i }));
+
+    expect(screen.getByText(/alice has been archived successfully/i)).toBeInTheDocument();
+
+    let updated = useEmployeeStore.getState().employees.find((e) => e.id === "e1");
+    expect(updated?.lifecycleStatus).toBe("archived");
+
+    // Click Restore
+    await user.click(screen.getByRole("button", { name: /restore alice/i }));
+    expect(screen.getByText(/confirm restore/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^restore$/i }));
+
+    expect(screen.getByText(/alice has been restored successfully/i)).toBeInTheDocument();
+
+    updated = useEmployeeStore.getState().employees.find((e) => e.id === "e1");
+    expect(updated?.lifecycleStatus).toBe("suspended");
+  });
+
+  // ── 5. Search filtering ─────────────────────────────────────────────────
 
   it("filters employees by search query", async () => {
     const user = userEvent.setup();
@@ -154,14 +185,48 @@ describe("validateLifecycleTransition", () => {
     expect(err!.message).toContain("administrators");
   });
 
-  it("rejects invalid transitions (activate an already active employee)", () => {
+  it("rejects non-admin users attempting to archive or restore", () => {
+    const errArchive = validateLifecycleTransition(employee({ lifecycleStatus: "suspended" }), "archive", "operator");
+    expect(errArchive?.code).toBe("UNAUTHORIZED");
+
+    const errRestore = validateLifecycleTransition(employee({ lifecycleStatus: "archived" }), "restore", "operator");
+    expect(errRestore?.code).toBe("UNAUTHORIZED");
+  });
+
+  it("rejects archiving active employees with an actionable error", () => {
     const err = validateLifecycleTransition(
       employee({ lifecycleStatus: "active" }),
-      "activate",
+      "archive",
       "admin",
     );
     expect(err).not.toBeNull();
     expect(err!.code).toBe("INVALID_TRANSITION");
+    expect(err!.message).toContain("Cannot archive an active employee");
+  });
+
+  it("allows archiving suspended and offboarded employees", () => {
+    const errSuspended = validateLifecycleTransition(
+      employee({ lifecycleStatus: "suspended" }),
+      "archive",
+      "admin",
+    );
+    expect(errSuspended).toBeNull();
+
+    const errOffboarded = validateLifecycleTransition(
+      employee({ lifecycleStatus: "offboarded" }),
+      "archive",
+      "admin",
+    );
+    expect(errOffboarded).toBeNull();
+  });
+
+  it("allows restoring archived employees", () => {
+    const err = validateLifecycleTransition(
+      employee({ lifecycleStatus: "archived" }),
+      "restore",
+      "admin",
+    );
+    expect(err).toBeNull();
   });
 
   it("rejects offboarding when onboarding is in progress", () => {
@@ -192,27 +257,22 @@ describe("validateLifecycleTransition", () => {
     expect(err).toBeNull();
   });
 
-  it("rejects reactivating an offboarded employee", () => {
-    const err = validateLifecycleTransition(
-      employee({ lifecycleStatus: "offboarded", isActive: false }),
-      "activate",
-      "admin",
-    );
-    expect(err).not.toBeNull();
-    expect(err!.code).toBe("INVALID_TRANSITION");
-  });
-
   it("error messages never contain salary or commitment data", () => {
     const emp = employee({ salary: 99999, salaryCommitment: "0xSECRET" });
     const err = validateLifecycleTransition(emp, "activate", "operator");
     expect(err!.message).not.toContain("99999");
     expect(err!.message).not.toContain("0xSECRET");
+
+    const errArchive = validateLifecycleTransition(emp, "archive", "admin");
+    expect(errArchive!.message).not.toContain("99999");
+    expect(errArchive!.message).not.toContain("0xSECRET");
   });
 });
 
 describe("deriveLifecycleStatus", () => {
   it("returns explicit lifecycleStatus when set", () => {
     expect(deriveLifecycleStatus(employee({ lifecycleStatus: "suspended" }))).toBe("suspended");
+    expect(deriveLifecycleStatus(employee({ lifecycleStatus: "archived" }))).toBe("archived");
   });
 
   it("falls back to isActive when lifecycleStatus is not set", () => {
@@ -234,15 +294,21 @@ describe("availableLifecycleActions", () => {
     ]);
   });
 
-  it("returns [activate, offboard] for admin on suspended employee", () => {
+  it("returns [activate, archive, offboard] for admin on suspended employee", () => {
     expect(
       availableLifecycleActions(employee({ lifecycleStatus: "suspended" }), "admin"),
-    ).toEqual(["activate", "offboard"]);
+    ).toEqual(["activate", "archive", "offboard"]);
   });
 
-  it("returns empty for offboarded employees", () => {
+  it("returns [archive] for offboarded employees", () => {
     expect(
       availableLifecycleActions(employee({ lifecycleStatus: "offboarded" }), "admin"),
-    ).toEqual([]);
+    ).toEqual(["archive"]);
+  });
+
+  it("returns [restore] for archived employees", () => {
+    expect(
+      availableLifecycleActions(employee({ lifecycleStatus: "archived" }), "admin"),
+    ).toEqual(["restore"]);
   });
 });

@@ -6,7 +6,7 @@ import type { Employee, EmployeeLifecycleStatus, UserRole } from "@/types";
  * Offboarded employees cannot be reactivated (must be re-onboarded).
  */
 
-export type LifecycleAction = "activate" | "suspend" | "offboard";
+export type LifecycleAction = "activate" | "suspend" | "offboard" | "archive" | "restore";
 
 export interface LifecycleTransitionError {
   code: string;
@@ -15,8 +15,9 @@ export interface LifecycleTransitionError {
 
 const ALLOWED_TRANSITIONS: Record<EmployeeLifecycleStatus, LifecycleAction[]> = {
   active: ["suspend", "offboard"],
-  suspended: ["activate", "offboard"],
-  offboarded: [],
+  suspended: ["activate", "archive", "offboard"],
+  offboarded: ["archive"],
+  archived: ["restore"],
 };
 
 /**
@@ -46,19 +47,25 @@ export function validateLifecycleTransition(
   }
 
   const currentStatus = deriveLifecycleStatus(employee);
-  const allowed = ALLOWED_TRANSITIONS[currentStatus];
+  const allowed = ALLOWED_TRANSITIONS[currentStatus] ?? [];
 
   if (!allowed.includes(action)) {
+    if (action === "archive" && currentStatus === "active") {
+      return {
+        code: "INVALID_TRANSITION",
+        message: "Cannot archive an active employee. Suspend or offboard them first.",
+      };
+    }
     return {
       code: "INVALID_TRANSITION",
       message: `Cannot ${action} an employee who is currently ${currentStatus}.`,
     };
   }
 
-  if (action === "offboard" && employee.onboardingStatus === "in_progress") {
+  if ((action === "offboard" || action === "archive") && employee.onboardingStatus === "in_progress") {
     return {
       code: "ONBOARDING_IN_PROGRESS",
-      message: "Cannot offboard an employee while onboarding is in progress.",
+      message: `Cannot ${action} an employee while onboarding is in progress.`,
     };
   }
 

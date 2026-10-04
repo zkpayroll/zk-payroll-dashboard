@@ -5,6 +5,8 @@ import {
   UserCheck,
   UserX,
   UserMinus,
+  Archive,
+  RotateCcw,
   AlertTriangle,
   Shield,
   Search,
@@ -37,7 +39,19 @@ const ACTION_CONFIG: Record<LifecycleAction, { label: string; icon: typeof UserC
     label: "Offboard",
     icon: UserX,
     variant: "bg-red-600 hover:bg-red-700 text-white",
-    confirm: "This will permanently remove the employee from payroll. This action cannot be undone.",
+    confirm: "This will permanently remove the employee from active payroll. This action cannot be undone.",
+  },
+  archive: {
+    label: "Archive",
+    icon: Archive,
+    variant: "bg-gray-600 hover:bg-gray-700 text-white",
+    confirm: "This will archive the inactive employee record.",
+  },
+  restore: {
+    label: "Restore",
+    icon: RotateCcw,
+    variant: "bg-blue-600 hover:bg-blue-700 text-white",
+    confirm: "This will restore the archived employee record.",
   },
 };
 
@@ -45,6 +59,7 @@ const LIFECYCLE_BADGE_MAP: Record<EmployeeLifecycleStatus, string> = {
   active: "active",
   suspended: "pending",
   offboarded: "inactive",
+  archived: "inactive",
 };
 
 type FilterStatus = "all" | EmployeeLifecycleStatus;
@@ -87,9 +102,12 @@ export default function EmployeeLifecycleManager() {
   }, [employees, filterStatus, searchQuery]);
 
   const counts = useMemo(() => {
-    const result: Record<FilterStatus, number> = { all: employees.length, active: 0, suspended: 0, offboarded: 0 };
+    const result: Record<FilterStatus, number> = { all: employees.length, active: 0, suspended: 0, offboarded: 0, archived: 0 };
     for (const e of employees) {
-      result[deriveLifecycleStatus(e)]++;
+      const st = deriveLifecycleStatus(e);
+      if (st in result) {
+        result[st]++;
+      }
     }
     return result;
   }, [employees]);
@@ -114,8 +132,18 @@ export default function EmployeeLifecycleManager() {
       note || undefined,
     );
     if (result.success) {
+      const actionText =
+        confirmation.action === "activate"
+          ? "activated"
+          : confirmation.action === "suspend"
+          ? "suspended"
+          : confirmation.action === "offboard"
+          ? "offboarded"
+          : confirmation.action === "archive"
+          ? "archived"
+          : "restored";
       setSuccessMessage(
-        `${confirmation.employee.name} has been ${confirmation.action === "activate" ? "activated" : confirmation.action === "suspend" ? "suspended" : "offboarded"} successfully.`,
+        `${confirmation.employee.name} has been ${actionText} successfully.`,
       );
       setConfirmation(null);
       setNote("");
@@ -161,7 +189,7 @@ export default function EmployeeLifecycleManager() {
             />
           </div>
           <div className="flex gap-1 flex-wrap">
-            {(["all", "active", "suspended", "offboarded"] as FilterStatus[]).map((s) => (
+            {(["all", "active", "suspended", "offboarded", "archived"] as FilterStatus[]).map((s) => (
               <button
                 key={s}
                 type="button"

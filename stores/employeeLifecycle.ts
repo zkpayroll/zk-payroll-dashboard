@@ -47,6 +47,10 @@ function lifecycleStatusFromAction(action: LifecycleAction): EmployeeLifecycleSt
       return 'suspended';
     case 'offboard':
       return 'offboarded';
+    case 'archive':
+      return 'archived';
+    case 'restore':
+      return 'suspended';
   }
 }
 
