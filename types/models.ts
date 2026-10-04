@@ -908,7 +908,11 @@ export type PeriodCloseBlockerCategory =
   | "holds"
   | "disputes"
   | "funding_reservations"
-  | "audit_references";
+  | "audit_references"
+  | "settlement"
+  | "reconciliation"
+  | "receipt_review"
+  | "audit_handoff";
 
 export interface PeriodCloseBlocker {
   category: PeriodCloseBlockerCategory;
