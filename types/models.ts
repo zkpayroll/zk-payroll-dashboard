@@ -7,12 +7,13 @@ export type OnboardingStatus = "not_started" | "in_progress" | "completed";
 export type EmployeeLifecycleStatus =
   | "active"
   | "suspended"
-  | "offboarded";
+  | "offboarded"
+  | "archived";
 
 export interface EmployeeLifecycleEvent {
   id: string;
   employeeId: string;
-  action: "activate" | "suspend" | "offboard";
+  action: "activate" | "suspend" | "offboard" | "archive" | "restore";
   performedBy: string;
   performedAt: string;
   note?: string;
