@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import {
   Upload,
   AlertTriangle,
@@ -15,6 +15,8 @@ import {
 import { toast } from "sonner";
 import { useEmployeeStore } from "@/stores/employees";
 import { sha256Hex } from "@/lib/zk/hash";
+import { findDuplicateReferenceIds } from "@/lib/validation/duplicateReferenceId";
+import DuplicateReferenceWarning from "@/components/employees/DuplicateReferenceWarning";
 import { ImportConflictResolver } from "./ImportConflictResolver";
 import type { Employee } from "@/types";
 
@@ -26,6 +28,8 @@ export interface CsvRow {
   address: string;
   salary: string;
   startDate: string;
+  /** Optional employee reference id (issue #431). Blank when absent. */
+  referenceId: string;
 }
 
 interface RowValidationError {
@@ -35,11 +39,12 @@ interface RowValidationError {
 }
 
 const REQUIRED_COLUMNS = ["name", "address", "salary", "start_date"];
-const OPTIONAL_COLUMNS = ["email", "department"];
+const OPTIONAL_COLUMNS = ["email", "department", "employee_id"];
 
-const CSV_TEMPLATE_HEADER = "name,email,department,address,salary,start_date";
+const CSV_TEMPLATE_HEADER =
+  "name,email,department,address,salary,start_date,employee_id";
 const CSV_TEMPLATE_ROW =
-  "Jane Doe,jane@company.io,Engineering,GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W37,5000,2025-06-01";
+  "Jane Doe,jane@company.io,Engineering,GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W37,5000,2025-06-01,EMP-001";
 
 function parseCsv(text: string): CsvRow[] {
   const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "");
@@ -54,6 +59,12 @@ function parseCsv(text: string): CsvRow[] {
   const addrIdx = headers.indexOf("address");
   const salaryIdx = headers.indexOf("salary");
   const startIdx = headers.indexOf("start_date");
+  // Optional employee reference id. Either spelling is accepted; files without
+  // the column parse exactly as before (issue #431).
+  const refIdx = Math.max(
+    headers.indexOf("employee_id"),
+    headers.indexOf("reference_id"),
+  );
 
   if (nameIdx === -1 || addrIdx === -1 || salaryIdx === -1) {
     return [];
@@ -71,6 +82,7 @@ function parseCsv(text: string): CsvRow[] {
       address: values[addrIdx]?.trim() ?? "",
       salary: values[salaryIdx]?.trim() ?? "",
       startDate: startIdx >= 0 ? (values[startIdx]?.trim() ?? "") : "",
+      referenceId: refIdx >= 0 ? (values[refIdx]?.trim() ?? "") : "",
     });
   }
 
@@ -194,6 +206,14 @@ export default function CsvImport() {
   const [allImported, setAllImported] = useState(false);
   const [showConflictResolver, setShowConflictResolver] = useState(false);
 
+  // Issue #431 — the same employee reference id appearing on more than one row
+  // of the onboarding input. Computed from the parsed rows so it refreshes
+  // with them and is impossible to forget after a re-parse.
+  const duplicateReferenceIds = useMemo(
+    () => findDuplicateReferenceIds(parsedRows),
+    [parsedRows],
+  );
+
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -223,6 +243,17 @@ export default function CsvImport() {
         setParsedRows(rows);
         setValidationErrors(allErrors);
         setImportedIds(new Set());
+
+        const duplicateRefs = findDuplicateReferenceIds(rows);
+        if (duplicateRefs.length > 0) {
+          toast.warning(
+            `${duplicateRefs.length} duplicate employee reference id${duplicateRefs.length !== 1 ? "s" : ""} in this file`,
+            {
+              description:
+                "Resolve them before importing so each employee keeps one reference id.",
+            },
+          );
+        }
 
         const errorCount = allErrors.filter(
           (e) => e.field !== "email" || allErrors.length <= 2,
@@ -456,6 +487,12 @@ export default function CsvImport() {
                   : ""}
                 . Fix errors before importing affected rows.
               </p>
+            </div>
+          )}
+
+          {duplicateReferenceIds.length > 0 && (
+            <div className="px-4 sm:px-6 py-3 border-b border-amber-100">
+              <DuplicateReferenceWarning duplicates={duplicateReferenceIds} />
             </div>
           )}
 

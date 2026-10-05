@@ -12,11 +12,12 @@ vi.mock("sonner", () => ({
 }));
 
 // Mock wallet store to ensure we are connected and on the correct network
+const walletState = { network: "TESTNET", isConnected: true, publicKey: "GTEST123" };
 vi.mock("@/stores/walletStore", () => ({
   useWalletStore: Object.assign(
-    (fn: any) => fn({ network: "TESTNET" }),
+    (fn?: any) => (fn ? fn(walletState) : walletState),
     {
-      getState: () => ({ network: "TESTNET" }),
+      getState: () => walletState,
       setState: vi.fn(),
     }
   ),
@@ -90,7 +91,7 @@ describe("PayrollWizard UI & Receipt Flow", () => {
 
     // Success toast and next step should have loaded
     expect(toast.success).toHaveBeenCalledWith("Proof generated successfully");
-    expect(screen.getByText("Review & Confirm Payroll")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /review & confirm payroll/i })).toBeInTheDocument();
 
     randomSpy.mockRestore();
   });
@@ -115,9 +116,11 @@ describe("PayrollWizard UI & Receipt Flow", () => {
 
     // Expect error message and retry button
     expect(toast.error).toHaveBeenCalledWith("Proof generation failed", expect.any(Object));
+    // The failure message shows in the proof step and is echoed in the approval
+    // audit trail, so it legitimately appears more than once.
     expect(
-      screen.getByText("Proof generation failed: circuit constraint mismatch. Please retry.")
-    ).toBeInTheDocument();
+      screen.getAllByText("Proof generation failed: circuit constraint mismatch. Please retry.").length
+    ).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
 
     randomSpy.mockRestore();
@@ -137,9 +140,9 @@ describe("PayrollWizard UI & Receipt Flow", () => {
 
     render(<PayrollWizard />);
 
-    expect(screen.getByText("Review & Confirm Payroll")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /review & confirm payroll/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByLabelText(/confirm payroll execution summary/i));
     const submitBtn = screen.getByRole("button", { name: /submit payroll/i });
     fireEvent.click(submitBtn);
 
@@ -178,7 +181,8 @@ describe("PayrollWizard UI & Receipt Flow", () => {
 
     render(<PayrollWizard />);
 
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByLabelText(/confirm payroll execution summary/i));
+
     const submitBtn = screen.getByRole("button", { name: /submit payroll/i });
     fireEvent.click(submitBtn);
 
@@ -200,6 +204,25 @@ describe("PayrollWizard UI & Receipt Flow", () => {
     expect(usePayrollWizardStore.getState().currentStep).toBe("review");
 
     randomSpy.mockRestore();
+  });
+
+  it("blocks submission when a conflicting payroll draft exists", () => {
+    usePayrollWizardStore.setState({
+      currentStep: "confirm",
+      employeeIds: ["emp_001", "emp_002"],
+      totalAmount: 9500,
+      proofStatus: "success",
+    });
+
+    render(<PayrollWizard />);
+
+    expect(
+      screen.getByRole("heading", { name: /draft conflict detected/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/another payroll draft is already tracking the selected employee batch/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /submit payroll/i })).toBeDisabled();
   });
 
   it("renders draft recovery banner when draft is found, and handles continue/discard actions", () => {

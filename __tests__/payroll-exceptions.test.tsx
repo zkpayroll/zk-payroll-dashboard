@@ -50,7 +50,7 @@ describe("PayrollExceptionsQueue", () => {
     expect(screen.getByText("Amara Diallo")).toBeInTheDocument();
     expect(screen.getByText("Kofi Boateng")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /resolve exception/i }));
+    fireEvent.click(screen.getByRole("button", { name: /activate employee/i }));
 
     expect(toastSuccess).toHaveBeenCalled();
   });

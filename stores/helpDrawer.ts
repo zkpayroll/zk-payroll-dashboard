@@ -160,4 +160,32 @@ export const HELP_CONTENT: Record<string, HelpContent> = {
       },
     ],
   },
+  "network-remediation": {
+    title: "Network & RPC Remediation Guide",
+    description:
+      "Troubleshoot and safely recover from RPC timeouts, network congestion, and retry exhaustion during payroll operations.",
+    sections: [
+      {
+        heading: "RPC retry exhaustion",
+        content:
+          "When automated retries fail, Soroban RPC or Horizon nodes may be experiencing rate limits (HTTP 429), congestion, or temporary downtime. Wait 30 seconds for rate limit windows to reset before attempting manual retries.",
+      },
+      {
+        heading: "Handling non-idempotent operations",
+        content:
+          "For transaction submissions, verify whether your transaction was already included in a ledger before resubmitting. Check the Pending Transaction Monitor or Stellar Expert explorer to avoid duplicate payments.",
+      },
+      {
+        heading: "Switching RPC endpoints or networks",
+        content:
+          "Ensure your wallet is connected to the expected network (Testnet/Public) and has sufficient XLM for transaction fees. If network errors persist, check dashboard status notices or contact system maintainers.",
+      },
+    ],
+    tips: [
+      "Always check the Pending Transaction Monitor before re-submitting payroll batches",
+      "Do not spam the submit button during high network latency",
+      "Ensure Freighter is unlocked and set to the expected network",
+    ],
+  },
 };
+

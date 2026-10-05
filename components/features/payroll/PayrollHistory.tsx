@@ -6,6 +6,8 @@ import PayrollCalendar from "./PayrollCalendar";
 import { MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import type { PayrollRun } from "@/types/models";
 import { searchPayrollRuns } from "@/lib/payrollSearch";
+import EmptyState from "@/components/ui/EmptyState";
+import { useHelpDrawer, HELP_CONTENT } from "@/stores/helpDrawer";
 
 type StatusFilter = "all" | "pending" | "verified" | "failed" | "cancelled";
 type OutcomeFilter = "all" | "pending" | "partial" | "complete" | "failed";
@@ -33,6 +35,7 @@ const initialFilters: Filters = {
 function PayrollHistory({ runs = MOCK_PAYROLL_RUNS }: PayrollHistoryProps) {
   const [filters, setFilters] = useState<Filters>(initialFilters);
   const [showFilters, setShowFilters] = useState(false);
+  const { openHelp } = useHelpDrawer();
 
   const filteredRuns = useMemo(() => {
     let results = runs;
@@ -205,7 +208,27 @@ function PayrollHistory({ runs = MOCK_PAYROLL_RUNS }: PayrollHistoryProps) {
         </div>
       )}
 
-      <PayrollCalendar runs={filteredRuns} />
+      {/* #365 — a filtered-to-zero result used to fall through to
+          PayrollCalendar's "No payroll runs yet" empty state, which is
+          misleading when the account actually has runs and only the current
+          filter combination excludes all of them. */}
+      {runs.length > 0 && activeFilterCount > 0 && filteredRuns.length === 0 ? (
+        <div className="bg-white rounded-lg shadow-sm">
+          <EmptyState
+            screen="history-filtered"
+            action={{ label: "Clear filters", onClick: clearFilters }}
+            secondaryAction={{
+              label: "View payroll guide",
+              onClick: () => {
+                const content = HELP_CONTENT.payroll;
+                if (content) openHelp("payroll", content);
+              },
+            }}
+          />
+        </div>
+      ) : (
+        <PayrollCalendar runs={filteredRuns} />
+      )}
     </>
   );
 }

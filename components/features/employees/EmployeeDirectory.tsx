@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 
-import { Users, Loader2, UserPlus, Upload } from "lucide-react"
+import { Users, Loader2, UserPlus, Upload, RotateCcw } from "lucide-react"
 import { useEmployeeStore } from "@/stores/employees";
 import { MOCK_EMPLOYEES } from "@/lib/api/mockData";
 import type { Employee } from "@/types";
@@ -25,6 +25,7 @@ function deriveStatus(e: Employee): "active" | "inactive" | "pending" {
 
 function EmployeeDirectory() {
   const { employees: storedEmployees, isLoading: storeLoading } = useEmployeeStore();
+  const retryOnboarding = useEmployeeStore((s) => s.retryOnboarding);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -57,6 +58,12 @@ function EmployeeDirectory() {
 
   const handleRowClick = (emp: Employee) => {
     setSelectedEmployee(emp);
+    setIsDetailOpen(true);
+  };
+
+  const handleRetryOnboarding = (emp: Employee) => {
+    retryOnboarding(emp.id);
+    setSelectedEmployee({ ...emp, onboardingStatus: "in_progress" });
     setIsDetailOpen(true);
   };
 
@@ -173,35 +180,61 @@ function EmployeeDirectory() {
             >
               {filtered.map((emp) => {
                 const status = deriveStatus(emp);
+                const needsRetry = emp.onboardingStatus !== "completed";
+                const retryLabel =
+                  emp.onboardingStatus === "in_progress"
+                    ? "Retry scheduled"
+                    : "Retry onboarding";
                 return (
                   <li 
                     key={emp.id} 
                     className="hover:bg-gray-50 active:bg-gray-100 transition-colors"
                   >
-                    <button
-                      type="button"
-                      onClick={() => handleRowClick(emp)}
-                      className="w-full text-left px-4 py-4 focus:outline-none"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{emp.name}</p>
-                          {emp.email && (
-                            <p className="text-xs text-gray-500 truncate mt-0.5">{emp.email}</p>
-                          )}
-                          <p className="text-xs text-gray-500 mt-1">
-                            {emp.department ?? "—"} · ${emp.salary.toLocaleString()}
-                          </p>
-                          <div className="mt-2 flex gap-2 flex-wrap">
-                            <StatusBadge status={status} showIcon={false} className="px-2 py-0.5 text-[10px]" />
-                            <OnboardingBadge status={emp.onboardingStatus} showIcon={false} />
+                    <div className="px-4 py-4">
+                      <button
+                        type="button"
+                        onClick={() => handleRowClick(emp)}
+                        className="w-full text-left focus:outline-none"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{emp.name}</p>
+                            {emp.email && (
+                              <p className="text-xs text-gray-500 truncate mt-0.5">{emp.email}</p>
+                            )}
+                            <p className="text-xs text-gray-500 mt-1">
+                              {emp.department ?? "—"} · ${emp.salary.toLocaleString()}
+                            </p>
+                            <div className="mt-2 flex gap-2 flex-wrap">
+                              <StatusBadge status={status} showIcon={false} className="px-2 py-0.5 text-[10px]" />
+                              <OnboardingBadge status={emp.onboardingStatus} showIcon={false} />
+                            </div>
+                            {emp.onboardingError && (
+                              <p className="mt-2 text-[11px] text-amber-700">
+                                Last onboarding failure: {emp.onboardingError}
+                              </p>
+                            )}
+                            <p className="text-[10px] text-gray-400 mt-2">
+                              Since {new Date(emp.startDate).toLocaleDateString()}
+                            </p>
                           </div>
-                          <p className="text-[10px] text-gray-400 mt-2">
-                            Since {new Date(emp.startDate).toLocaleDateString()}
-                          </p>
                         </div>
-                      </div>
-                    </button>
+                      </button>
+                      {needsRetry && (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleRetryOnboarding(emp);
+                          }}
+                          disabled={emp.onboardingStatus === "in_progress"}
+                          className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-medium text-amber-700 hover:bg-amber-100"
+                        >
+                          <RotateCcw className="w-3 h-3" aria-hidden="true" />
+                          {retryLabel}
+                        </button>
+                      )}
+                    </div>
                   </li>
                 );
               })}
@@ -243,7 +276,30 @@ function EmployeeDirectory() {
                          <StatusBadge status={status} showIcon={false} />
                       </td>
                       <td className="px-6 py-4">
-                        <OnboardingBadge status={emp.onboardingStatus} />
+                        <div className="space-y-2">
+                          <OnboardingBadge status={emp.onboardingStatus} />
+                          {emp.onboardingError && (
+                            <p className="text-xs text-amber-700">
+                              {emp.onboardingError}
+                            </p>
+                          )}
+                          {emp.onboardingStatus !== "completed" && (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleRetryOnboarding(emp);
+                              }}
+                              disabled={emp.onboardingStatus === "in_progress"}
+                              className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700 hover:bg-amber-100"
+                            >
+                              <RotateCcw className="w-3 h-3" aria-hidden="true" />
+                              {emp.onboardingStatus === "in_progress"
+                                ? "Retry scheduled"
+                                : "Retry onboarding"}
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
                         {new Date(emp.startDate).toLocaleDateString()}

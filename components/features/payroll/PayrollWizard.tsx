@@ -23,25 +23,24 @@ import {
   History,
 } from "lucide-react";
 import { toast } from "sonner";
+import type { Employee } from "@/types/models";
+import DuplicateWarningPanel from "@/components/employees/DuplicateWarningPanel";
 import { usePayrollWizardStore } from "@/stores/payrollWizard";
 import { useWalletStore } from "@/stores/walletStore";
 import { useApprovalHistory } from "@/stores/approvalHistory";
 import { useSession } from "@/hooks/useSession";
 import { EXPECTED_NETWORK } from "@/components/providers/StellarProvider";
 import { IncidentBanner } from "@/components/ui/IncidentBanner";
-import { MOCK_EMPLOYEES, MOCK_COMPANIES, MOCK_PAYROLL_RUNS, MOCK_TREASURY_BALANCE } from "@/lib/api/mockData";
+import { MOCK_COMPANIES, MOCK_EMPLOYEES, MOCK_PAYROLL_RUNS, MOCK_TREASURY_BALANCE } from "@/lib/api/mockData";
 import PayrollReceipt from "./PayrollReceipt";
 import PayrollApprovalAuditTrail from "./PayrollApprovalAuditTrail";
 import { usePayrollAuditTrailStore } from "@/stores/payrollAuditTrail";
 import ApprovalHistoryDrawer from "./ApprovalHistoryDrawer";
 import { PayrollRiskWarnings } from "./PayrollRiskWarnings";
 import { WalletReconnectRecoveryBanner } from "@/components/features/wallet/WalletReconnectRecoveryBanner";
-import type { PayrollWizardStep } from "@/types";
-import {
-  trackEvent,
-  mapErrorToType,
-  bucketEmployeeCount,
-} from "@/lib/telemetry";
+import { ContractErrorHelpButton } from "@/components/features/errors/ContractErrorDrawer";
+import type { PayrollRun, PayrollWizardStep } from "@/types";
+import { trackEvent, mapErrorToType, bucketEmployeeCount } from "@/lib/telemetry";
 
 const STEPS: { key: PayrollWizardStep; label: string }[] = [
   { key: "review", label: "Review" },
@@ -52,6 +51,14 @@ const STEPS: { key: PayrollWizardStep; label: string }[] = [
 
 function stepIndex(step: PayrollWizardStep): number {
   return STEPS.findIndex((s) => s.key === step);
+}
+
+function findConflictingRuns(employeeIds: string[]): PayrollRun[] {
+  return MOCK_PAYROLL_RUNS.filter(
+    (run) =>
+      run.status === "pending" &&
+      run.employeeIds.some((employeeId) => employeeIds.includes(employeeId)),
+  );
 }
 
 function PayrollWizard() {
@@ -107,6 +114,10 @@ function PayrollWizard() {
 
   const selectedEmployees = useMemo(
     () => MOCK_EMPLOYEES.filter((e) => employeeIds.includes(e.id)),
+    [employeeIds],
+  );
+  const conflictingRuns = useMemo(
+    () => findConflictingRuns(employeeIds),
     [employeeIds],
   );
 
@@ -493,9 +504,11 @@ function PayrollWizard() {
             employeeIds={employeeIds}
             selectedEmployees={selectedEmployees}
             totalAmount={totalAmount}
+            conflictingRuns={conflictingRuns}
             onBack={prevStep}
             onSubmit={handleSubmit}
             isWrongNetwork={isWrongNetwork}
+            isSessionExpired={isSessionExpired}
           />
         )}
         {currentStep === "submit" && (
@@ -535,7 +548,7 @@ function ReviewStep({
   isWrongNetwork,
 }: {
   employeeIds: string[];
-  selectedEmployees: { id: string; name: string; salary: number }[];
+  selectedEmployees: Employee[];
   totalAmount: number;
   onStart: () => void;
   onNext: () => void;
@@ -567,6 +580,7 @@ function ReviewStep({
         Review the employees and amounts included in this payroll run before
         generating the ZK proof.
       </p>
+      <DuplicateWarningPanel employees={selectedEmployees} />
       <div className="border rounded-lg divide-y">
         {selectedEmployees.map((emp) => (
           <div key={emp.id} className="px-4 py-3 flex justify-between">
@@ -655,14 +669,17 @@ function ProofStep({
         <div className="text-center py-6 space-y-3">
           <AlertCircle className="w-8 h-8 text-red-500 mx-auto" />
           <p className="text-sm text-red-700">{error}</p>
-          <button
-            type="button"
-            onClick={onRetry}
-            className="w-full sm:w-auto px-4 py-2 rounded-md bg-red-50 text-red-700 text-sm font-medium hover:bg-red-100 border border-red-200 transition-colors inline-flex justify-center items-center gap-1"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Retry
-          </button>
+          <div className="flex flex-col sm:flex-row justify-center gap-3">
+            <button
+              type="button"
+              onClick={onRetry}
+              className="w-full sm:w-auto px-4 py-2 rounded-md bg-red-50 text-red-700 text-sm font-medium hover:bg-red-100 border border-red-200 transition-colors inline-flex justify-center items-center gap-1"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Retry
+            </button>
+            <ContractErrorHelpButton error={error} />
+          </div>
         </div>
       )}
 
@@ -683,21 +700,23 @@ function ProofStep({
 function ConfirmStep({
   selectedEmployees,
   totalAmount,
+  conflictingRuns,
   onBack,
   onSubmit,
   isWrongNetwork,
+  isSessionExpired,
 }: {
   employeeIds: string[];
   selectedEmployees: { id: string; name: string; salary: number }[];
   totalAmount: number;
+  conflictingRuns: PayrollRun[];
   onBack: () => void;
   onSubmit: () => void;
   isWrongNetwork: boolean;
+  isSessionExpired: boolean;
 }) {
   const [confirmed, setConfirmed] = useState(false);
   const store = usePayrollWizardStore();
-  const { sessionState } = useSession();
-  const isSessionExpired = sessionState === "expired";
 
   const { isProofNearingExpiration, treasuryBalanceOverride } = store;
   const treasuryBalance =
@@ -809,14 +828,16 @@ function ConfirmStep({
       );
     }
 
+    if (conflictingRuns.length > 0) {
+      list.push(
+        `Payroll draft conflict detected with ${conflictingRuns
+          .map((run) => run.id)
+          .join(", ")}. Another admin is already preparing this employee batch.`,
+      );
+    }
+
     return list;
-  }, [
-    treasuryBalance,
-    totalAmount,
-    store.proofStatus,
-    isProofNearingExpiration,
-    selectedEmployees,
-  ]);
+  }, [treasuryBalance, totalAmount, store.proofStatus, isProofNearingExpiration, selectedEmployees, conflictingRuns]);
 
   const state: "ready" | "warning" | "blocked" = useMemo(() => {
     if (blockers.length > 0) return "blocked";
@@ -922,6 +943,25 @@ function ConfirmStep({
         selectedEmployees={selectedEmployees}
         allEmployees={MOCK_EMPLOYEES}
       />
+
+      {conflictingRuns.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <h4 className="text-sm font-semibold text-red-800">Draft conflict detected</h4>
+            <p className="text-sm text-red-700 mt-0.5">
+              Another payroll draft is already tracking the selected employee batch. Resolve or discard the overlapping run before submitting.
+            </p>
+            <ul className="list-disc list-inside text-xs text-red-700 mt-2 space-y-1">
+              {conflictingRuns.map((run) => (
+                <li key={run.id}>
+                  Run {run.id} is still pending review.
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {/* Grid: Payroll Info & Asset summary */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1274,6 +1314,7 @@ function SubmitStep({
             >
               Start Over
             </button>
+            <ContractErrorHelpButton error={error} />
           </div>
         </div>
       )}

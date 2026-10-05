@@ -176,7 +176,7 @@ function ExportCard({
           ? "border-gray-200 opacity-70 grayscale-[30%]"
           : "border-gray-200 hover:border-indigo-200 hover:shadow-md"
       }`}
-      aria-disabled={isLocked}
+      data-disabled={isLocked}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">

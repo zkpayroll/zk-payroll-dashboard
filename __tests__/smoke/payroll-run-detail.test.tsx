@@ -4,13 +4,15 @@ import PayrollRunDetail from "@/components/features/payroll/PayrollRunDetail";
 import { MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 
 describe("Payroll Run Detail", () => {
-  it("renders scheduled submission-locked run without process action", () => {
+  it("renders scheduled confirmation-locked run without process action", () => {
+    // tx_003 is a pending run that already has a transaction hash, so it is
+    // locked awaiting on-chain confirmation (see getPayrollLockState).
     const run = MOCK_PAYROLL_RUNS.find((r) => r.id === "tx_003")!;
     render(<PayrollRunDetail run={run} />);
 
     expect(screen.getByRole("heading", { level: 1, name: /payroll run/i })).toBeInTheDocument();
     expect(screen.getByText("Scheduled")).toBeInTheDocument();
-    expect(screen.getByRole("alert", { name: /payroll run locked: submission/i })).toBeInTheDocument();
+    expect(screen.getByRole("alert", { name: /payroll run locked: confirmation/i })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /process payroll/i })).not.toBeInTheDocument();
   });
 

@@ -8,6 +8,7 @@ interface EmployeeState {
   addEmployee: (employee: Employee) => void;
   updateEmployee: (id: string, updates: Partial<Employee>) => void;
   removeEmployee: (id: string) => void;
+  retryOnboarding: (id: string, reason?: string) => void;
   setEmployees: (employees: Employee[]) => void;
   setLoading: (loading: boolean) => void;
 }
@@ -33,6 +34,21 @@ export const useEmployeeStore = create<EmployeeState>()(
       removeEmployee: (id) =>
         set((state) => ({
           employees: state.employees.filter((e) => e.id !== id),
+        })),
+
+      retryOnboarding: (id, reason) =>
+        set((state) => ({
+          employees: state.employees.map((employee) =>
+            employee.id === id
+              ? {
+                  ...employee,
+                  onboardingStatus: "in_progress" as const,
+                  onboardingRetryCount: (employee.onboardingRetryCount ?? 0) + 1,
+                  onboardingError: reason ?? null,
+                  lastOnboardingAttemptAt: new Date().toISOString(),
+                }
+              : employee,
+          ),
         })),
 
       setEmployees: (employees) => set({ employees }),

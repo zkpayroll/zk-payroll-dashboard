@@ -29,6 +29,12 @@ describe('AdminOverview', () => {
     expect(screen.getByText('Pending actions')).toBeInTheDocument();
   });
 
+  it('renders the pending transaction monitor', () => {
+    render(<AdminOverview />);
+    expect(screen.getByRole('heading', { name: /pending transaction monitor/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /view explorer/i }).length).toBeGreaterThan(0);
+  });
+
   it('links treasury card to /history', () => {
     render(<AdminOverview />);
     const links = screen.getAllByRole('link', { name: /view details/i });

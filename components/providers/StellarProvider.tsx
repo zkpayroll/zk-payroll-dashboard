@@ -23,6 +23,7 @@ import { WalletErrorOverlay } from './WalletErrorOverlay';
 import { createLogger } from '@/lib/logger';
 import { startPerformanceMark, endPerformanceMark } from '@/lib/monitoring';
 import { categorizeSigningError } from '@/lib/wallet/signingErrors';
+import { useSigningFailuresStore, type RecoverableSigningCategory } from '@/stores/signingFailures';
 
 // ─── Network Configuration ────────────────────────────────────────────────────
 
@@ -349,6 +350,12 @@ export const StellarProvider: React.FC<{ children: React.ReactNode }> = ({
                     label: rawMessage,
                 });
                 setError(rawMessage);
+                if (category !== 'wrong-network') {
+                    useSigningFailuresStore.getState().recordFailure({
+                        category: category as RecoverableSigningCategory,
+                        message: rawMessage,
+                    });
+                }
                 switch (category) {
                     case 'rejected':
                         setSignRetry(() => retry);

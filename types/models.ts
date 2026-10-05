@@ -13,6 +13,9 @@ export interface Employee {
   isActive: boolean;
   status?: "active" | "inactive" | "pending";
   onboardingStatus: OnboardingStatus;
+  onboardingRetryCount?: number;
+  onboardingError?: string | null;
+  lastOnboardingAttemptAt?: string | null;
   startDate: string;
   lastPayment?: string;
 }
@@ -101,12 +104,18 @@ export interface PayrollTransaction {
   employeeCount: number;
   proof: string;
   status: "pending" | "verified" | "failed" | "cancelled";
-  approvalStatus?: "draft" | "pending_executive_approval" | "approved" | "rejected";
+  approvalStatus?:
+    | "draft"
+    | "pending_executive_approval"
+    | "approved"
+    | "rejected"
+    | "correction_requested";
   approvalHistory?: Array<{
     approvedBy: string;
     approvedAt: string;
     role: string;
     comment?: string;
+    action?: "approved" | "rejected" | "correction_requested" | "resubmitted";
   }>;
   txHash?: string;
   isArchived?: boolean;
@@ -114,6 +123,8 @@ export interface PayrollTransaction {
 
 export interface PayrollRun extends PayrollTransaction {
   employeeIds: string[];
+  /** Settlement-service receipt identifier; absent until settlement completes. */
+  receiptId?: string | null;
   executedAt?: string | null;
   transactionHash?: string | null;
   reconciliationStatus?: "pending" | "partial" | "complete" | "failed";
@@ -439,3 +450,184 @@ export interface ComplianceEvidenceBundle {
   };
 }
 
+// ─── Payroll Review Risk Scoring (#258) ──────────────────────────────────────
+
+export type RiskFactorType =
+  | "treasury_balance"
+  | "stale_wallet"
+  | "invalid_address"
+  | "inactive_employee"
+  | "missing_commitment"
+  | "high_variance"
+  | "new_employee"
+  | "large_amount";
+
+export type RiskSeverity = "low" | "medium" | "high" | "critical";
+
+export interface RiskFactor {
+  type: RiskFactorType;
+  severity: RiskSeverity;
+  title: string;
+  description: string;
+  weight: number;
+}
+
+export interface PayrollRiskScore {
+  payrollId: string;
+  overallScore: number;
+  riskLevel: "clear" | "caution" | "warning" | "block";
+  factors: RiskFactor[];
+  calculatedAt: string;
+}
+
+// ─── Employee Onboarding Readiness Tracker (#259) ─────────────────────────────
+
+export type OnboardingStep =
+  | "wallet_connected"
+  | "identity_verified"
+  | "salary_set"
+  | "commitment_generated"
+  | "active_status";
+
+export type OnboardingStepStatus = "pending" | "in_progress" | "complete" | "failed";
+
+export interface EmployeeOnboardingStep {
+  step: OnboardingStep;
+  label: string;
+  status: OnboardingStepStatus;
+  completedAt?: string;
+  error?: string;
+}
+
+export interface EmployeeOnboardingReadiness {
+  employeeId: string;
+  name: string;
+  overallStatus: "not_ready" | "partial" | "ready";
+  steps: EmployeeOnboardingStep[];
+  readyForPayroll: boolean;
+  completedCount: number;
+  totalCount: number;
+}
+
+// ─── Treasury Drain Simulation Warning (#260) ─────────────────────────────────
+
+export interface TreasuryDrainConfig {
+  reserveThreshold: number;
+  emergencyReserve: number;
+  warningEnabled: boolean;
+}
+
+export interface TreasuryDrainSimulation {
+  currentBalance: number;
+  projectedDrain: number;
+  remainingAfterDrain: number;
+  reserveThreshold: number;
+  emergencyReserve: number;
+  wouldExceedReserve: boolean;
+  wouldExceedEmergency: boolean;
+  severity: "safe" | "warning" | "critical";
+  message: string;
+}
+
+// ─── Auditor-Ready Payroll Timeline (#261) ────────────────────────────────────
+
+export type AuditTimelineEventType =
+  | "run_initiated"
+  | "employees_selected"
+  | "proof_generated"
+  | "treasury_verified"
+  | "approval_received"
+  | "transaction_submitted"
+  | "block_confirmed"
+  | "reconciliation_completed"
+  | "run_failed";
+
+export interface AuditTimelineEvent {
+  id: string;
+  type: AuditTimelineEventType;
+  timestamp: string;
+  actor: string;
+  /** Privacy-safe description — never includes raw salary amounts */
+  summary: string;
+  /** Hash of event details for tamper-proofing */
+  eventHash: string;
+  /** Optional metadata — all values are commitments or hashes, not raw data */
+  metadata?: Record<string, string>;
+}
+
+export interface AuditReadyTimeline {
+  payrollId: string;
+  companyId: string;
+  events: AuditTimelineEvent[];
+  /** Merkle root of all event hashes for verification */
+  timelineRoot: string;
+  generatedAt: string;
+  /** Whether this timeline has been exported for audit */
+  exported: boolean;
+}
+
+// ─── Wallet Rotation Approval Timeline (#262) ────────────────────────────────
+
+export type WalletRotationEventType =
+  | "rotation_requested"
+  | "approval_granted"
+  | "approval_rejected"
+  | "cooldown_activated"
+  | "cooldown_expired"
+  | "emergency_override"
+  | "rotation_completed"
+  | "rotation_failed";
+
+export type WalletRotationReasonCode =
+  | "key_compromise"
+  | "device_loss"
+  | "scheduled_rotation"
+  | "compliance_requirement"
+  | "emergency";
+
+export interface WalletRotationEvent {
+  id: string;
+  employeeId: string;
+  type: WalletRotationEventType;
+  timestamp: string;
+  actor: string;
+  reasonCode: WalletRotationReasonCode;
+  previousWallet: string;
+  newWallet?: string;
+  /** Human-readable description — wallet addresses are masked by default */
+  summary: string;
+  metadata?: Record<string, string>;
+}
+
+export interface WalletRotationRequest {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  previousWallet: string;
+  newWallet: string;
+  reasonCode: WalletRotationReasonCode;
+  requestedBy: string;
+  requestedAt: string;
+  status: "pending" | "approved" | "rejected" | "cooldown" | "completed" | "failed";
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
+  cooldownEndsAt?: string;
+  isEmergency?: boolean;
+  events: WalletRotationEvent[];
+  metadata?: Record<string, string>;
+}
+
+export interface WalletRotationCooldown {
+  employeeId: string;
+  rotationId: string;
+  activatedAt: string;
+  expiresAt: string;
+  isActive: boolean;
+}
+
+export interface WalletRotationWarning {
+  type: "cooldown_active" | "payroll_blocker" | "pending_approval";
+  message: string;
+  severity: "info" | "warning" | "critical";
+}

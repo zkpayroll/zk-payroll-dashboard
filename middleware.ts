@@ -59,8 +59,8 @@ function applySecurityHeaders(response: NextResponse): void {
 
 const PUBLIC_PATHS = ['/', '/login', '/api/health', '/api/csp-report'];
 const PUBLIC_PREFIXES = ['/api/auth/'];
-const PROTECTED_PREFIXES = ['/dashboard', '/payroll', '/employees', '/settings', '/history', '/treasury', '/compliance', '/setup', '/incidents', '/admin'];
-const ADMIN_ONLY_PREFIXES = ['/payroll/cancel', '/compliance/revoke', '/treasury/update', '/employees/deactivate', '/api/payroll/\:\s*\d+', '/api/compliance/\:\s*\d+', '/api/treasury/\:\s*\d+', '/api/employees/\:\s*\d+'];
+const PROTECTED_PREFIXES = ['/dashboard', '/payroll', '/employees', '/settings', '/history', '/treasury', '/compliance', '/setup', '/incidents', '/admin', '/audit'];
+const ADMIN_ONLY_PREFIXES = ['/payroll/cancel', '/compliance/revoke', '/treasury/update', '/employees/deactivate', '/api/payroll/\\:\\s*\\d+', '/api/compliance/\\:\\s*\\d+', '/api/treasury/\\:\\s*\\d+', '/api/employees/\\:\\s*\\d+'];
 
 function isPublicRoute(pathname: string): boolean {
   if (PUBLIC_PATHS.includes(pathname)) return true;
@@ -73,7 +73,7 @@ function isProtectedRoute(pathname: string): boolean {
 
 function isAdminOnlyRoute(pathname: string): boolean {
   return ADMIN_ONLY_PREFIXES.some(pattern => {
-    const regex = new RegExp(pattern.replace(/:/g, '\\:'));
+    const regex = new RegExp(pattern.replace(/:/g, '\\\\:'));
     return regex.test(pathname);
   });
 }

@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Employee Onboarding Duplicate Reference Warning**: Warn when onboarding input repeats an employee reference id
+  - Optional `employee_id` column on the CSV import (also accepts `reference_id`)
+  - Warning panel in the import preview naming the duplicated ids and their row numbers
+  - `lib/validation/duplicateReferenceId.ts` pure grouping helper shared by onboarding surfaces
+  - Tests covering the helper, the panel, and the CSV flow (duplicates, distinct ids, column-less files)
+  - Operator handbook CSV format and troubleshooting updated
+
 - **Transaction Detail Drawer**: Comprehensive detail view for inspecting payroll transactions
   - View transaction summary with total amount and employee count
   - Display verification status with clear visual indicators and explanations

@@ -252,6 +252,8 @@ export default function PayrollExceptionsQueue() {
                           Payroll run {tx.id}
                         </span>
                         <span
+                          role="status"
+                          aria-label={tx.status}
                           className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${
                             tx.status === "failed"
                               ? "bg-red-100 text-red-700"

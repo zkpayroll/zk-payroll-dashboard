@@ -7,12 +7,15 @@ import { useWalletStore } from "@/stores/walletStore";
 import { useCompanyStore } from "@/stores/company";
 import WalletConnect from "@/components/features/wallet/WalletConnect";
 import PayrollSummary from "@/components/features/payroll/PayrollSummary";
+import PeriodSummaryCard from "@/components/features/payroll/PeriodSummaryCard";
 import SystemStatus from "@/components/features/dashboard/SystemStatus";
 import QuickActions from "@/components/features/dashboard/QuickActions";
 import OnboardingChecklistPanel from "@/components/features/dashboard/OnboardingChecklistPanel";
+import OnboardingReadinessTracker from "@/components/features/employees/OnboardingReadinessTracker";
 import PinnedAlertsPanel from "@/components/features/dashboard/PinnedAlertsPanel";
 import { SessionTimeoutBanner } from "@/components/features/dashboard/SessionTimeoutBanner";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import ReviewerWorkloadSummary from "@/components/reviewers/ReviewerWorkloadSummary";
 
 function DashboardHome() {
   const { isFreighterInstalled } = useStellar();
@@ -131,13 +134,22 @@ function DashboardHome() {
         <PinnedAlertsPanel alerts={sampleAlerts} tasks={sampleTasks} />
       </ErrorBoundary>
       <ErrorBoundary>
+        <ReviewerWorkloadSummary />
+      </ErrorBoundary>
+      <ErrorBoundary>
         <QuickActions />
       </ErrorBoundary>
       <ErrorBoundary>
         <OnboardingChecklistPanel />
       </ErrorBoundary>
       <ErrorBoundary>
+        <OnboardingReadinessTracker />
+      </ErrorBoundary>
+      <ErrorBoundary>
         <SystemStatus />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <PeriodSummaryCard />
       </ErrorBoundary>
       <ErrorBoundary>
         <PayrollSummary />

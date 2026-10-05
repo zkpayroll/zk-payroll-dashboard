@@ -22,8 +22,11 @@ describe('role-aware navigation and route rules', () => {
       'Archived Payrolls',
       'Exports',
       'Compliance',
+      'Attestations',
+      'Reconciliation Inspector',
       'Settings',
     ]);
+
   });
 
   it('keeps restricted pages behind role-aware route checks', () => {

@@ -30,6 +30,21 @@ vi.mock("@/components/providers/StellarProvider", () => ({
   }),
 }));
 
+// The demo dataset keeps tx_003 perpetually "pending" for the only two active
+// employees (emp_001/emp_002), so draft-conflict detection would always fire and
+// make the all-clear "Ready" state unreachable. Draft-conflict behavior is
+// covered on its own in payroll-wizard.test.tsx; here we isolate the validation
+// flows by dropping in-flight pending runs from the conflict source.
+vi.mock("@/lib/api/mockData", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api/mockData")>();
+  return {
+    ...actual,
+    MOCK_PAYROLL_RUNS: actual.MOCK_PAYROLL_RUNS.filter(
+      (run) => run.status !== "pending",
+    ),
+  };
+});
+
 describe("Payroll Confirmation Summary & Validation Flows", () => {
   beforeEach(() => {
     vi.useFakeTimers();

@@ -15,6 +15,8 @@ import { useEmployeeStore } from "@/stores/employees";
 import { MOCK_EMPLOYEES, MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import type { Employee } from "@/types";
 import EmptyState from "@/components/ui/EmptyState";
+import EmployeeAuditSidebar from "./EmployeeAuditSidebar";
+import WalletChangeReviewCard from "@/components/review/WalletChangeReviewCard";
 
 interface CommitmentEntry {
   id: string;
@@ -195,6 +197,10 @@ function EmployeeDetailPageContent({ employeeId }: { employeeId: string }) {
         </div>
       </div>
 
+      <WalletChangeReviewCard employeeId={employee.id} employeeName={employee.name} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="lg:col-span-2 space-y-6">
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b flex items-center gap-2">
           <Shield className="w-4 h-4 text-gray-500" aria-hidden="true" />
@@ -333,6 +339,10 @@ function EmployeeDetailPageContent({ employeeId }: { employeeId: string }) {
             </tbody>
           </table>
         )}
+      </div>
+      </div>
+
+      <EmployeeAuditSidebar employee={employee} />
       </div>
     </section>
   );

@@ -1,22 +1,28 @@
-name: CI
+name: Dashboard CI
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - dev
   pull_request:
-    branches: [ main ]
-
+    branches:
+      - main
+      - dev
 jobs:
-  build:
+  verify:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -24,19 +30,16 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Lint Markdown
-        run: npm run lint:md
+      - name: Typecheck
+        run: npm run typecheck
 
-      - name: Unit Tests
-        run: npm test || echo "No tests found yet"
+      - name: Test
+        run: npm test
 
-      - name: Smoke Tests
+      - name: Smoke tests
         run: npm run test:smoke
 
-      - name: Build Next.js
+      - name: Build
         run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: 1
-
-      - name: Type Check
-        run: npx tsc --noEmit

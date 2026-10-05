@@ -222,9 +222,14 @@ The system will automatically:
 **CSV Format:**
 
 ```csv
-name,address,email,department,salary,startDate
-John Doe,GADDRESS123...,john@example.com,Engineering,5000,2024-01-01
+name,email,department,address,salary,start_date,employee_id
+John Doe,john@example.com,Engineering,GADDRESS123...,5000,2024-01-01,EMP-001
 ```
+
+`employee_id` is optional. When present, the import preview warns if the same
+reference id appears on more than one row, and names the affected rows. Resolve
+the duplicate before importing so each employee maps to exactly one reference id
+in payroll.
 
 #### Import Review Queue
 
@@ -471,6 +476,7 @@ For approved requests:
 
 - CSV import fails validation
 - Some records rejected
+- Duplicate employee reference id warning
 
 **Solutions:**
 
@@ -480,6 +486,10 @@ For approved requests:
 4. Ensure salary amounts are numeric
 5. Verify date format (YYYY-MM-DD)
 6. Remove special characters from names
+7. For a duplicate reference id warning, edit the `employee_id` column so each
+   id appears once. The warning lists the affected row numbers; the import is
+   not blocked, but unresolved duplicates will match the wrong employee in
+   payroll.
 
 ### System Status Issues
 
