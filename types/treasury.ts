@@ -9,6 +9,8 @@
  * evaluator never has to round-trip money through floating point.
  */
 
+import type { ShortfallAction } from "@/types/policy";
+
 /**
  * Reserve health for a single payroll asset.
  *
@@ -123,3 +125,89 @@ export type TreasuryLiquidityReserveResult =
   | TreasuryLiquidityReserveInvalidResult
   | TreasuryLiquidityReserveUnscheduledResult
   | TreasuryLiquidityReserveEvaluatedResult;
+
+/**
+ * Types for Dashboard Treasury Replenishment Readiness Analysis (#617).
+ *
+ * Answers whether the treasury should be replenished before the next payroll
+ * run, given the configured reserve policy (`ReserveRulesPolicy`), and how
+ * much top-up is recommended.
+ */
+
+/**
+ * - `ready`         – balance meets the policy reserve target; no action needed.
+ * - `watch`         – balance covers payroll but sits below the reserve target.
+ * - `replenish_now` – balance is below the replenishment threshold or cannot
+ *                     cover the next payroll run; act before executing.
+ */
+export type TreasuryReplenishmentReadinessStatus = "ready" | "watch" | "replenish_now";
+
+export const TREASURY_REPLENISHMENT_READINESS_STATUSES: readonly TreasuryReplenishmentReadinessStatus[] =
+  ["ready", "watch", "replenish_now"] as const;
+
+export const TREASURY_REPLENISHMENT_READINESS_STATUS_LABELS: Record<
+  TreasuryReplenishmentReadinessStatus,
+  string
+> = {
+  ready: "Ready",
+  watch: "Below target",
+  replenish_now: "Replenish now",
+};
+
+/** Which input failed validation. */
+export type TreasuryReplenishmentIssueField =
+  | "availableBalance"
+  | "nextPayrollObligation"
+  | "reservePolicy";
+
+export interface TreasuryReplenishmentIssue {
+  field: TreasuryReplenishmentIssueField;
+  message: string;
+}
+
+/** The reserve policy slice the analysis depends on. */
+export interface TreasuryReplenishmentPolicyInput {
+  minReservePercentage: number;
+  minReserveFixedAmount: number;
+  replenishThresholdPercentage: number;
+  shortfallPolicy: ShortfallAction;
+}
+
+/** Raw readings the replenishment analysis evaluates. */
+export interface TreasuryReplenishmentSnapshot {
+  assetCode: string;
+  availableBalance: TreasuryAmountInput | null | undefined;
+  nextPayrollObligation: TreasuryAmountInput | null | undefined;
+  policy: TreasuryReplenishmentPolicyInput | null | undefined;
+}
+
+interface TreasuryReplenishmentResultBase {
+  assetCode: string;
+}
+
+/** An input was unusable; no readiness status is reported. */
+export interface TreasuryReplenishmentInvalidResult
+  extends TreasuryReplenishmentResultBase {
+  kind: "invalid";
+  issues: TreasuryReplenishmentIssue[];
+}
+
+export interface TreasuryReplenishmentEvaluatedResult
+  extends TreasuryReplenishmentResultBase {
+  kind: "evaluated";
+  status: TreasuryReplenishmentReadinessStatus;
+  balance: string;
+  nextPayrollObligation: string;
+  targetReserveAmount: string;
+  replenishThresholdAmount: string;
+  shortfall: string;
+  topUpAmount: string;
+  shortfallPolicy: ShortfallAction;
+  shouldReplenish: boolean;
+  payrollBlocked: boolean;
+  message: string;
+}
+
+export type TreasuryReplenishmentReadinessResult =
+  | TreasuryReplenishmentInvalidResult
+  | TreasuryReplenishmentEvaluatedResult;

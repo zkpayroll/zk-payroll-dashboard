@@ -1,5 +1,6 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import TimezoneDisplayPreference from "@/components/timezone/TimezoneDisplayPreference";
+import PayrollBoundaryPreview from "@/components/timezone/PayrollBoundaryPreview";
 
 export const metadata = {
   title: "Timezone Display | ZK Payroll",
@@ -18,6 +19,7 @@ function TimezoneSettingsPage() {
           </p>
         </div>
         <TimezoneDisplayPreference />
+        <PayrollBoundaryPreview />
       </div>
     </DashboardLayout>
   );

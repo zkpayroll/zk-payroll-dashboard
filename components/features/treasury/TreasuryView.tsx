@@ -12,6 +12,7 @@ import FundingImbalanceDashboard from "./FundingImbalanceDashboard";
 import ReservationExpiryWarning from "./ReservationExpiryWarning";
 import ReservationToastListener from "./ReservationToastListener";
 import AssetReadinessTable from "./AssetReadinessTable";
+import TreasuryReplenishmentReadinessCard from "./TreasuryReplenishmentReadinessCard";
 import { createFundingReservation } from "@/lib/events/reservationEvents";
 import SupportedAssetsEmptyState from "@/components/features/assets/SupportedAssetsEmptyState";
 import { hasSupportedPayrollAssets } from "@/lib/assets/supportedAssets";
@@ -108,6 +109,8 @@ function TreasuryView({ configuredAssets }: { configuredAssets?: Array<{ code: s
           </div>
         </article>
       </div>
+
+      <TreasuryReplenishmentReadinessCard />
 
       <AssetReadinessTable
         rows={[
