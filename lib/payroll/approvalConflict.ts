@@ -79,7 +79,8 @@ export interface ApprovalConflictDetail {
     | "correction_expired"
     | "already_decided_by_you"
     | "not_awaiting_approval"
-    | "insufficient_treasury_reservation";
+    | "insufficient_treasury_reservation"
+    | "missing_decision_reason";
   /** The state the draft is actually in. */
   currentStatus: ApprovalSnapshot["approvalStatus"];
   /** Human label for the state, e.g. "Approved". */
@@ -268,6 +269,55 @@ export function insufficientTreasuryConflict(
       currentStatusLabel: STATUS_LABELS[snapshot.approvalStatus],
       attemptedAction: "approved",
       message,
+    },
+  };
+}
+
+/**
+ * Review decision completeness (#684).
+ *
+ * `rejectDraft` and `requestCorrection` both record a reviewer's `comment`
+ * into `approvalHistory`, but neither the store nor this module previously
+ * verified it was non-empty — a rejection or correction request could be
+ * recorded with no rationale at all. That leaves the drafter (and the audit
+ * trail) with a decision but no explanation of what to fix or why the run
+ * was turned back, which defeats the point of recording a reason in the
+ * first place.
+ *
+ * `approved` deliberately stays exempt: approving carries no obligation to
+ * justify "why this is fine", and the queue UI already supplies a sensible
+ * default comment for it. Only decisions that ask someone to act on
+ * feedback (`rejected`, `correction_requested`) must actually carry that
+ * feedback.
+ */
+export function requiresDecisionReason(action: ApprovalAction): boolean {
+  return action === "rejected" || action === "correction_requested";
+}
+
+/** Whether `comment` is non-empty after trimming — whitespace-only doesn't count. */
+export function hasDecisionReason(comment?: string): boolean {
+  return typeof comment === "string" && comment.trim().length > 0;
+}
+
+/**
+ * Builds the conflict payload for a rejection/correction attempted without a
+ * reason. Kept separate from `conflict()` (approval-state races) since this
+ * is a completeness check on the *input*, not a question of the draft's
+ * current state — it can fire even against a draft nobody else has touched.
+ */
+export function missingDecisionReasonConflict(
+  snapshot: ApprovalSnapshot,
+  attemptedAction: ApprovalAction,
+): ApprovalActionResult {
+  const attempted = ACTION_LABELS[attemptedAction];
+  return {
+    ok: false,
+    conflict: {
+      reason: "missing_decision_reason",
+      currentStatus: snapshot.approvalStatus,
+      currentStatusLabel: STATUS_LABELS[snapshot.approvalStatus],
+      attemptedAction,
+      message: `A reason is required to ${attempted} this payroll. Add a comment explaining what needs to change before submitting the decision.`,
     },
   };
 }

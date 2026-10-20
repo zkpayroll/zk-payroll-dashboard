@@ -8,6 +8,9 @@ import {
   approvalsRecorded,
   requiredApprovalsFor,
   insufficientTreasuryConflict,
+  requiresDecisionReason,
+  hasDecisionReason,
+  missingDecisionReasonConflict,
   type ApprovalAction,
   type ApprovalActionResult,
 } from "@/lib/payroll/approvalConflict";
@@ -203,6 +206,20 @@ export const useApprovalQueueStore = create<ApprovalQueueState>()(
       },
       rejectDraft: (id, reviewerName, role, comment) => {
         const target = get().drafts.find((d) => d.id === id);
+        // Decision completeness (#684): a rejection without a reason leaves
+        // the drafter with nothing to act on. This is checked only once the
+        // action is otherwise legal against the draft's current state — a
+        // stale/conflicting reject (e.g. the draft was already approved by
+        // someone else) must still surface as *that* conflict, not a missing
+        // reason, so the state check runs first via `evaluateApprovalAction`.
+        if (
+          target &&
+          requiresDecisionReason("rejected") &&
+          !hasDecisionReason(comment) &&
+          evaluateApprovalAction(target, "rejected", reviewerName, true).ok
+        ) {
+          return missingDecisionReasonConflict(target, "rejected");
+        }
         const { drafts, result } = guardedUpdate(
           get().drafts, id, reviewerName, role, "rejected",
           (d, at) => ({
@@ -236,6 +253,21 @@ export const useApprovalQueueStore = create<ApprovalQueueState>()(
         return result;
       },
       requestCorrection: (id, reviewerName, role, comment) => {
+        const target = get().drafts.find((d) => d.id === id);
+        // Decision completeness (#684): correction requests already type
+        // `comment` as required, but nothing previously enforced it at
+        // runtime — a caller (e.g. a future API route, or a test) could
+        // still pass an empty string straight through to approvalHistory.
+        // As with reject, a stale/conflicting request must surface as that
+        // conflict rather than a missing-reason error.
+        if (
+          target &&
+          requiresDecisionReason("correction_requested") &&
+          !hasDecisionReason(comment) &&
+          evaluateApprovalAction(target, "correction_requested", reviewerName, true).ok
+        ) {
+          return missingDecisionReasonConflict(target, "correction_requested");
+        }
         const { drafts, result } = guardedUpdate(
           get().drafts, id, reviewerName, role, "correction_requested",
           // Correction requests keep the run in "pending" (not cancelled) since
