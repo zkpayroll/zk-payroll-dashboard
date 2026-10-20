@@ -9,3 +9,4 @@ export * from "./ActivePeriodConflictWarning";
 export * from "./PayrollCorrectionPermissionNotice";
 export * from "./DuplicateExecutionPreventionMessage";
 export * from "./EmployerConfigurationRevisionHistory";
+export * from "./LateAdjustmentEscalationBanner";
