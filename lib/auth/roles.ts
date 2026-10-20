@@ -228,3 +228,21 @@ export function getCancellationRestrictionReason(role: UserRole): string | null 
   return 'Payroll cancellation is restricted to Admin and Operator roles. Auditor view is read-only.';
 }
 
+/**
+ * Emergency payroll pause authorization (#665).
+ *
+ * Unlike cancellation (admin or operator, irreversible), an emergency pause
+ * is admin-only: it is meant for a trusted party to halt an in-flight run
+ * while suspected fraud/compliance/treasury issues are investigated, and
+ * resuming it is just as sensitive as pausing it, so both ends of the
+ * action share the same restriction.
+ */
+export function canPausePayroll(role: UserRole): boolean {
+  return role === 'admin';
+}
+
+export function getPauseRestrictionReason(role: UserRole): string | null {
+  if (canPausePayroll(role)) return null;
+  return 'Emergency pause/resume is restricted to Admin roles. Operators and Auditors have read-only visibility into paused runs.';
+}
+

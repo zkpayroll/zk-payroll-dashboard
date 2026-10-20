@@ -36,7 +36,9 @@ import {
 } from "@/lib/payroll/scheduleUtils";
 import ReconciliationDiffPanel from "@/components/features/payroll/ReconciliationDiffPanel";
 import CancelPayrollDialog from "./CancelPayrollDialog";
+import PausePayrollDialog from "./PausePayrollDialog";
 import PayrollCancellationPanel from "./PayrollCancellationPanel";
+import { canPausePayroll } from "@/lib/auth/roles";
 import { MissingProofWarning, ExpiredProofWarning } from "@/components/features/proofs/MissingProofWarning";
 import ApprovalExpiryBadge from "@/components/signing/ApprovalExpiryBadge";
 import { evaluateApprovalExpiry } from "@/lib/date/approvalExpiry";
@@ -50,6 +52,7 @@ const STATUS_ICONS: Record<string, LucideIcon> = {
   pending: Clock,
   failed: XCircle,
   cancelled: XCircle,
+  paused: AlertTriangle,
 };
 
 const LAST_UPDATED_FORMATTER = new Intl.DateTimeFormat("en-US", {
@@ -72,11 +75,14 @@ export function findPayrollRun(id: string, runs = MOCK_PAYROLL_RUNS): PayrollRun
   return runs.find((run) => run.id === id);
 }
 
-export type LockState = "submission" | "confirmation" | "reconciliation" | "cancellation" | null;
+export type LockState = "submission" | "confirmation" | "reconciliation" | "cancellation" | "paused" | null;
 
 export function getPayrollLockState(run: PayrollRun): LockState {
   if (run.status === "cancelled") {
     return "cancellation";
+  }
+  if (run.status === "paused") {
+    return "paused";
   }
   if (run.status === "pending") {
     const txHash = run.transactionHash ?? run.txHash;
@@ -106,6 +112,7 @@ export default function PayrollRunDetail({ run: propRun, proofReference, userRol
 
   const [isLoading, setIsLoading] = useState(!propRun);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [isPauseDialogOpen, setIsPauseDialogOpen] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(new Date());
 
   const handleRefresh = useCallback(async () => {
@@ -369,6 +376,15 @@ export default function PayrollRunDetail({ run: propRun, proofReference, userRol
                 Cancel Batch
               </button>
             )}
+            {(run.status === "pending" || run.status === "verified") && canPausePayroll(userRole) && (
+              <button
+                type="button"
+                onClick={() => setIsPauseDialogOpen(true)}
+                className="inline-flex items-center justify-center px-4 py-2 rounded-md border border-amber-300 text-amber-700 bg-white text-sm font-medium hover:bg-amber-50 transition-colors"
+              >
+                Emergency Pause
+              </button>
+            )}
             {kind === "scheduled" && !lockState && freshness.blocksExecution && (
               <span
                 data-testid="execution-blocked-by-proof"
@@ -405,6 +421,19 @@ export default function PayrollRunDetail({ run: propRun, proofReference, userRol
           onCancel={() => setIsCancelDialogOpen(false)}
           onSuccess={() => {
             setIsCancelDialogOpen(false);
+            router.refresh();
+          }}
+        />
+      )}
+
+      {isPauseDialogOpen && run && (
+        <PausePayrollDialog
+          isOpen={isPauseDialogOpen}
+          payroll={run}
+          userRole={userRole}
+          onCancel={() => setIsPauseDialogOpen(false)}
+          onSuccess={() => {
+            setIsPauseDialogOpen(false);
             router.refresh();
           }}
         />

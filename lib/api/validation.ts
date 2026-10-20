@@ -39,7 +39,7 @@ export const createPayrollSchema = z.object({
 });
 
 export const updatePayrollStatusSchema = z.object({
-  status: z.enum(["pending", "verified", "failed", "cancelled"]),
+  status: z.enum(["pending", "verified", "failed", "cancelled", "paused"]),
   txHash: z.string().optional(),
 });
 
@@ -51,7 +51,7 @@ export type UpdatePayrollStatusInput = z.infer<
 // ─── Transaction Query Schema ─────────────────────────────────────────────────
 
 export const transactionQuerySchema = paginationSchema.extend({
-  status: z.enum(["pending", "verified", "failed", "cancelled"]).optional(),
+  status: z.enum(["pending", "verified", "failed", "cancelled", "paused"]).optional(),
   companyId: z.string().optional(),
   from: z.string().optional(),
   to: z.string().optional(),
@@ -66,6 +66,20 @@ export const cancelPayrollSchema = z.object({
 });
 
 export type CancelPayrollInput = z.infer<typeof cancelPayrollSchema>;
+
+// ─── Emergency Payroll Pause Schema (#665) ───────────────────────────────────
+
+export const pausePayrollSchema = z.object({
+  reason: z.string().min(3, "Pause reason must be at least 3 characters"),
+});
+
+export type PausePayrollInput = z.infer<typeof pausePayrollSchema>;
+
+export const resumePayrollSchema = z.object({
+  notes: z.string().optional(),
+});
+
+export type ResumePayrollInput = z.infer<typeof resumePayrollSchema>;
 
 // ─── Validation Helper ────────────────────────────────────────────────────────
 

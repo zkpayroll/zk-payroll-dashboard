@@ -169,7 +169,7 @@ export interface PayrollTransaction {
   totalAmount: number;
   employeeCount: number;
   proof: string;
-  status: "pending" | "verified" | "failed" | "cancelled";
+  status: "pending" | "verified" | "failed" | "cancelled" | "paused";
   reconciliationStatus?: ReconciliationStatus;
   reconciliationDetails?: {
     processedCount: number;
@@ -208,6 +208,11 @@ export interface PayrollTransaction {
     | "manual_request"
     | "expired_proof"
     | "unknown";
+  /** Emergency pause metadata (#665). Mirrors `PayrollRun`'s pause fields. */
+  pausedAt?: string | null;
+  pausedBy?: string | null;
+  pauseReason?: string | null;
+  statusBeforePause?: "pending" | "verified";
 }
 
 export type PayrollCancellationReason =
@@ -237,6 +242,17 @@ export interface PayrollRun extends PayrollTransaction {
   cancellationDetail?: string;
   cancelledAt?: string | null;
   cancelledBy?: string | null;
+  /**
+   * Emergency pause details (#665) — present only when status is "paused".
+   * Unlike cancellation, a paused run is resumable: the dispatch pipeline
+   * must check `status !== "paused"` before continuing settlement, and
+   * resuming clears these fields and restores the prior status.
+   */
+  pausedAt?: string | null;
+  pausedBy?: string | null;
+  pauseReason?: string | null;
+  /** The status to restore on resume (what the run was before it was paused). */
+  statusBeforePause?: "pending" | "verified";
 }
 
 export interface ViewKey {
@@ -439,6 +455,17 @@ export interface MultiAssetReconciliation {
     totalExpected: number;
     totalConfirmed: number;
     discrepancyCount: number;
+    /**
+     * Rounding safeguard (#667): the difference between `totalConfirmed`
+     * and the sum of each entry's amount independently rounded to the
+     * nearest Stellar stroop (7 decimals). A nonzero value here is expected
+     * dust from per-payment rounding, not a missing payment — callers
+     * should surface it separately from `discrepancyCount`, which counts
+     * entries that are actually missing or mismatched.
+     */
+    roundingDust: number;
+    /** True when `roundingDust` exceeds the expected bound for this group's payment count. */
+    roundingDriftExceeded: boolean;
   }>;
   canExportAudit: boolean;
 }

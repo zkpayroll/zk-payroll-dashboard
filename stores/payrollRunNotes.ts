@@ -44,7 +44,7 @@ export interface AddRunNoteInput {
   body: string;
   role: UserRole;
   /** Optional run status; a final run rejects new notes. */
-  runStatus?: "pending" | "verified" | "failed" | "cancelled";
+  runStatus?: "pending" | "verified" | "failed" | "cancelled" | "paused";
   employees?: RunNoteValidationOptions["employees"];
 }
 
