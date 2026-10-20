@@ -132,8 +132,8 @@ describe("approvalQueue store — decision completeness (#684)", () => {
   });
 
   it("refuses a correction request with no comment and writes nothing (failure path)", () => {
-    // @ts-expect-error — exercising the runtime guard for a caller that
-    // bypasses TypeScript's compile-time required-comment signature.
+    // An empty string still satisfies the `comment: string` signature at
+    // compile time — this is exactly the gap the runtime guard closes.
     const result = useApprovalQueueStore.getState().requestCorrection(ID, "CFO", "Finance Director", "");
     expect(result.ok).toBe(false);
     if (result.ok) return;
