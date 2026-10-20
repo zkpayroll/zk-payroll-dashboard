@@ -18,6 +18,7 @@ import PinnedAlertsPanel from "@/components/features/dashboard/PinnedAlertsPanel
 import { SessionTimeoutBanner } from "@/components/features/dashboard/SessionTimeoutBanner";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import DashboardAssetAvailabilityCheck from "@/components/features/dashboard/DashboardAssetAvailabilityCheck";
+import DashboardPaymentAssetCompatibilityCheck from "@/components/features/dashboard/DashboardPaymentAssetCompatibilityCheck";
 import PayoutScheduleCollisionPanel from "@/components/features/dashboard/PayoutScheduleCollisionPanel";
 import DashboardCompensationPolicyCheck from "@/components/features/dashboard/DashboardCompensationPolicyCheck";
 import DashboardEmployeeEligibilityStatusCheck from "@/components/features/dashboard/DashboardEmployeeEligibilityStatusCheck";
@@ -158,6 +159,9 @@ function DashboardHome() {
         <DashboardAssetAvailabilityCheck
           configuredAssets={MOCK_COMPANIES[0]?.treasury ? [{ code: "USDC" }, { code: "XLM" }] : []}
         />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <DashboardPaymentAssetCompatibilityCheck />
       </ErrorBoundary>
       <ErrorBoundary>
         <PayoutScheduleCollisionPanel
