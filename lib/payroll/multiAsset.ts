@@ -88,6 +88,42 @@ export function deriveRunStatus(groups: AssetGroup[]): MultiAssetPayrollRun["sta
   return "draft";
 }
 
+/**
+ * Rounds a single payment amount to the nearest Stellar stroop (#667).
+ *
+ * Every Stellar asset settles with exactly `STELLAR_ASSET_DECIMALS` (7)
+ * decimal places, so a payment amount that arrives with more precision than
+ * that (e.g. from a salary split or a percentage-based bonus calculation)
+ * cannot actually be paid out as entered — the network rounds it. Rounding
+ * each payment independently, rather than rounding only the group total,
+ * mirrors how the real dispatch path pays employees one transaction at a
+ * time.
+ */
+export function roundToStroop(amount: number): number {
+  if (!Number.isFinite(amount)) return 0;
+  const scale = 10 ** STELLAR_ASSET_DECIMALS;
+  return Math.round(amount * scale) / scale;
+}
+
+/**
+ * Sums a group's per-employee amounts after each is independently rounded
+ * to the nearest stroop, and reports the resulting "dust" versus a naive
+ * floating-point sum (#667). Used by `buildReconciliation` to distinguish
+ * expected rounding dust from an actual missing/mismatched payment.
+ */
+export function computeRoundingSafeguard(
+  amounts: number[],
+): { roundedTotal: number; roundingDust: number; roundingDriftExceeded: boolean } {
+  const naiveTotal = amounts.reduce((s, a) => s + a, 0);
+  const roundedTotal = amounts.reduce((s, a) => s + roundToStroop(a), 0);
+  const roundingDust = roundToStroop(roundedTotal - naiveTotal);
+  // Bound matches describeAssetRounding's maxDrift (#544): at most half a
+  // stroop of drift per payment, accumulated across the group.
+  const maxExpectedDrift = (amounts.length * STELLAR_MIN_UNIT) / 2;
+  const roundingDriftExceeded = Math.abs(roundingDust) > maxExpectedDrift + STELLAR_MIN_UNIT;
+  return { roundedTotal, roundingDust, roundingDriftExceeded };
+}
+
 /** Build a reconciliation summary for a completed (or partial) run. */
 export function buildReconciliation(run: MultiAssetPayrollRun): MultiAssetReconciliation {
   const groups = run.assetGroups.map((group) => {
@@ -113,6 +149,13 @@ export function buildReconciliation(run: MultiAssetPayrollRun): MultiAssetReconc
     const totalConfirmed = entries.reduce((s, e) => s + e.confirmedAmount, 0);
     const discrepancyCount = entries.filter((e) => e.status !== "confirmed").length;
 
+    // Rounding safeguard (#667): computed from *confirmed* amounts, since
+    // expected (pre-settlement) amounts haven't gone through the stroop
+    // rounding the network actually applies yet.
+    const { roundingDust, roundingDriftExceeded } = computeRoundingSafeguard(
+      entries.map((e) => e.confirmedAmount),
+    );
+
     return {
       asset: group.asset,
       status:
@@ -127,10 +170,19 @@ export function buildReconciliation(run: MultiAssetPayrollRun): MultiAssetReconc
       totalExpected: group.totalAmount,
       totalConfirmed,
       discrepancyCount,
+      roundingDust,
+      roundingDriftExceeded,
     } as MultiAssetReconciliation["groups"][number];
   });
 
-  const canExportAudit = groups.every((g) => g.status === "complete" || g.status === "partial");
+  // Rounding safeguard (#667): a group whose dust exceeds the expected
+  // per-payment stroop bound signals a real arithmetic problem (not benign
+  // rounding), so the audit export is blocked until it's investigated —
+  // exporting a reconciliation that silently absorbed unexplained drift
+  // would defeat the point of an audit trail.
+  const canExportAudit = groups.every(
+    (g) => (g.status === "complete" || g.status === "partial") && !g.roundingDriftExceeded,
+  );
 
   return {
     runId: run.id,

@@ -11,6 +11,9 @@ import {
 import type { MultiAssetReconciliation, ReconciliationEntry } from "@/types/models";
 import { assetLabel, formatAssetAmount } from "@/lib/payroll/multiAsset";
 
+/** Absolute dust amounts at/below this are not worth rendering a badge for. */
+const DUST_DISPLAY_THRESHOLD = 1e-7;
+
 // ── Status helpers ────────────────────────────────────────────────────────────
 
 const ENTRY_STATUS_CFG: Record<
@@ -96,6 +99,23 @@ function GroupPanel({ group }: { group: MultiAssetReconciliation["groups"][numbe
           {group.discrepancyCount > 0 && (
             <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-700">
               {group.discrepancyCount} discrepanc{group.discrepancyCount !== 1 ? "ies" : "y"}
+            </span>
+          )}
+          {Math.abs(group.roundingDust) > DUST_DISPLAY_THRESHOLD && (
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                group.roundingDriftExceeded
+                  ? "bg-red-100 text-red-700"
+                  : "bg-gray-100 text-gray-600"
+              }`}
+              title={
+                group.roundingDriftExceeded
+                  ? "Rounding dust exceeds the expected per-payment stroop bound — investigate before exporting the audit trail."
+                  : "Expected rounding dust from independently rounding each payment to the nearest stroop."
+              }
+            >
+              {group.roundingDriftExceeded ? "Rounding drift exceeded" : "Rounding dust"}:{" "}
+              {formatAssetAmount(group.roundingDust, group.asset.code)}
             </span>
           )}
         </div>

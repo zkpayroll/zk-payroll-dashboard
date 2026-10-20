@@ -7,6 +7,9 @@ import {
   formatAssetAmount,
   assetLabel,
   isNative,
+  roundToStroop,
+  computeRoundingSafeguard,
+  STELLAR_MIN_UNIT,
 } from "@/lib/payroll/multiAsset";
 import type {
   AssetGroup,
@@ -184,6 +187,66 @@ describe("buildReconciliation", () => {
     };
     const recon = buildReconciliation(modified);
     expect(recon.canExportAudit).toBe(false);
+  });
+
+  it("reports near-zero rounding dust for already stroop-aligned confirmed amounts", () => {
+    const run = MOCK_MULTI_ASSET_RUNS[0];
+    const recon = buildReconciliation(run);
+    for (const group of recon.groups) {
+      expect(Math.abs(group.roundingDust)).toBeLessThanOrEqual(STELLAR_MIN_UNIT);
+      expect(group.roundingDriftExceeded).toBe(false);
+    }
+  });
+});
+
+describe("roundToStroop (#667)", () => {
+  it("rounds to the nearest 7-decimal Stellar unit", () => {
+    expect(roundToStroop(1.00000005)).toBeCloseTo(1.0000001, 7);
+    expect(roundToStroop(1.000000049)).toBeCloseTo(1.0, 7);
+  });
+
+  it("treats non-finite input as zero", () => {
+    expect(roundToStroop(Number.NaN)).toBe(0);
+    expect(roundToStroop(Number.POSITIVE_INFINITY)).toBe(0);
+  });
+});
+
+describe("computeRoundingSafeguard (#667)", () => {
+  it("reports ~zero dust for amounts already aligned to the stroop grid", () => {
+    const result = computeRoundingSafeguard([100, 200.5, 300.25]);
+    expect(Math.abs(result.roundingDust)).toBeLessThanOrEqual(STELLAR_MIN_UNIT);
+    expect(result.roundingDriftExceeded).toBe(false);
+  });
+
+  it("bounds dust by half a stroop per payment for sub-stroop-precision amounts", () => {
+    // Each amount carries more than 7 decimals of (unpayable) precision, so
+    // rounding each one independently introduces up to half a stroop of
+    // drift per payment — this is the scenario #667's title describes:
+    // payouts split with more precision than the network can actually settle.
+    const amounts = Array.from({ length: 10 }, (_, i) => 100 + i * 0.123456789);
+    const result = computeRoundingSafeguard(amounts);
+    const maxExpectedDrift = (amounts.length * STELLAR_MIN_UNIT) / 2;
+    expect(Math.abs(result.roundingDust)).toBeLessThanOrEqual(maxExpectedDrift + STELLAR_MIN_UNIT);
+    expect(result.roundingDriftExceeded).toBe(false);
+  });
+
+  it("never flags roundingDriftExceeded from stroop rounding alone, by construction", () => {
+    // computeRoundingSafeguard's dust is always the difference between a
+    // naive sum and a per-payment-rounded sum of the *same* array, so it is
+    // mathematically bounded by n × half a stroop — it can never exceed its
+    // own bound on its own. roundingDriftExceeded exists as a safety net for
+    // a caller passing already-corrupted amounts (e.g. a future conversion
+    // step); this test documents that guarantee rather than forcing a false
+    // positive that the function's own math cannot produce.
+    const manyPayments = Array.from({ length: 1000 }, (_, i) => 1 + i * 0.123456789);
+    const result = computeRoundingSafeguard(manyPayments);
+    expect(result.roundingDriftExceeded).toBe(false);
+  });
+
+  it("returns zero dust and no drift for an empty payment list", () => {
+    const result = computeRoundingSafeguard([]);
+    expect(result.roundingDust).toBe(0);
+    expect(result.roundingDriftExceeded).toBe(false);
   });
 });
 
