@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { CORRECTION_REQUEST_TTL_MS, useApprovalQueueStore, type ApprovalDraft } from "@/stores/approvalQueue";
-import type {
-  ApprovalActionResult,
-  ApprovalConflictDetail,
+import { usePayrollPolicyStore } from "@/stores/payrollPolicy";
+import {
+  approvalsRecorded,
+  requiredApprovalsFor,
+  type ApprovalActionResult,
+  type ApprovalConflictDetail,
 } from "@/lib/payroll/approvalConflict";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -38,11 +41,16 @@ function correctionExpiry(draft: ApprovalDraft): number | null {
 export function ExecutiveApprovalQueue() {
   const { drafts, approveDraft, rejectDraft, requestCorrection, resubmitDraft } =
     useApprovalQueueStore();
+  const approvalsPolicy = usePayrollPolicyStore((s) => s.policy.approvals);
   const [filter, setFilter] = useState<
     "pending" | "corrections" | "approved" | "rejected" | "all"
   >("pending");
   const [selectedDraft, setSelectedDraft] = useState<ApprovalDraft | null>(null);
   const [comment, setComment] = useState("");
+  // Quorum (#664) requires distinct reviewers; this mock UI has no real
+  // multi-user session, so the acting reviewer's name is editable here
+  // rather than hardcoded, so a second, different approver can be simulated.
+  const [reviewerName, setReviewerName] = useState("Executive Admin");
   const [correctionErrorId, setCorrectionErrorId] = useState<string | null>(null);
   // #552 — set when a decision is refused because the draft no longer holds
   // the state this reviewer was looking at (someone else acted first).
@@ -97,14 +105,14 @@ export function ExecutiveApprovalQueue() {
 
   const handleApprove = (draft: ApprovalDraft) => {
     applyDecision(
-      () => approveDraft(draft.id, "Executive Admin", "Admin", comment || "Approved for execution"),
+      () => approveDraft(draft.id, reviewerName.trim() || "Executive Admin", "Admin", comment || "Approved for execution"),
       true,
     );
   };
 
   const handleReject = (draft: ApprovalDraft) => {
     applyDecision(
-      () => rejectDraft(draft.id, "Executive Admin", "Admin", comment || "Rejected during executive review"),
+      () => rejectDraft(draft.id, reviewerName.trim() || "Executive Admin", "Admin", comment || "Rejected during executive review"),
       true,
     );
   };
@@ -116,7 +124,7 @@ export function ExecutiveApprovalQueue() {
       return;
     }
     applyDecision(
-      () => requestCorrection(draft.id, "Executive Admin", "Admin", trimmed),
+      () => requestCorrection(draft.id, reviewerName.trim() || "Executive Admin", "Admin", trimmed),
       true,
     );
   };
@@ -137,9 +145,21 @@ export function ExecutiveApprovalQueue() {
             Review and authorize high-value payroll drafts prior to cryptographic signing and network dispatch.
           </p>
         </div>
-        <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg text-sm text-indigo-800">
-          <AlertTriangle className="h-4 w-4 text-indigo-600" />
-          <span className="font-semibold">{pendingCount}</span> draft(s) awaiting review
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-xs text-gray-600">
+            Reviewing as
+            <input
+              type="text"
+              value={reviewerName}
+              onChange={(e) => setReviewerName(e.target.value)}
+              className="px-2 py-1 border rounded-md text-xs w-36 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              aria-label="Reviewer name"
+            />
+          </label>
+          <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg text-sm text-indigo-800">
+            <AlertTriangle className="h-4 w-4 text-indigo-600" />
+            <span className="font-semibold">{pendingCount}</span> draft(s) awaiting review
+          </div>
         </div>
       </div>
 
@@ -238,6 +258,13 @@ export function ExecutiveApprovalQueue() {
             (() => {
               const expiry = draft.approvalStatus === "correction_requested" ? correctionExpiry(draft) : null;
               const correctionExpired = expiry !== null && expiry <= now;
+              const requiredApprovals = requiredApprovalsFor({
+                requiredApprovalsCount: approvalsPolicy.requiredApprovalsCount,
+                requireDualApproval: approvalsPolicy.requireDualApproval,
+                dualApprovalThreshold: approvalsPolicy.dualApprovalThreshold,
+                totalAmount: draft.totalAmount,
+              });
+              const approversRecorded = approvalsRecorded(draft);
               return (
             <div
               key={draft.id}
@@ -260,7 +287,9 @@ export function ExecutiveApprovalQueue() {
                     />
                     <span className="text-xs text-gray-500">
                       {draft.approvalStatus === "pending_executive_approval"
-                        ? "Executive Review Required"
+                        ? requiredApprovals > 1
+                          ? `Executive Review Required (${approversRecorded.length} of ${requiredApprovals} approvals)`
+                          : "Executive Review Required"
                         : draft.approvalStatus === "approved"
                         ? "Approved for Signing"
                         : draft.approvalStatus === "correction_requested"

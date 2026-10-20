@@ -5,6 +5,8 @@ import {
   type ApprovalSnapshot,
 } from "@/lib/payroll/approvalConflict";
 import { useApprovalQueueStore } from "@/stores/approvalQueue";
+import { usePayrollPolicyStore, DEFAULT_PAYROLL_POLICY } from "@/stores/payrollPolicy";
+import { useTreasuryStore } from "@/stores/treasury";
 
 function snapshot(over: Partial<ApprovalSnapshot> = {}): ApprovalSnapshot {
   return { approvalStatus: "pending_executive_approval", approvalHistory: [], ...over };
@@ -196,6 +198,28 @@ describe("approvalQueue store — guarded actions (#552)", () => {
   const ID = "draft_exec_001";
 
   beforeEach(() => {
+    // This suite is about approval-conflict detection (#552) — stale
+    // second decisions, lost updates — not about quorum (#664) or treasury
+    // reservation (#666), which are exercised in their own dedicated test
+    // files. The policy baseline is set to a single required approval and
+    // the treasury is given ample balance, so a lone "approved" call here
+    // still reaches "approved" the way these tests expect.
+    usePayrollPolicyStore.setState({
+      policy: {
+        ...JSON.parse(JSON.stringify(DEFAULT_PAYROLL_POLICY)),
+        approvals: {
+          requiredApprovalsCount: 1,
+          requireDualApproval: false,
+          dualApprovalThreshold: 50000,
+          allowSelfApproval: false,
+          requireAuditorApproval: true,
+        },
+      },
+    });
+    useTreasuryStore.setState({
+      balances: { USDC: { assetCode: "USDC", available: 500000, reserved: 0, projected: 0 } },
+      obligations: [],
+    });
     // Reset to the seed so each test starts from a known pending row.
     useApprovalQueueStore.setState({
       drafts: [

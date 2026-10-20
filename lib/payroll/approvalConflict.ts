@@ -35,6 +35,40 @@ export interface ApprovalSnapshot {
   }>;
 }
 
+/**
+ * Quorum requirement for a single draft (#664).
+ *
+ * `requiredApprovalsCount` is the org-wide policy baseline
+ * (`stores/payrollPolicy.ts`). A draft whose `totalAmount` meets or exceeds
+ * `dualApprovalThreshold` needs at least 2 approvals regardless of the
+ * baseline, when `requireDualApproval` is on — the two rules combine via
+ * `Math.max`, they don't override each other.
+ */
+export interface ApprovalQuorum {
+  requiredApprovalsCount: number;
+  requireDualApproval: boolean;
+  dualApprovalThreshold: number;
+  totalAmount: number;
+}
+
+/** The number of *distinct* reviewers who have recorded an "approved" decision. */
+export function approvalsRecorded(snapshot: ApprovalSnapshot): string[] {
+  const approvers = new Set<string>();
+  for (const entry of snapshot.approvalHistory ?? []) {
+    if (entry.action === "approved") approvers.add(entry.approvedBy);
+  }
+  return Array.from(approvers);
+}
+
+/** How many distinct approvals a draft needs before it can move to "approved". */
+export function requiredApprovalsFor(quorum: ApprovalQuorum): number {
+  const baseline = Math.max(1, Math.floor(quorum.requiredApprovalsCount) || 1);
+  if (quorum.requireDualApproval && quorum.totalAmount >= quorum.dualApprovalThreshold) {
+    return Math.max(baseline, 2);
+  }
+  return baseline;
+}
+
 export interface ApprovalConflictDetail {
   /** Stable machine-readable cause, for tests and telemetry. */
   reason:
@@ -44,7 +78,8 @@ export interface ApprovalConflictDetail {
     | "awaiting_correction"
     | "correction_expired"
     | "already_decided_by_you"
-    | "not_awaiting_approval";
+    | "not_awaiting_approval"
+    | "insufficient_treasury_reservation";
   /** The state the draft is actually in. */
   currentStatus: ApprovalSnapshot["approvalStatus"];
   /** Human label for the state, e.g. "Approved". */
@@ -194,11 +229,47 @@ export function evaluateApprovalAction(
       return conflict("awaiting_correction", snapshot, attemptedAction, prior);
     case "pending_executive_approval":
     default:
+      // An "approved" decision is special under quorum (#664): several
+      // *distinct* reviewers each legitimately approve the same draft while
+      // it stays "pending_executive_approval" until quorum is met, so the
+      // last-decision-by-you guard only blocks the exact same reviewer
+      // approving twice, not a second reviewer approving after the first.
+      if (attemptedAction === "approved") {
+        const alreadyApprovedByReviewer =
+          reviewerName !== undefined &&
+          approvalsRecorded(snapshot).includes(reviewerName);
+        if (alreadyApprovedByReviewer) {
+          return conflict("already_decided_by_you", snapshot, attemptedAction, prior);
+        }
+        return { ok: true };
+      }
       if (prior && reviewerName && prior.approvedBy === reviewerName) {
         return conflict("already_decided_by_you", snapshot, attemptedAction, prior);
       }
       return { ok: true };
   }
+}
+
+/**
+ * Builds the conflict payload for a reservation refused by treasury
+ * insufficiency (#666) — distinct from the approval-state race conditions
+ * `conflict()` handles, since this is a treasury-balance decision, not a
+ * question of who else already decided on this draft.
+ */
+export function insufficientTreasuryConflict(
+  snapshot: ApprovalSnapshot,
+  message: string,
+): ApprovalActionResult {
+  return {
+    ok: false,
+    conflict: {
+      reason: "insufficient_treasury_reservation",
+      currentStatus: snapshot.approvalStatus,
+      currentStatusLabel: STATUS_LABELS[snapshot.approvalStatus],
+      attemptedAction: "approved",
+      message,
+    },
+  };
 }
 
 /** Exposed for the queue UI, which labels the state in a conflict banner. */
