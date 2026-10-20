@@ -22,3 +22,7 @@ export * from "./duplicatePayoutDetection";
 export * from "./periodReopenRestrictions";
 export * from "./draftComparisonSnapshot";
 export * from "./employeeActivationPrerequisites";
+export * from "./outlierPaymentInvestigationWorkflow";
+export * from "./reviewerDecisionConflictDetection";
+export * from "./recipientValidationReconciliation";
+export * from "./compensationPolicyDependencyMapping";
