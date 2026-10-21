@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useContractPauseGuard } from "@/hooks/useContractPauseGuard";
@@ -18,6 +18,52 @@ import {
   ShieldAlert,
 } from "lucide-react";
 
+type RetryDecisionOutcome = "allowed" | "blocked" | "deferred";
+
+interface RetryDecisionLogEntry {
+  id: string;
+  payrollId: string;
+  outcome: RetryDecisionOutcome;
+  reason: string;
+  attempt: number;
+  timestamp: string;
+}
+
+const RETRY_DECISION_REASON_LABELS: Record<RetryDecisionOutcome, string> = {
+  allowed: "Retry permitted",
+  blocked: "Retry blocked",
+  deferred: "Retry deferred",
+};
+
+function evaluateRetryDecision(
+  payrollId: string,
+  attempt: number,
+  isMutationDisabled: boolean,
+): Omit<RetryDecisionLogEntry, "id" | "timestamp"> {
+  if (isMutationDisabled) {
+    return {
+      payrollId,
+      outcome: "blocked",
+      reason: "CONTRACT_PAUSED",
+      attempt,
+    };
+  }
+  if (attempt > 3) {
+    return {
+      payrollId,
+      outcome: "deferred",
+      reason: "MAX_ATTEMPTS_EXCEEDED",
+      attempt,
+    };
+  }
+  return {
+    payrollId,
+    outcome: "allowed",
+    reason: "RETRY_WITHIN_POLICY",
+    attempt,
+  };
+}
+
 export default function PayrollDashboardPage() {
   const { isMutationDisabled, pauseReason, remediationHref } =
     useContractPauseGuard();
@@ -25,6 +71,29 @@ export default function PayrollDashboardPage() {
   const evaluations = usePayrollConcurrencyStore((s) => s.evaluations);
   const dismissedPayrollIds = usePayrollConcurrencyStore((s) => s.dismissedPayrollIds);
   const dismissWarning = usePayrollConcurrencyStore((s) => s.dismissWarning);
+
+  const [retryDecisionLog, setRetryDecisionLog] = useState<
+    RetryDecisionLogEntry[]
+  >([]);
+
+  const recordRetryDecision = useCallback(
+    (payrollId: string, attempt: number) => {
+      const decision = evaluateRetryDecision(
+        payrollId,
+        attempt,
+        isMutationDisabled,
+      );
+      setRetryDecisionLog((prev) => [
+        {
+          ...decision,
+          id: `${payrollId}-${attempt}-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+    },
+    [isMutationDisabled],
+  );
 
   const activeConcurrentConflict = useMemo(() => {
     return (
@@ -117,6 +186,62 @@ export default function PayrollDashboardPage() {
             }}
           />
         )}
+
+        {/* Retry Policy Decision Log */}
+        <div
+          data-testid="retry-decision-log"
+          className="bg-white rounded-lg shadow-sm border p-4 space-y-3"
+        >
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+              Retry Policy Decisions
+            </h2>
+            <span className="text-xs text-gray-500">
+              {retryDecisionLog.length} recorded
+            </span>
+          </div>
+          {retryDecisionLog.length === 0 ? (
+            <p className="text-xs text-gray-500">
+              No retry decisions recorded yet. Retry evaluations will appear
+              here with privacy-safe identifiers only.
+            </p>
+          ) : (
+            <ul className="divide-y divide-gray-100 border rounded-lg overflow-hidden">
+              {retryDecisionLog.map((entry) => (
+                <li
+                  key={entry.id}
+                  data-testid="retry-decision-entry"
+                  className="p-3 flex items-center justify-between text-xs"
+                >
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-medium text-gray-900">
+                        {entry.payrollId}
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full font-medium ${
+                          entry.outcome === "allowed"
+                            ? "bg-green-100 text-green-700"
+                            : entry.outcome === "blocked"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        {RETRY_DECISION_REASON_LABELS[entry.outcome]}
+                      </span>
+                    </div>
+                    <p className="text-gray-500">
+                      {entry.reason} · attempt {entry.attempt}
+                    </p>
+                  </div>
+                  <span className="text-gray-400">
+                    {new Date(entry.timestamp).toLocaleTimeString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         {/* Action Controls Toolbar */}
         <div className="bg-white rounded-lg shadow-sm border p-4">
@@ -279,6 +404,14 @@ export default function PayrollDashboardPage() {
                   View Details
                   <ArrowRight className="w-4 h-4" />
                 </Link>
+                <button
+                  type="button"
+                  data-testid={`retry-decision-${run.id}`}
+                  onClick={() => recordRetryDecision(run.id, 1)}
+                  className="ml-3 text-xs font-medium text-gray-600 hover:text-indigo-700 underline"
+                >
+                  Log Retry Decision
+                </button>
               </div>
             ))}
           </div>

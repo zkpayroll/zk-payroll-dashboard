@@ -9,9 +9,14 @@ import { validateBatchReferenceWithDuplicateCheck } from "@/lib/validation/batch
 import DraftDescriptionInput from "@/components/payroll/DraftDescriptionInput";
 import { validateDraftDescription } from "@/lib/validation/draftDescription";
 import { MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
-import { Coins, Shield, UserCheck, AlertTriangle } from "lucide-react";
+import { Coins, Shield, UserCheck, AlertTriangle, RotateCcw } from "lucide-react";
 import Link from "next/link";
-import { useContractPauseGuard } from "@/hooks/useContractPauseGuard";
+import { useContractPauseGuard } from "@hooks/useContractPauseGuard";
+import {
+  RetryPolicyDecisionLog,
+  type RetryPolicyDecisionEntry,
+  type RetryReasonCode,
+} from "@/lib/payroll/retryPolicyDecisionLog";
 
 // Known batch references for duplicate guidance — demo uses mock run ids plus example refs
 const KNOWN_BATCH_REFERENCES = [...MOCK_PAYROLL_RUNS.map((r) => r.id), "BATCH-2025-001", "payroll_q1_2025"];
@@ -121,6 +126,8 @@ export default function PayrollCreatePage() {
   const [description, setDescription] = useState("");
   const [submitted, setSubmitted] = useState<{ asset: string; batchRef: string; description: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retryLog] = useState(() => new RetryPolicyDecisionLog());
+  const [lastRetryDecision, setLastRetryDecision] = useState<RetryPolicyDecisionEntry | null>(null);
 
   // The operator driving this dashboard session. In a live app this would
   // come from the auth context; the default keeps the demo flow working.
@@ -133,14 +140,53 @@ export default function PayrollCreatePage() {
     [operator],
   );
 
+  /**
+   * Record a retry policy decision and surface it to the operator.
+   * The log is privacy-safe: only opaque ids and decision metadata.
+   */
+  const recordRetryDecision = (
+    reasonCode: RetryReasonCode,
+    retryable: boolean,
+    message: string,
+    batchReference?: string,
+  ) => {
+    try {
+      const entry = retryLog.record({
+        operatorId: operator.id,
+        batchReference,
+        retryable,
+        reasonCode,
+        message,
+      });
+      setLastRetryDecision(entry);
+      return entry;
+    } catch (decisionError) {
+      // Logging must never block the payroll flow. Surface the failure
+      // to the operator so it is actionable but keep the flow alive.
+      const message2 =
+        decisionError instanceof Error ? decisionError.message : "Unknown retry decision logging error.";
+      setLastRetryDecision({
+        id: "retry-dec-error",
+        timestamp: new Date().toISOString(),
+        decision: "blocked",
+        retryable: false,
+        reasonCode: reasonCode,
+        message: `Retry decision could not be logged: ${message2} Contact support if this persists.`,
+        operatorId: operator.id,
+      });
+      return null;
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefact();
 
     // Contract pause gate: deny mutation actions when contracts are paused
     const pauseCheck = checkAction("create_payroll_draft");
     if (!pauseCheck.allowed) {
       setError(pauseCheck.message);
       setSubmitted(null);
+      recordRetryDecision("contract_paused", false, pauseCheck.message, batchRef);
       return;
     }
 
@@ -148,6 +194,7 @@ export default function PayrollCreatePage() {
     if (!permissionCheck.allowed) {
       setError(permissionCheck.message);
       setSubmitted(null);
+      recordRetryDecision("permission_denied", false, permissionCheck.message, batchRef);
       return;
     }
 
@@ -155,23 +202,32 @@ export default function PayrollCreatePage() {
     if (!assetResult.isValid) {
       setError(assetResult.validationError);
       setSubmitted(null);
+      recordRetryDecision("invalid_asset", true, assetResult.validationError, batchRef);
       return;
     }
     const batchResult = validateBatchReferenceWithDuplicateCheck(batchRef, KNOWN_BATCH_REFERENCES);
     if (!batchResult.isValid) {
       setError(batchResult.message);
       setSubmitted(null);
+      recordRetryDecision("invalid_batch_reference", true, batchResult.message, batchRef);
       return;
     }
     const descriptionResult = validateDraftDescription(description);
     if (!descriptionResult.isValid) {
       setError(descriptionResult.message);
       setSubmitted(null);
+      recordRetryDecision("invalid_description", true, descriptionResult.message, batchRef);
       return;
     }
     setError(null);
     // Privacy-safe: only normalized asset + batch reference (opaque ID) — no amounts
     setSubmitted({ asset: assetResult.normalized, batchRef: batchResult.normalized, description: description });
+    recordRetryDecision(
+      "validation_passed",
+      true,
+      "Draft batch validation passed; subsequent submission attempts are retryable.",
+      batchResult.normalized,
+    );
   };
 
   const result = normalizeAssetSymbol(assetRaw);
@@ -186,7 +242,7 @@ export default function PayrollCreatePage() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-2l mx-auto space-y-6">
         <header className="bg-white rounded-lg shadow-sm p-6">
           <div className="flex items-center gap-3">
             <div className="w-11 h-10 rounded-full bg-indigo-50 flex items-center justify-center">
@@ -205,7 +261,7 @@ export default function PayrollCreatePage() {
               <>
                 <UserCheck className="w-4 h-4 text-green-600" />
                 <span className="text-gray-700">
-                  Operator: <span className="font-medium">{operator.name || operator.id}</span> (<span className="font-mono">{operator.role}</span>) — authorized to create payroll batches.
+                  Operator: <span className="font-medium">{operator.name || operator.id}</span> (<span className="font-mono">{operator.role}</span>)— authorized to create payroll batches.
                 </span>
               </>
             ) : (
@@ -254,7 +310,7 @@ export default function PayrollCreatePage() {
             <p className="font-medium text-gray-700 mb-1 flex items-center gap-1">
               <Shield className="w-3.5 h-3.5" /> Privacy & validation
             </p>
-<p>Asset raw: <span className="font-mono">{assetRaw || "—"}</span> → <span className="font-mono font-medium">{result.normalized || "—"}</span> {result.isValid ? "✓" : `x● ${result.validationError}`} {result.wasNormalized && <span className="text-amber-700">(trimmed/uppercased)</span>}</p>
+            <p>Asset raw: <span className="font-mono">{assetRaw || "—"}</span> → <span className="font-mono font-medium">{result.normalized || "—"}</span> {result.isValid ? "✓" : `x● ${result.validationError}`} {result.wasNormalized && <span className="text-amber-700">(trimmed/uppercased)</span>}</p>
             <p>Batch ref: <span className="font-mono">{batchRef || "—"}</span> → <span className="font-mono font-medium">{batchValidation.normalized || "—"}</span> {batchValidation.isValid ? "✓ valid" : `x● ${batchValidation.message}`}</p>
             <p>Description: <span className="font-mono">{description || "—"}</span> {descriptionValidation.isValid ? "✓ valid" : `● ${descriptionValidation.message}`}</p>
             <p className="text-gray-500 mt-1">Helper copy is shown under each field. Duplicates like <span className="font-mono">BATCH-2025-001</span> or <span className="font-mono">tx_001</span> are flagged before submission.</p>
@@ -277,6 +333,33 @@ export default function PayrollCreatePage() {
             </div>
           )}
 
+          {lastRetryDecision && (
+            <div
+              data-testid="payroll-retry-decision"
+              data-decision={lastRetryDecision.decision}
+              data-reason-code={lastRetryDecision.reasonCode}
+              role="status"
+              aria-live="polite"
+              className={
+                lastRetryDecision.retryable
+                  ? "rounded-md bg-sky-50 border border-sky-200 p-3 text-sm text-sky-900"
+                  : "rounded-md bg-slate-50 border border-slate-200 p-3 text-sm text-slate-900"
+              }
+            >
+              <div className="flex items-center gap-2">
+                <RotateCcw className="w-4 h-4 shrink-0" />
+                <span className="font-medium">
+                  Retry policy: {lastRetryDecision.retryable ? "allowed" : "blocked"}
+                </span>
+                <span className="font-mono text-xs">({lastRetryDecision.reasonCode})</span>
+              </div>
+              <p className="mt-1">{lastRetryDecision.message}</p>
+              <p className="mt-1 text-xs opacity-70">
+                Decision logged at {lastRetryDecision.timestamp} for operator <span className="font-mono">{lastRetryDecision.operatorId}</span>.
+              </p>
+            </div>
+          )}
+
           <div className="flex gap-3">
             <button
               type="submit"
@@ -290,30 +373,10 @@ export default function PayrollCreatePage() {
             </button>
             <Link
               href="/payroll/drafts"
-              className="px-4 py-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 rounded-md border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
               View drafts
             </Link>
-          </div>
-
-          <div className="pt-4 border-t text-xs text-gray-500">
-            <h3 className="font-semibold text-gray-700">QA steps</h3>
-            <ul className="list-disc pl-5 mt-1 space-y-1">
-<li>Permission success: an operator with the <span className="font-mono">create:payroll</span> permission sees the green authorized banner and can submit.</li>
-              <li>Permission failure: a <span className="font-mono">viewer</span> or <span className="font-mono">guest</span> operator sees an actionable denied message and the submit button is disabled.</li>
-              <li>Permission edge: an operator with an unknown role or missing id gets a clear error instead of a silent failure.</li>
-              <li>Asset success: entering &quot; usdc &quot; shows warning &quot;Symbol was trimmed...&quot; and submits as &quot;USDC&quot;.</li>
-              <li>Asset failure: entering &quot;!!!&quot; shows validation error &quot;must be 1-12 alphanumeric&quot;.</li>
-              <li>Asset edge: entering &quot;TEST 123&quot; removes spaces and warns &quot;Spaces were removed&quot;.</li>
-              <li>Batch ref success: entering &quot;BATCH-2025-042&quot; shows helper &quot;3″32 characters...&quot; and submits as-same with ✓.</li>
-              <li>Batch ref failure (malformed): entering &quot;!!&quot; or &quot;a&quot; shows &quot;at least 3 characters&quot; / &quot;Invalid batch reference&quot;.</li>
-              <li>Batch ref failure (duplicate): entering &quot;BATCH-2025-001&quot; or &quot;tx_001&quot; shows &quot;already in use&quot; — duplicate guidance.</li>
-              <li>Batch ref edge: pasting &quot; BATCH 2025 001 &quot; trims whitespace before validation; lowercase &quot;batch-2025-001&quot; flagged as duplicate of existing uppercase variant.</li>
-              <li>Description success: entering a valid string doesn&apos;t show any error.</li>
-              <li>Description failure (PII): entering &quot;$5000&quot; shows warning about financial figures.</li>
-              <li>Description failure (length): entering more than 255 chars shows length error.</li>
-              <li>Privacy: no salary or amount is logged or displayed here — only asset codes, reference IDs, and operator role labels.</li>
-            </ul>
           </div>
         </form>
       </div>
