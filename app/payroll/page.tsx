@@ -16,6 +16,7 @@ import {
   Clock,
   ArrowRight,
   ShieldAlert,
+  SlidersHorizontal,
 } from "lucide-react";
 
 type RetryDecisionOutcome = "allowed" | "blocked" | "deferred";
@@ -64,6 +65,21 @@ function evaluateRetryDecision(
   };
 }
 
+const POST_SUBMISSION_ADJUSTMENT_LIMIT = 3;
+
+interface PostSubmissionAdjustmentState {
+  payrollId: string;
+  adjustmentsUsed: number;
+  lastAdjustedAt: string | null;
+}
+
+function getAdjustmentLimitError(adjustmentsUsed: number): string | null {
+  if (adjustmentsUsed >= POST_SUBMISSION_ADJUSTMENT_LIMIT) {
+    return `Adjustment limit reached (${POST_SUBMISSION_ADJUSTMENT_LIMIT} per payroll run). Contact an approver to request a new batch.`;
+  }
+  return null;
+}
+
 export default function PayrollDashboardPage() {
   const { isMutationDisabled, pauseReason, remediationHref } =
     useContractPauseGuard();
@@ -75,6 +91,10 @@ export default function PayrollDashboardPage() {
   const [retryDecisionLog, setRetryDecisionLog] = useState<
     RetryDecisionLogEntry[]
   >([]);
+
+  const [adjustmentState, setAdjustmentState] = useState<
+    Record<string, PostSubmissionAdjustmentState>
+  >({});
 
   const recordRetryDecision = useCallback(
     (payrollId: string, attempt: number) => {
@@ -93,6 +113,36 @@ export default function PayrollDashboardPage() {
       ]);
     },
     [isMutationDisabled],
+  );
+
+  const recordAdjustment = useCallback(
+    (payrollId: string) => {
+      if (isMutationDisabled) {
+        return {
+          ok: false as const,
+          error: "Adjustments are disabled while payroll contracts are paused.",
+        };
+      }
+      const current = adjustmentState[payrollId] ?? {
+        payrollId,
+        adjustmentsUsed: 0,
+        lastAdjustedAt: null,
+      };
+      const limitError = getAdjustmentLimitError(current.adjustmentsUsed);
+      if (limitError) {
+        return { ok: false as const, error: limitError };
+      }
+      setAdjustmentState((prev) => ({
+        ...prev,
+        [payrollId]: {
+          payrollId,
+          adjustmentsUsed: current.adjustmentsUsed + 1,
+          lastAdjustedAt: new Date().toISOString(),
+        },
+      }));
+      return { ok: true as const };
+    },
+    [adjustmentState, isMutationDisabled],
   );
 
   const activeConcurrentConflict = useMemo(() => {
@@ -175,6 +225,27 @@ export default function PayrollDashboardPage() {
             </div>
           </div>
         )}
+
+        {/* Post-Submission Adjustment Limits */}
+        <div
+          data-testid="adjustment-limits-panel"
+          className="bg-white rounded-lg shadow-sm border p-4 space-y-3"
+        >
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+              <SlidersHorizontal className="w-4 h-4 text-indigo-600" />
+              Post-Submission Adjustments
+            </h2>
+            <span className="text-xs text-gray-500">
+              Limit: {POST_SUBMISSION_ADJUSTMENT_LIMIT} per run
+            </span>
+          </div>
+          <p className="text-xs text-gray-500">
+            Adjustments after submission are capped to protect payroll
+            integrity. Privacy-safe identifiers only; no salary or address data
+            is exposed.
+          </p>
+        </div>
 
         {/* Concurrent Payroll Edit Warnings */}
         {activeConcurrentConflict && (
@@ -412,6 +483,37 @@ export default function PayrollDashboardPage() {
                 >
                   Log Retry Decision
                 </button>
+                {(() => {
+                  const state = adjustmentState[run.id];
+                  const used = state?.adjustmentsUsed ?? 0;
+                  const limitError = getAdjustmentLimitError(used);
+                  return (
+                    <div className="ml-3 flex items-center gap-2">
+                      <span
+                        data-testid={`adjustment-count-${run.id}`}
+                        className="text-xs text-gray-500"
+                      >
+                        {used}/{POST_SUBMISSION_ADJUSTMENT_LIMIT} adjustments
+                      </span>
+                      <button
+                        type="button"
+                        data-testid={`adjustment-action-${run.id}`}
+                        disabled={Boolean(limitError) || isMutationDisabled}
+                        aria-disabled={Boolean(limitError) || isMutationDisabled}
+                        title={
+                          limitError ??
+                          (isMutationDisabled
+                            ? "Adjustments disabled: Payroll contracts are paused."
+                            : "Request a post-submission adjustment")
+                        }
+                        onClick={() => recordAdjustment(run.id)}
+                        className="text-xs font-medium text-gray-600 hover:text-indigo-700 underline disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed"
+                      >
+                        Adjust
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
             ))}
           </div>

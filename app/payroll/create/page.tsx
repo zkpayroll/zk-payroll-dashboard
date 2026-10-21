@@ -120,11 +120,48 @@ export const DEFAULT_PAYROLL_OPERATOR: PayrollOperator = {
   permissions: [],
 };
 
+export interface AdjustmentLimitValidationResult {
+  isValid: boolean;
+  normalized: string;
+  message: string;
+}
+
+/**
+ * Validate the post-submission adjustment limit.
+ *
+ * An empty value is valid and means "no adjustments allowed".
+ * Otherwise the value must be a non-negative finite number.
+ */
+export function validateAdjustmentLimit(raw: string): AdjustmentLimitValidationResult {
+  const trimmed = (raw ?? "").trim();
+  if (trimmed.length === 0) {
+    return { isValid: true, normalized: "0", message: "No post-submission adjustments allowed." };
+  }
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) {
+    return {
+      isValid: false,
+      normalized: "",
+      message: `Adjustment limit "${trimmed}" is not a valid number. Enter a non-negative amount.`,
+    };
+  }
+  if (parsed < 0) {
+    return {
+      isValid: false,
+      normalized: "",
+      message: "Adjustment limit cannot be negative. Enter a non-negative amount.",
+    };
+  }
+  return { isValid: true, normalized: String(parsed), message: "Adjustment limit is valid." };
+}
+
 export default function PayrollCreatePage() {
   const [assetRaw, setAssetRaw] = useState("");
   const [batchRef, setBatchRef] = useState("");
   const [description, setDescription] = useState("");
-  const [submitted, setSubmitted] = useState<{ asset: string; batchRef: string; description: string } | null>(null);
+  const [submitted, setSubmitted] = useState<{ asset: string; batchRef: string; description: string; adjustmentLimit?: string } | null>(null);
+  const [adjustmentLimit, setAdjustmentLimit] = useState("");
+  const [adjustmentLimitError, setAdjustmentLimitError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retryLog] = useState(() => new RetryPolicyDecisionLog());
   const [lastRetryDecision, setLastRetryDecision] = useState<RetryPolicyDecisionEntry | null>(null);
@@ -179,7 +216,7 @@ export default function PayrollCreatePage() {
   };
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefact();
+    e.preventDefault();
 
     // Contract pause gate: deny mutation actions when contracts are paused
     const pauseCheck = checkAction("create_payroll_draft");
@@ -219,9 +256,23 @@ export default function PayrollCreatePage() {
       recordRetryDecision("invalid_description", true, descriptionResult.message, batchRef);
       return;
     }
+    const limitResult = validateAdjustmentLimit(adjustmentLimit);
+    if (!limitResult.isValid) {
+      setError(limitResult.message);
+      setAdjustmentLimitError(limitResult.message);
+      setSubmitted(null);
+      recordRetryDecision("invalid_adjustment_limit", true, limitResult.message, batchRef);
+      return;
+    }
+    setAdjustmentLimitError(null);
     setError(null);
     // Privacy-safe: only normalized asset + batch reference (opaque ID) — no amounts
-    setSubmitted({ asset: assetResult.normalized, batchRef: batchResult.normalized, description: description });
+    setSubmitted({
+      asset: assetResult.normalized,
+      batchRef: batchResult.normalized,
+      description: description,
+      adjustmentLimit: limitResult.normalized,
+    });
     recordRetryDecision(
       "validation_passed",
       true,
@@ -305,6 +356,37 @@ export default function PayrollCreatePage() {
             value={description}
             onChange={setDescription}
           />
+
+          <div className="space-y-1">
+            <label htmlFor="adjustment-limit" className="block text-sm font-medium text-gray-700">
+              Post-submission adjustment limit
+            </label>
+            <input
+              id="adjustment-limit"
+              type="number"
+              min="0"
+              step="any"
+              inputMode="decimal"
+              value={adjustmentLimit}
+              onChange={(e) => {
+                setAdjustmentLimit(e.target.value);
+                setAdjustmentLimitError(null);
+              }}
+              placeholder="e.g. 1000"
+              aria-invalid={adjustmentLimitError ? true : undefined}
+              aria-describedby={adjustmentLimitError ? "adjustment-limit-error" : undefined}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+            {adjustmentLimitError ? (
+              <p id="adjustment-limit-error" data-testid="adjustment-limit-error" className="text-xs text-red-600">
+                {adjustmentLimitError}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500">
+                Maximum amount that can be adjusted after submission. Leave empty to disallow adjustments.
+              </p>
+            )}
+          </div>
 
           <div className="rounded-lg bg-gray-50 border p-3 text-xs text-gray-600">
             <p className="font-medium text-gray-700 mb-1 flex items-center gap-1">

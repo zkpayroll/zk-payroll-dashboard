@@ -15,6 +15,28 @@ interface RouteContext {
   params: { id: string };
 }
 
+// Post-submission adjustment limits.
+const MAX_ADJUSTMENTS_PER_PAYROLL = 5;
+const MAX_ADJUSTMENT_AMOUNT = 10000;
+const ADJUSTABLE_STATUSES = new Set<PayrollRun["status"]>(["draft", "pending", "failed"]);
+
+export const adjustmentLimitsSchema = z.object({
+  adjustments: z.array(
+    z.object({
+      type: z.enum([
+        "amount_change",
+        "recipient_change",
+        "memo_change",
+        "delay",
+      ], { invalid_type_error: "Unsupported adjustment type." }),
+      amount: z.number().positive().finite().optional(),
+      recipientId: z.string().min(1).optional(),
+      memo: z.string().max(280).optional(),
+      delayDays: z.number().int().min(0).max(30).optional(),
+    }),
+  ).min(1).max(MAX_ADJUSTMENTS_PER_PAYROLL),
+});
+
 export async function OPTIONS(request: NextRequest) {
   return handleOptions(request);
 }
@@ -37,6 +59,71 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     if (!payroll) return withCors(notFoundResponse("Payroll run"), request);
 
     const body = await request.json();
+
+    // Support post-submission adjustments alongside the existing status update flow.
+    if (body && typeof body === "object" && "adjustments" in body) {
+      const adjustmentParsed = parseBody(adjustmentLimitsSchema, body);
+      if (!adjustmentParsed.success) {
+        return withCors(validationErrorResponse(adjustmentParsed.errors), request);
+      }
+
+      if (!ADJUSTABLE_STATUSES.has(payroll.status)) {
+        return withCors(
+          errorResponse(
+            "ADJUSTMENT_NOT_ALLOWED",
+            `Payroll run in '${payroll.status}' status cannot be adjusted. Adjustments are allowed in statuses: ${Array.from(ADJUSTABLE_STATUSES).join(", ")}.`,
+            409,
+          ),
+          request,
+        );
+      }
+
+      const existingAdjustments = Array.isArray((payroll as PayrollRun & { adjustments?: unknown[] }).adjustments)
+        ? (payroll as PayrollRun & { adjustments?: unknown[] }).adjustments!
+        : [];
+      const newAdjustments = adjustmentParsed.data.adjustments;
+
+      if (existingAdjustments.length + newAdjustments.length > MAX_ADJUSTMENTS_PER_PAYROLL) {
+        return withCors(
+          errorResponse(
+            "ADJUSTMENT_LIMIT_EXCEEDED",
+            `Payroll run already has ${existingAdjustments.length} adjustment(s); adding ${newAdjustments.length} would exceed the limit of ${MAX_ADJUSTMENTS_PER_PAYROLL}.`,
+            422,
+          ),
+          request,
+        );
+      }
+
+      const totalAdjustmentAmount = newAdjustments.reduce(
+        (sum, adjustment) => sum + (adjustment.type === "amount_change" ? adjustment.amount ?? 0 : 0),
+        0,
+      );
+      if (totalAdjustmentAmount > MAX_ADJUSTMENT_AMOUNT) {
+        return withCors(
+          errorResponse(
+            "ADJUSTMENT_AMOUNT_LIMIT_EXCEEDED",
+            `Total adjustment amount ${totalAdjustmentAmount} exceeds the limit of ${MAX_ADJUSTMENT_AMOUNT}.`,
+            422,
+          ),
+          request,
+        );
+      }
+
+      const now = new Date().toISOString();
+      const recordedAdjustments = newAdjustments.map((adjustment) => ({
+        ...adjustment,
+        id: `adj_${crypto.randomUUID()}`,
+        createdAt: now,
+      }));
+
+      const updated = {
+        ...payroll,
+        adjustments: [...existingAdjustments, ...recordedAdjustments],
+        updatedAt: now,
+      };
+      return withCors(successResponse(updated), request);
+    }
+
     const parsed = parseBody(updatePayrollStatusSchema, body);
     if (!parsed.success) {
       return withCors(validationErrorResponse(parsed.errors), request);
