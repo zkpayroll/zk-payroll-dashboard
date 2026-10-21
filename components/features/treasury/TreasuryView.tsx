@@ -14,10 +14,15 @@ import ReservationToastListener from "./ReservationToastListener";
 import AssetReadinessTable from "./AssetReadinessTable";
 import TreasuryReplenishmentReadinessCard from "./TreasuryReplenishmentReadinessCard";
 import { createFundingReservation } from "@/lib/events/reservationEvents";
+import PartialReleaseFailureAlert from "./PartialReleaseFailureAlert";
+import type { PartialReleaseFailure } from "@/lib/treasury/partialRelease";
 import SupportedAssetsEmptyState from "@/components/features/assets/SupportedAssetsEmptyState";
 import { hasSupportedPayrollAssets } from "@/lib/assets/supportedAssets";
 
-function TreasuryView({ configuredAssets }: { configuredAssets?: Array<{ code: string; issuer?: string }> } = {}) {
+function TreasuryView({
+  configuredAssets,
+  releaseFailures = [],
+}: { configuredAssets?: Array<{ code: string; issuer?: string }>; releaseFailures?: PartialReleaseFailure[] } = {}) {
   const [toastVisible, setToastVisible] = useState(false);
 
   // Demo wiring: if no assets passed, treat treasury address presence as "configured"
@@ -48,6 +53,10 @@ function TreasuryView({ configuredAssets }: { configuredAssets?: Array<{ code: s
       <h2 id="treasury-heading" className="text-lg font-semibold text-gray-900">
         Treasury
       </h2>
+
+      {releaseFailures.map((failure) => (
+        <PartialReleaseFailureAlert key={failure.releaseId} failure={failure} />
+      ))}
 
       {assetsMissing && (
         <SupportedAssetsEmptyState configuredAssets={effectiveAssets} variant="treasury" compact={false} />

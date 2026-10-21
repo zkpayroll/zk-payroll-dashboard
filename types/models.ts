@@ -213,6 +213,10 @@ export interface PayrollTransaction {
   pausedBy?: string | null;
   pauseReason?: string | null;
   statusBeforePause?: "pending" | "verified";
+  /** Payroll policy revision the run executed under (#751); absent on older runs. */
+  policyRevision?: number | null;
+  /** Set when proof verification failed because of a verification key mismatch (#763). */
+  verificationKeyMismatch?: import("@/lib/zk/verificationKeyMismatch").VerificationKeyMismatch;
 }
 
 export type PayrollCancellationReason =

@@ -44,6 +44,9 @@ import ApprovalExpiryBadge from "@/components/signing/ApprovalExpiryBadge";
 import { evaluateApprovalExpiry } from "@/lib/date/approvalExpiry";
 import BatchRootComparison from "@/components/features/reconciliation/BatchRootComparison";
 import { PayrollSubmissionStepper } from "@/components/stepper/PayrollSubmissionStepper";
+import { ContractBatchLimitWarning } from "@/components/features/payroll/ContractBatchLimitWarning";
+import { PolicyRevisionBadge } from "@/components/features/payroll/PolicyRevisionBadge";
+import { VerificationKeyMismatchDetails } from "@/components/features/proofs/VerificationKeyMismatchDetails";
 import CacheFreshnessIndicator from "./CacheFreshnessIndicator";
 
 import type { LucideIcon } from "lucide-react";
@@ -293,6 +296,14 @@ export default function PayrollRunDetail({ run: propRun, proofReference, userRol
       {/* Cancellation detail panel — only for cancelled batches */}
       {run.status === "cancelled" && <PayrollCancellationPanel run={run} />}
 
+      {/* #763 — verification key mismatch, shown with fingerprints only */}
+      {run.verificationKeyMismatch && (
+        <VerificationKeyMismatchDetails mismatch={run.verificationKeyMismatch} />
+      )}
+
+      {/* #752 — runs larger than one contract submission are split */}
+      {kind === "scheduled" && <ContractBatchLimitWarning count={run.employeeCount} />}
+
       {/* Proof blocker warnings — actionable guidance when payroll cannot proceed */}
       {kind === "scheduled" && freshness.state === "missing" && (
         <MissingProofWarning runId={run.id} actionHref="/payroll/execute" />
@@ -442,7 +453,7 @@ export default function PayrollRunDetail({ run: propRun, proofReference, userRol
       {/* Run metadata */}
       <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">
         <h3 className="text-sm font-semibold text-gray-900">Run Metadata</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <div className="border rounded-lg p-4">
             <div className="flex items-center gap-2 text-gray-500 mb-1">
               <Calendar className="w-4 h-4" />
@@ -451,6 +462,13 @@ export default function PayrollRunDetail({ run: propRun, proofReference, userRol
             <p className="text-sm font-medium text-gray-900">
               {formatPeriodLabel(run)}
             </p>
+          </div>
+          <div className="border rounded-lg p-4" data-testid="run-policy-revision">
+            <div className="flex items-center gap-2 text-gray-500 mb-1">
+              <FileCode className="w-4 h-4" />
+              <span className="text-xs font-medium uppercase">Policy Revision</span>
+            </div>
+            <PolicyRevisionBadge revision={run.policyRevision} />
           </div>
           <div className="border rounded-lg p-4">
             <div className="flex items-center gap-2 text-gray-500 mb-1">

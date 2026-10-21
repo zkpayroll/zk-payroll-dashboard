@@ -71,6 +71,7 @@ import { getPayoutLimitStatus } from "@/lib/payroll/payoutLimit";
 import { createPayrollDraftChecksum, matchesReviewedPayrollDraft } from "@/lib/payroll/draftChecksum";
 import PayerAccountStatus from "@/components/features/payroll/PayerAccountStatus";
 import { usePayrollPolicyStore } from "@/stores/payrollPolicy";
+import { ContractBatchLimitWarning } from "@/components/features/payroll/ContractBatchLimitWarning";
 import { PayrollInstructionVersionBadge } from "@/components/features/payroll/PayrollInstructionVersionBadge";
 import {
   getDraftInstructionVersion,
@@ -815,6 +816,8 @@ function ReviewStep({
         generating the ZK proof.
       </p>
       <PayoutCountLimitIndicator count={selectedEmployees.length} limit={maxBatchSize} />
+      {/* #752 — the contract accepts fewer payouts per submission than the policy may allow. */}
+      <ContractBatchLimitWarning count={selectedEmployees.length} policyMaxBatchSize={maxBatchSize} />
       {/* #534 — which payroll instruction (policy version) governs this run. */}
       {versionStatus.state !== "unconfigured" && (
         <div className="flex items-center gap-2">
