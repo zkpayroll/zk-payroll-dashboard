@@ -4,6 +4,8 @@ import { useMemo } from "react";
 import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useContractPauseGuard } from "@/hooks/useContractPauseGuard";
+import { usePayrollConcurrencyStore } from "@/stores/payrollConcurrency";
+import { ConcurrentPayrollEditWarningBanner } from "@/components/payroll/ConcurrentPayrollEditWarningBanner";
 import { MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import {
   AlertTriangle,
@@ -19,6 +21,18 @@ import {
 export default function PayrollDashboardPage() {
   const { isMutationDisabled, pauseReason, remediationHref } =
     useContractPauseGuard();
+
+  const evaluations = usePayrollConcurrencyStore((s) => s.evaluations);
+  const dismissedPayrollIds = usePayrollConcurrencyStore((s) => s.dismissedPayrollIds);
+  const dismissWarning = usePayrollConcurrencyStore((s) => s.dismissWarning);
+
+  const activeConcurrentConflict = useMemo(() => {
+    return (
+      Object.values(evaluations).find(
+        (e) => e.hasConflict && !dismissedPayrollIds[e.warnings[0]?.payrollId],
+      ) ?? null
+    );
+  }, [evaluations, dismissedPayrollIds]);
 
   const runs = useMemo(() => MOCK_PAYROLL_RUNS, []);
 
@@ -91,6 +105,17 @@ export default function PayrollDashboardPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Concurrent Payroll Edit Warnings */}
+        {activeConcurrentConflict && (
+          <ConcurrentPayrollEditWarningBanner
+            evaluation={activeConcurrentConflict}
+            onDismiss={() => {
+              const payrollId = activeConcurrentConflict.warnings[0]?.payrollId;
+              if (payrollId) dismissWarning(payrollId);
+            }}
+          />
         )}
 
         {/* Action Controls Toolbar */}

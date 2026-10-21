@@ -945,3 +945,50 @@ npm test
 - **Zero Salary Leaks:** No employee compensation figures, salary numbers, or dollar amounts appear in revocation states.
 - **Masked Addresses:** Auditor Stellar addresses are truncated (`0x1111...0000`).
 - **ZK Circuit Protection:** Audit view keys only permit off-chain cryptographic proof verification and aggregated metrics, preventing disclosure of individual payroll commitments.
+
+---
+
+## #739 — Dashboard Concurrent Payroll Edit Warnings
+
+**Goal:** Detect concurrent edits, optimistic lock / revision conflicts, and active operator presence when multiple operators or dashboard tabs edit payroll drafts or payroll runs simultaneously, preventing accidental overwrites while maintaining zero-leakage privacy guarantees.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `src/payroll/concurrentPayrollEditWarning.ts` | Pure evaluation engine, session lifecycle functions, conflict detection, and privacy sanitization. |
+| `lib/payroll/concurrentPayrollEditWarning.ts` | Clean re-export interface for domain logic across dashboard modules. |
+| `components/payroll/ConcurrentPayrollEditWarningBanner.tsx` | Accessible banner (`role="alert"`) rendering critical, warning, and info states with reload/renew/review actions. |
+| `hooks/useConcurrentPayrollEdit.ts` | React hook managing session heartbeats, conflict evaluations, and action handlers. |
+| `stores/payrollConcurrency.ts` | Zustand store managing active edit sessions, peer presences, and remote change tracking. |
+| `app/payroll/page.tsx` | Dashboard layer overview displaying active concurrent edit warnings and reload affordances. |
+| `__tests__/concurrent-payroll-edit-warnings.test.ts` | Comprehensive unit tests for session lifecycle, optimistic locks, expiration, and privacy guarantees. |
+| `__tests__/concurrent-payroll-edit-warning-banner.test.tsx` | React component tests verifying rendering, severity styling, active editor counts, and callback interactions. |
+
+### Conflict Types & Resolution
+
+1. **`version_mismatch` (Critical, Blocking):**
+   - Triggered when `latestRemoteVersion` differs from session `baseVersion`.
+   - Blocks mutation actions (`canSubmit: false`).
+   - Surfaces primary action "Reload Latest Version" and secondary "Review Changes".
+   - Displays masked operator identifier (e.g. `op_...c123` or `GBBD...FLA5`).
+
+2. **`session_expired` (Critical, Blocking):**
+   - Triggered when edit session exceeds operational TTL (30 minutes) without renewal.
+   - Blocks mutation actions (`canSubmit: false`).
+   - Surfaces "Renew Session" and "Reload Latest" actions.
+
+3. **`concurrent_active_editor` (Warning, Non-blocking):**
+   - Triggered when peer sessions on the same payroll have sent a heartbeat within 2 minutes.
+   - Displays active editor badge (e.g. `2 active`).
+   - Non-blocking advisory to coordinate edits with other operators.
+
+4. **`stale_timestamp` (Warning, Non-blocking):**
+   - Triggered when remote `updatedAt` is newer than session `baseUpdatedAt` while versions match.
+   - Advises reloading latest state to avoid missing intermediate edits.
+
+### Privacy Guarantees
+
+- **Zero Compensation Leaks:** Warning objects and audit summaries never contain employee salary figures, dollar amounts, recipient arrays, or cryptographic keys.
+- **Masked Identifiers:** Operator IDs and Stellar addresses are systematically truncated (e.g., `GBBD...FLA5`).
+- **Audit-Safe Serialization:** `sanitizeConcurrentWarningForAudit` strips all contextual draft data, recording only opaque version stamps and collision counts.

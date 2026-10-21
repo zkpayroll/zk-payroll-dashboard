@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Dashboard Concurrent Payroll Edit Warnings (#739)**: Implements optimistic lock detection, active editor presence warnings, and session validity controls when multiple operators edit payroll drafts and runs simultaneously.
+  - Pure domain module `src/payroll/concurrentPayrollEditWarning.ts` and re-export `lib/payroll/concurrentPayrollEditWarning.ts` evaluating `version_mismatch`, `session_expired`, `concurrent_active_editor`, and `stale_timestamp` conflicts.
+  - Structured conflict decision engine (`evaluateConcurrentPayrollEdits`) returning actionable recommended actions (`reload_latest`, `review_changes`, `renew_session`, `proceed_with_caution`) and blocking status.
+  - Zero private financial data leaks: guarantees zero employee salaries, identities, or cryptographic secrets are exposed in warning titles, descriptions, or serialized audit entries.
+  - UI banner component `ConcurrentPayrollEditWarningBanner` (`components/payroll/ConcurrentPayrollEditWarningBanner.tsx`) rendering severity-tailored accessible alerts (`role="alert"`), active peer count badges, and action triggers.
+  - React hook `hooks/useConcurrentPayrollEdit.ts` and Zustand store `stores/payrollConcurrency.ts` managing edit sessions, peer presences, and heartbeats.
+  - Integrated concurrent edit warning banner into central payroll overview dashboard in `app/payroll/page.tsx`.
+  - Comprehensive unit and component test suites in `__tests__/concurrent-payroll-edit-warnings.test.ts` and `__tests__/concurrent-payroll-edit-warning-banner.test.tsx` covering all conflict paths, edge cases, and privacy invariants.
 - **Audit Grant Revocation Status & Timestamp in Dashboard Layer (#515)**: Surfaces immutable revocation timestamps and status badges for third-party compliance audit grants in the dashboard layer.
   - Added `AuditGrantRevocationStatus` component (`components/features/audit/AuditGrantRevocationStatus.tsx` and re-export in `components/audit/AuditGrantRevocationStatus.tsx`) rendering accessible `role="status"` badges, alert banners, and inline timestamps with zero employee salary / PII leakage.
   - Enhanced `AuditGrantScopeDetailsDrawer` (`components/features/audit/AuditGrantScopeDetailsDrawer.tsx`) to support `revokedAt`, `revokedBy`, and `revocationReason`, rendering prominent revocation alerts, timestamp details in the auditor metadata card, and disabling redundant "Revoke Grant" and "Extend Grant" actions when already revoked.
