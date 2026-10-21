@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -31,12 +31,15 @@ export interface SnapshotLockApprovalProps {
   snapshotId: string;
   snapshot?: PayrollObligationSnapshot | null;
   initialState?: LoadState;
+  /** Optional approval adapter; the default remains the existing local simulation. */
+  onApprove?: (id: string) => Promise<void>;
 }
 
 export function SnapshotLockApproval({
   snapshotId,
   snapshot: propSnapshot,
   initialState,
+  onApprove,
 }: SnapshotLockApprovalProps) {
   const [snapshot, setSnapshot] = useState<PayrollObligationSnapshot | null | undefined>(
     propSnapshot !== undefined ? propSnapshot : undefined,
@@ -56,11 +59,22 @@ export function SnapshotLockApproval({
         : "loading"),
   );
   const [lockError, setLockError] = useState<string | null>(null);
+  // State cannot guard repeated calls before React commits the pending screen.
+  const approvalRequest = useRef<symbol | null>(null);
+
+  useEffect(() => {
+    setLockError(null);
+    return () => {
+      // A response for an old route (or an unmounted screen) cannot update this one.
+      approvalRequest.current = null;
+    };
+  }, [snapshotId]);
 
   useEffect(() => {
     if (propSnapshot !== undefined) {
       setSnapshot(propSnapshot);
       if (initialState) return;
+      if (approvalRequest.current !== null) return;
       if (propSnapshot === null) setState("empty");
       else if (propSnapshot) {
         const v = validateSnapshotLockReadiness(propSnapshot);
@@ -97,17 +111,35 @@ export function SnapshotLockApproval({
   }, [snapshotId, propSnapshot, initialState]);
 
   const handleApproveLock = async () => {
-    if (!snapshot) return;
+    if (
+      approvalRequest.current !== null ||
+      state !== "loaded" ||
+      !snapshot ||
+      snapshot.id !== snapshotId
+    ) return;
     const validation = validateSnapshotLockReadiness(snapshot);
     if (!validation.canApproveLock) return;
+
+    const request = Symbol("approval");
+    approvalRequest.current = request;
     setState("locking");
     setLockError(null);
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    if (validation.canApproveLock) {
-      setState("locked");
-    } else {
-      setLockError("Lock approval blocked by SDK validation.");
-      setState("blocked");
+    try {
+      if (onApprove) {
+        await onApprove(snapshot.id);
+      } else {
+        // Preserve the demo flow; no wallet signing or network call is introduced.
+        await new Promise<void>((resolve) => setTimeout(resolve, 600));
+      }
+      if (approvalRequest.current === request) setState("locked");
+    } catch {
+      if (approvalRequest.current === request) {
+        // Do not surface provider errors: they may contain private payroll data.
+        setLockError("Could not approve the snapshot lock. Please try again.");
+        setState("loaded");
+      }
+    } finally {
+      if (approvalRequest.current === request) approvalRequest.current = null;
     }
   };
 
@@ -115,9 +147,17 @@ export function SnapshotLockApproval({
     return (
       <div
         data-testid={state === "locking" ? "snapshot-locking" : "snapshot-approval-loading"}
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
         className="space-y-4 animate-pulse"
       >
         <div className="bg-white rounded-xl border border-gray-200 p-6 h-40" />
+        {state === "locking" && (
+          <button type="button" disabled className="px-4 py-2 rounded-md bg-gray-100 text-gray-500 text-sm">
+            Approving snapshot lock...
+          </button>
+        )}
       </div>
     );
   }
