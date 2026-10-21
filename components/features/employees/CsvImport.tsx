@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import {
   Upload,
   AlertTriangle,
@@ -11,11 +11,20 @@ import {
   UserPlus,
   Loader2,
   ShieldCheck,
+  ShieldAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useEmployeeStore } from "@/stores/employees";
 import { sha256Hex } from "@/lib/zk/hash";
 import { ImportConflictResolver } from "./ImportConflictResolver";
+import {
+  ImportSalaryCommitmentDuplicateWarning,
+  type DuplicateCommitmentResolution,
+} from "./ImportSalaryCommitmentDuplicateWarning";
+import {
+  evaluateDuplicateSalaryCommitments,
+  type SalaryCommitmentDuplicateGroup,
+} from "@/src/payroll/importSalaryCommitmentDuplicates";
 import type { Employee } from "@/types";
 
 export interface CsvRow {
@@ -194,6 +203,75 @@ export default function CsvImport() {
   const [importedIds, setImportedIds] = useState<Set<string>>(new Set());
   const [allImported, setAllImported] = useState(false);
   const [showConflictResolver, setShowConflictResolver] = useState(false);
+  const [duplicateResolutions, setDuplicateResolutions] = useState<
+    Record<string, DuplicateCommitmentResolution>
+  >({});
+
+  // Duplicate salary commitments detected in the parsed file (#749).
+  const duplicateGroups = useMemo(
+    () =>
+      evaluateDuplicateSalaryCommitments(
+        parsedRows.map((row) => ({
+          rowIndex: row.rowIndex,
+          address: row.address,
+          salary: row.salary,
+          name: row.name,
+        })),
+      ).groups,
+    [parsedRows],
+  );
+
+  /** Row indexes that take part in at least one duplicate group. */
+  const duplicateRowIndexes = useMemo(
+    () => new Set(duplicateGroups.flatMap((group) => group.rowIndexes)),
+    [duplicateGroups],
+  );
+
+  /** Groups the operator has not resolved yet. */
+  const unresolvedDuplicateGroups = useMemo(
+    () =>
+      duplicateGroups.filter(
+        (group) => duplicateResolutions[group.id] === undefined,
+      ),
+    [duplicateGroups, duplicateResolutions],
+  );
+
+  /** Rows excluded by the operator's duplicate resolution. */
+  const excludedRowIndexes = useMemo(() => {
+    const excluded = new Set<number>();
+    duplicateGroups.forEach((group) => {
+      const resolution = duplicateResolutions[group.id];
+      if (resolution === undefined) return;
+      group.rowIndexes.forEach((rowIndex) => {
+        if (resolution !== rowIndex) excluded.add(rowIndex);
+      });
+    });
+    return excluded;
+  }, [duplicateGroups, duplicateResolutions]);
+
+  const validRows = useMemo(
+    () =>
+      parsedRows.filter((row) => {
+        const rowErrors = validationErrors.filter(
+          (e) => e.rowIndex === row.rowIndex,
+        );
+        return rowErrors.length === 0;
+      }),
+    [parsedRows, validationErrors],
+  );
+
+  /** Rows that can actually be imported once duplicates are resolved. */
+  const importableRows = useMemo(
+    () => validRows.filter((row) => !excludedRowIndexes.has(row.rowIndex)),
+    [validRows, excludedRowIndexes],
+  );
+
+  const handleResolveDuplicate = useCallback(
+    (group: SalaryCommitmentDuplicateGroup, resolution: DuplicateCommitmentResolution) => {
+      setDuplicateResolutions((prev) => ({ ...prev, [group.id]: resolution }));
+    },
+    [],
+  );
 
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -229,6 +307,7 @@ export default function CsvImport() {
         setParsedRows(rows);
         setValidationErrors(allErrors);
         setImportedIds(new Set());
+        setDuplicateResolutions({});
 
         const errorCount = allErrors.filter(
           (e) => e.field !== "email" || allErrors.length <= 2,
@@ -261,6 +340,29 @@ export default function CsvImport() {
 
   const handleImportRow = useCallback(
     async (row: CsvRow) => {
+      // Guard: a row that is part of an unresolved duplicate salary
+      // commitment, or that the operator excluded, must never be committed
+      // (#749).
+      if (excludedRowIndexes.has(row.rowIndex)) {
+        toast.error("Row excluded", {
+          description:
+            "This row duplicates another row's salary commitment and was excluded from the import.",
+        });
+        return;
+      }
+      if (
+        duplicateRowIndexes.has(row.rowIndex) &&
+        unresolvedDuplicateGroups.some((group) =>
+          group.rowIndexes.includes(row.rowIndex),
+        )
+      ) {
+        toast.error("Resolve the duplicate salary commitment first", {
+          description:
+            "This row commits the same salary to the same wallet as another row. Keep one row or exclude the group.",
+        });
+        return;
+      }
+
       setImportingRow(row.rowIndex);
       try {
         const salt = crypto.randomUUID();
@@ -290,20 +392,23 @@ export default function CsvImport() {
         setImportingRow(null);
       }
     },
-    [addEmployee],
+    [
+      addEmployee,
+      duplicateRowIndexes,
+      excludedRowIndexes,
+      unresolvedDuplicateGroups,
+    ],
   );
 
   const handleImportAll = useCallback(() => {
-    const validRows = parsedRows.filter((row) => {
-      const rowErrors = validationErrors.filter(
-        (e) => e.rowIndex === row.rowIndex,
-      );
-      return rowErrors.length === 0;
-    });
+    // Duplicate salary commitments must be resolved before the import runs
+    // (#749) — otherwise the directory would hold two commitments to the
+    // same hidden salary for the same wallet.
+    if (unresolvedDuplicateGroups.length > 0) return;
 
     // Show conflict resolver before importing
     setShowConflictResolver(true);
-  }, [parsedRows, validationErrors]);
+  }, [unresolvedDuplicateGroups.length]);
 
   const handleConflictResolve = useCallback(
     async (resolvedRows: CsvRow[], _skippedIds: string[]) => {
@@ -326,6 +431,7 @@ export default function CsvImport() {
     setSourceColumns([]);
     setImportedIds(new Set());
     setAllImported(false);
+    setDuplicateResolutions({});
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -335,10 +441,7 @@ export default function CsvImport() {
     return validationErrors.filter((e) => e.rowIndex === rowIndex);
   };
 
-  const validRowCount = parsedRows.filter((row) => {
-    const rowErrors = getRowErrors(row.rowIndex);
-    return rowErrors.length === 0;
-  }).length;
+  const validRowCount = validRows.length;
 
   return (
     <section aria-labelledby="csv-import-heading" className="space-y-6">
@@ -442,11 +545,20 @@ export default function CsvImport() {
               <button
                 type="button"
                 onClick={handleImportAll}
-                disabled={validRowCount === 0 || allImported}
+                disabled={
+                  importableRows.length === 0 ||
+                  allImported ||
+                  unresolvedDuplicateGroups.length > 0
+                }
+                title={
+                  unresolvedDuplicateGroups.length > 0
+                    ? "Resolve every duplicate salary commitment before importing."
+                    : undefined
+                }
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
               >
                 <UserPlus className="w-3.5 h-3.5" />
-                Import all valid ({validRowCount})
+                Import all valid ({importableRows.length})
               </button>
             </div>
           </div>
@@ -485,6 +597,16 @@ export default function CsvImport() {
               </p>
             )}
           </section>
+
+          {duplicateGroups.length > 0 && (
+            <div className="px-4 sm:px-6 pb-3">
+              <ImportSalaryCommitmentDuplicateWarning
+                groups={duplicateGroups}
+                resolutions={duplicateResolutions}
+                onResolve={handleResolveDuplicate}
+              />
+            </div>
+          )}
 
           <div className="overflow-x-auto">
             <table className="w-full text-left">
@@ -555,16 +677,28 @@ export default function CsvImport() {
                   const hasErrors = rowErrors.length > 0;
                   const isImported = importedIds.has(`${row.rowIndex}`);
                   const isImporting = importingRow === row.rowIndex;
+                  const isDuplicate = duplicateRowIndexes.has(row.rowIndex);
+                  const isExcluded = excludedRowIndexes.has(row.rowIndex);
+                  const hasUnresolvedDuplicate =
+                    isDuplicate &&
+                    unresolvedDuplicateGroups.some((group) =>
+                      group.rowIndexes.includes(row.rowIndex),
+                    );
 
                   return (
                     <tr
                       key={row.rowIndex}
+                      data-testid={`csv-import-row-${row.rowIndex}`}
                       className={
                         hasErrors
                           ? "bg-red-50/30"
                           : isImported
                             ? "bg-green-50/30"
-                            : "hover:bg-gray-50"
+                            : isExcluded
+                              ? "bg-gray-50/60"
+                              : isDuplicate
+                                ? "bg-amber-50/60"
+                                : "hover:bg-gray-50"
                       }
                     >
                       <td className="px-3 py-3 text-xs font-mono text-gray-500">
@@ -589,9 +723,9 @@ export default function CsvImport() {
                         {row.startDate || "—"}
                       </td>
                       <td className="px-3 py-3">
-                        {rowErrors.length > 0 ? (
-                          <div className="space-y-1">
-                            {rowErrors.map((err, i) => (
+                        <div className="space-y-1">
+                          {rowErrors.length > 0 ? (
+                            rowErrors.map((err, i) => (
                               <span
                                 key={i}
                                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-200"
@@ -599,14 +733,29 @@ export default function CsvImport() {
                                 <AlertTriangle className="w-2.5 h-2.5" />
                                 {err.field}: {err.message}
                               </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
-                            <CheckCircle className="w-3 h-3" />
-                            Valid
-                          </span>
-                        )}
+                            ))
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
+                              <CheckCircle className="w-3 h-3" />
+                              Valid
+                            </span>
+                          )}
+                          {isDuplicate && (
+                            <span
+                              data-testid={`csv-import-duplicate-badge-${row.rowIndex}`}
+                              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                                isExcluded
+                                  ? "bg-gray-50 text-gray-500 border-gray-200"
+                                  : "bg-amber-50 text-amber-700 border-amber-200"
+                              }`}
+                            >
+                              <ShieldAlert className="w-2.5 h-2.5" />
+                              {isExcluded
+                                ? "Duplicate commitment — excluded"
+                                : "Duplicate commitment"}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-3 text-right">
                         {isImported ? (
@@ -618,6 +767,12 @@ export default function CsvImport() {
                           <span className="text-xs text-gray-400">
                             Fix errors
                           </span>
+                        ) : hasUnresolvedDuplicate ? (
+                          <span className="text-xs text-gray-400">
+                            Resolve duplicate
+                          </span>
+                        ) : isExcluded ? (
+                          <span className="text-xs text-gray-400">Excluded</span>
                         ) : isImporting ? (
                           <Loader2 className="w-4 h-4 text-indigo-600 animate-spin inline" />
                         ) : (
@@ -656,12 +811,7 @@ export default function CsvImport() {
 
       {showConflictResolver && (
         <ImportConflictResolver
-          rows={parsedRows.filter((row) => {
-            const rowErrors = validationErrors.filter(
-              (e) => e.rowIndex === row.rowIndex,
-            );
-            return rowErrors.length === 0;
-          })}
+          rows={importableRows}
           existingEmployees={employees.map((e) => ({
             name: e.name,
             email: e.email,

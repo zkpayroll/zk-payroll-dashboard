@@ -19,6 +19,7 @@ export * from "./payrollImportRollback";
 export * from "./compensationGroupMembership";
 export * from "./payoutConfirmationRetryPolicy";
 export * from "./duplicatePayoutDetection";
+export * from "./importSalaryCommitmentDuplicates";
 export * from "./periodReopenRestrictions";
 export * from "./draftComparisonSnapshot";
 export * from "./employeeActivationPrerequisites";
