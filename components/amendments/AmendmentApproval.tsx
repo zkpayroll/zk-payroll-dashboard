@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -11,7 +11,7 @@ import {
   Lock,
   EyeOff,
   AlertTriangle,
-} from "lucide-react";
+} from "lucides-react";
 import {
   fetchAmendmentById,
   validateAmendmentPlan,
@@ -26,6 +26,53 @@ export interface AmendmentApprovalProps {
   amendmentId: string;
   amendment?: SalaryCommitmentAmendment | null;
   initialState?: LoadState;
+}
+
+// Post-submission adjustment limits applied in the dashboard layer.
+// These guardrails prevent operators from approving amendments that exceed
+// safe operational bounds after the amendment has already been submitted.
+export const MAX_APPROVAL_ATTEMPTS = 3;
+export const MAX_ADJUSTMENT_WINDOW_HOURS = 72;
+
+export interface AdjustmentLimitResult {
+  isAllowed: boolean;
+  reason?: string;
+  remainingAttempts?: number;
+}
+
+/**
+ * Evaluates the post-submission adjustment limits for an amendment.
+ * This is pure and deterministic so it can be tested and reused by the dashboard.
+ */
+export function evaluateAdjustmentLimits(
+  amendment: SalaryCommitmentAmendment,
+  now: Date = new Date(),
+): AdjustmentLimitResult {
+  const attempts = amendment.adjustmentAttempts ?? 0;
+  if (attempts >= MAX_APPROVAL_ATTEMPTS) {
+    return {
+      isAllowed: false,
+      remainingAttempts: 0,
+      reason: `Approval attempt limit reached (${MAX_APPROVAL_ATTEMPTS}). Request a new amendment instead.`,
+    };
+  }
+
+  const submittedAt = amendment.submittedAt ? new Date(amendment.submittedAt) : null;
+  if (submittedAt && !Number.isNaN(submittedAt.getTime())) {
+    const hoursSinceSubmission = (now.getTime() - submittedAt.getTime()) / (3600 * 1000);
+    if (hoursSinceSubmission > MAX_ADJUSTMENT_WINDOW_HOURS) {
+      return {
+        isAllowed: false,
+        remainingAttempts: MAX_APPROVAL_ATTEMPTS - attempts,
+        reason: `Adjustment window of ${MAX_ADJUSTMENT_WINDOW_HOURS}h has expired. Request a fresh amendment.`,
+      };
+    }
+  }
+
+  return {
+    isAllowed: true,
+    remainingAttempts: MAX_APPROVAL_ATTEMPTS - attempts,
+  };
 }
 
 export function AmendmentApproval({
@@ -91,10 +138,21 @@ export function AmendmentApproval({
     };
   }, [amendmentId, propAmendment, initialState]);
 
+  const adjustmentLimits = useMemo(() => {
+    if (!amendment) return null;
+    return evaluateAdjustmentLimits(amendment);
+  }, [amendment]);
+
   const handleApprove = async () => {
     if (!amendment) return;
     const validation = validateAmendmentPlan(amendment);
     if (!validation.canApprove) return;
+    const limits = evaluateAdjustmentLimits(amendment);
+    if (!limits.isAllowed) {
+      setApprovalError(limits.reason ?? "Adjustment limit blocked approval.");
+      setState("blocked");
+      return;
+    }
     setState("approving");
     setApprovalError(null);
     // Simulate SDK approval call with validation gate
@@ -103,7 +161,7 @@ export function AmendmentApproval({
     if (validation.canApprove) {
       setState("approved");
     } else {
-      setApprovalError("Approval blocked by SDK validation.");
+      setApprovalError("Approval blocked by SGK validation.");
       setState("blocked");
     }
   };
@@ -116,7 +174,7 @@ export function AmendmentApproval({
         className="space-y-4"
       >
         <div className="bg-white rounded-xl border border-gray-200 p-6 animate-pulse space-y-4">
-          <div className="h-5 bg-gray-200 rounded w-64" />
+          <div className="h5 bg-gray-200 rounded w-64" />
           <div className="h-4 bg-gray-100 rounded w-full" />
           <div className="h-24 bg-gray-100 rounded" />
           <div className="h-10 bg-gray-200 rounded w-40" />
@@ -165,6 +223,7 @@ export function AmendmentApproval({
   }
 
   const validation = validateAmendmentPlan(amendment);
+  const limitsBlocked = adjustmentLimits !== null && !adjustmentLimits.isAllowed;
 
   // Approved state
   if (state === "approved") {
@@ -241,8 +300,21 @@ export function AmendmentApproval({
     );
   }
 
-  // Blocked state (stale or policy-invalid)
-  if (state === "blocked" || validation.isBlocked) {
+  // Blocked state (stale, policy-invalid, or post-submission adjustment limit)
+  if (state === "blocked" || validation.isBlocked || limitsBlocked) {
+    const blockedReason =
+      limitsBlocked && !validation.isBlocked
+        ? (adjustmentLimits ?? {}).reason ?? approvalError
+        : validation.blockedReason;
+    const blockedTitle =
+      limitsBlocked && !validation.isBlocked
+        ? "Adjustment limit reached — approval blocked"
+        : validation.isStale
+          ? "Stale commitment — approval blocked"
+          : !validation.isPolicyValid
+            ? "Policy violation — approval blocked"
+            : "Approval blocked";
+
     return (
       <section
         data-testid="amendment-blocked-state"
@@ -265,19 +337,15 @@ export function AmendmentApproval({
           <ShieldAlert className="h-6 w-6 text-red-600 shrink-0 mt-0.5" aria-hidden="true" />
           <div>
             <h2 id="blocked-heading" className="text-base font-semibold text-red-900">
-              {validation.isStale
-                ? "Stale commitment — approval blocked"
-                : !validation.isPolicyValid
-                  ? "Policy violation — approval blocked"
-                  : "Approval blocked"}
+              {blockedTitle}
             </h2>
-            <p className="text-sm text-red-700 mt-1">{validation.blockedReason}</p>
+            <p className="text-sm text-red-700 mt-1">{blockedReason}</p>
             {validation.nextSteps && (
               <p className="text-sm text-red-600 mt-2">{validation.nextSteps}</p>
             )}
             <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-red-600">
               <Lock className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>SDK validation prevents approval of stale or policy-invalid plans.</span>
+              <span>SGK validation prevents approval of stale, policy-invalid, or over-limit plans.</span>
             </div>
           </div>
         </div>
@@ -290,6 +358,11 @@ export function AmendmentApproval({
           <ul className="mt-2 text-xs text-amber-700 list-disc list-inside space-y-1">
             {validation.isStale && <li>Request a fresh amendment with the latest commitment version.</li>}
             {!validation.isPolicyValid && <li>Correct the amendment to meet asset, period, or threshold policy.</li>}
+            {limitsBlocked && (
+              <li>
+                Post-submission adjustment limits: max {MAX_APPROVAL_ATTEMPTS} attempts within {MAX_ADJUSTMENT_WINDOW_HOURS}h of submission.
+              </li>
+            )}
             <li>Salary values stay encrypted — only hashes and safe metadata are reviewed.</li>
           </ul>
         </div>
@@ -321,13 +394,9 @@ export function AmendmentApproval({
     );
   }
 
-  // Loaded — pending valid state
+  // Loaded state — ready for review and approval
   return (
-    <section
-      data-testid="amendment-approval"
-      aria-labelledby="approval-heading"
-      className="space-y-6"
-    >
+    <section data-testid="amendment-approval" aria-labelledby="approval-heading" className="space-y-6">
       <Link
         href={`/payroll/amendments/${amendment.id}`}
         className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900"
@@ -336,90 +405,59 @@ export function AmendmentApproval({
         Back to detail
       </Link>
 
-      <header className="bg-white rounded-xl border border-gray-200 p-6 space-y-3">
-        <div className="flex items-center gap-2">
-          <Clock className="h-5 w-5 text-amber-600" aria-hidden="true" />
-          <h1 id="approval-heading" className="text-lg font-semibold text-gray-900">
-            Approve amendment {amendment.id}
-          </h1>
-        </div>
-        <p className="text-sm text-gray-600">
-          Review safe metadata below. Salary values remain encrypted — only commitment hashes,
-          employee reference, period, asset, and approval status are shown.
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h1 id="approval-heading" className="text-lg font-semibold text-gray-900">
+          Review amendment
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Approving will activate the new salary commitment. Raw salary values remain encrypted.
         </p>
-        {validation.nextSteps && (
-          <p className="text-xs text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2">
-            {validation.nextSteps}
-          </p>
-        )}
-      </header>
+      </div>
 
       <AmendmentDiff amendment={amendment} />
 
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <h3 className="text-sm font-medium text-gray-800">Post-submission adjustment limits</h3>
+        <ul className="mt-2 text-xs text-gray-600 list-disc list-inside space-y-1">
+          <li>Max {MAX_APPROVAL_ATTEMPTS} approval attempts</li>
+          <li>Adjustment window: {MAX_ADJUSTMENT_WINDOW_HOURS} hours from submission</li>
+          {adjustmentLimits && (
+            <li data-testid="adjustment-remaining">
+              Remaining attempts: {adjustmentLimits.remainingAttempts ?? 0}
+            </li>
+          )}
+        </ul>
+      </div>
+
       {approvalError && (
-        <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-          <XCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
-          {approvalError}
+        <div data-testid="amendment-approval-error-message" role="alert" className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-sm text-red-700">{approvalError}</p>
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-        <h3 className="text-sm font-semibold text-gray-900">Approval decision</h3>
-        <p className="text-xs text-gray-500">
-          Approving applies the new commitment hash on-chain. This action is audited and cannot be
-          undone without a new amendment.
-        </p>
-
-        <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={handleApprove}
-            disabled={!validation.canApprove}
-            data-testid="amendment-approve-button"
-            aria-disabled={!validation.canApprove}
-            className={`inline-flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              validation.canApprove
-                ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                : "bg-gray-100 text-gray-400 cursor-not-allowed"
-            }`}
-          >
-            {validation.canApprove ? (
-              <>
-                <CheckCircle2 className="h-4 w-4 mr-1.5" aria-hidden="true" />
-                Confirm approval
-              </>
-            ) : (
-              <>
-                <Lock className="h-4 w-4 mr-1.5" aria-hidden="true" />
-                Approval blocked
-              </>
-            )}
-          </button>
-          <Link
-            href={`/payroll/amendments/${amendment.id}`}
-            className="inline-flex items-center justify-center px-4 py-2 rounded-md border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </Link>
-        </div>
-
-        {!validation.canApprove && validation.blockedReason && (
-          <p
-            data-testid="amendment-approval-blocked-reason"
-            className="text-xs text-red-600 flex items-start gap-1.5"
-          >
-            <ShieldAlert className="h-3.5 w-3.5 mt-0.5 shrink-0" aria-hidden="true" />
-            {validation.blockedReason}
-          </p>
-        )}
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={handleApprove}
+          disabled={!validation.canApprove||!!approvalError}
+          data-testid="amendment-approve-button"
+          className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+        >
+          <CheckCircle2 className="h-4 w-4 mr-1.5" aria-hidden="true" />
+          Approve amendment
+        </button>
+        <Link
+          href={`/payroll/amendments/${amendment.id}`}
+          className="inline-flex items-center justify-center px-4 py-2 rounded-md border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Cancel
+        </Link>
       </div>
 
-      <footer className="flex items-start gap-2 text-xs text-gray-500 bg-indigo-50 border border-indigo-200 rounded-lg p-3">
-        <EyeOff className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+      <footer className="flex items-start gap-2 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <Clock className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden="true" />
         <span>{AMENDMENT_PRIVACY_NOTICE}</span>
       </footer>
     </section>
   );
 }
-
-export default AmendmentApproval;

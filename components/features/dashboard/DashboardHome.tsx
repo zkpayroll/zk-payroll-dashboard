@@ -24,6 +24,7 @@ import DashboardCompensationPolicyCheck from "@/components/features/dashboard/Da
 import DashboardEmployeeEligibilityStatusCheck from "@/components/features/dashboard/DashboardEmployeeEligibilityStatusCheck";
 import DashboardPayoutVarianceAnomalyDetection from "@/components/features/dashboard/DashboardPayoutVarianceAnomalyDetection";
 import DashboardOrganizationConfigChangeLedger from "@/components/features/dashboard/DashboardOrganizationConfigChangeLedger";
+import DashboardPayrollOperationsHealthCard from "@/components/features/dashboard/DashboardPayrollOperationsHealthCard";
 import { MOCK_COMPANIES, MOCK_EMPLOYEES } from "@/lib/api/mockData";
 
 function DashboardHome() {
@@ -150,6 +151,9 @@ function DashboardHome() {
       </ErrorBoundary>
       <ErrorBoundary>
         <OnboardingReadinessTracker />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <DashboardPayrollOperationsHealthCard />
       </ErrorBoundary>
       <ErrorBoundary>
         <TreasuryBalanceSummaryCard />

@@ -213,6 +213,10 @@ export interface PayrollTransaction {
   pausedBy?: string | null;
   pauseReason?: string | null;
   statusBeforePause?: "pending" | "verified";
+  /** Payroll policy revision the run executed under (#751); absent on older runs. */
+  policyRevision?: number | null;
+  /** Set when proof verification failed because of a verification key mismatch (#763). */
+  verificationKeyMismatch?: import("@/lib/zk/verificationKeyMismatch").VerificationKeyMismatch;
 }
 
 export type PayrollCancellationReason =
@@ -322,6 +326,16 @@ export interface PayrollWizardState {
   transactionHash: string | null;
   isProofNearingExpiration?: boolean;
   treasuryBalanceOverride?: number | null;
+  /**
+   * Set when a proof generation or transaction submission was in flight
+   * (proofStatus/submissionStatus was not "idle") and the step reached was
+   * past "review" at the moment the draft was last persisted. Survives a
+   * browser close / network drop mid-flow so the wizard can distinguish a
+   * plain unsubmitted draft from a settlement that was interrupted
+   * mid-submission (#755). Never holds proof artifacts or transaction
+   * hashes — only the step name for display.
+   */
+  interruptedAtStep?: PayrollWizardStep | null;
 }
 
 export type ApprovalEventType =
@@ -1185,3 +1199,104 @@ export const DEFAULT_PAYROLL_IMPORT_ROLLBACK_POLICY: PayrollImportRollbackPolicy
   allowRollbackAfterExecution: false,
   allowRollbackAfterReconciliation: false,
 };
+
+// ─── Payroll Upload Recovery Checkpoints ─────────────────────────────────────
+
+/**
+ * The stage of a payroll upload at which a checkpoint was recorded.
+ *
+ * Mirrors the four wizard steps plus a terminal state so the recovery
+ * banner can direct the operator to the exact point of interruption.
+ *
+ * - `draft_started`   – employee selection and amount review are complete.
+ * - `proof_generated` – ZK proof was produced and validated.
+ * - `confirmed`       – operator reviewed and confirmed the proof step.
+ * - `submitting`      – transaction dispatch was in flight when interrupted.
+ * - `completed`       – upload finished successfully; no recovery needed.
+ */
+export type UploadCheckpointStage =
+  | "draft_started"
+  | "proof_generated"
+  | "confirmed"
+  | "submitting"
+  | "completed";
+
+/**
+ * A privacy-safe snapshot of payroll upload progress written at each
+ * meaningful wizard transition.
+ *
+ * Sensitive fields — employee amounts, salaries, ZK proofs, wallet keys —
+ * are intentionally excluded. Only structural metadata safe to store
+ * client-side or transmit to a logging endpoint is recorded.
+ */
+export interface UploadCheckpoint {
+  /** Opaque run identifier generated when the wizard session starts. */
+  runId: string;
+  /** Upload stage this checkpoint represents. */
+  stage: UploadCheckpointStage;
+  /**
+   * Number of employees in the batch — count only, never IDs or amounts.
+   * A zero value means no employees were locked in at checkpoint time.
+   */
+  employeeCount: number;
+  /** Whether a valid ZK proof existed when this checkpoint was written. */
+  proofReady: boolean;
+  /** ISO-8601 timestamp when the checkpoint was recorded. */
+  savedAt: string;
+  /**
+   * Human-readable hint surfaced in the recovery banner.
+   * Must not contain salary figures, wallet addresses, or employee names.
+   */
+  recoveryHint: string;
+}
+
+/**
+ * Result returned by the checkpoint API on a GET request.
+ * Wraps the latest checkpoint plus staleness metadata.
+ */
+export interface UploadCheckpointQueryResult {
+  checkpoint: UploadCheckpoint | null;
+  /** True when a recoverable (non-completed) checkpoint exists. */
+  isRecoverable: boolean;
+  /**
+   * Age in seconds since the checkpoint was saved.
+   * Null when no checkpoint exists.
+   */
+  ageSeconds: number | null;
+}
+
+// ─── Payroll Draft Provenance ─────────────────────────────────────────────────
+
+/**
+ * The kind of change that produced a draft provenance entry.
+ *
+ * `created` is recorded once when a draft is first saved; `updated` is
+ * recorded on every subsequent mutation so operators can trace a draft's
+ * chain of custody back to its origin.
+ */
+export type DraftProvenanceAction = "created" | "updated";
+
+/**
+ * One link in a payroll draft's chain of custody.
+ *
+ * Provenance records *who* touched a draft and *when*, plus a one-way content
+ * digest so any change to the draft's contents is detectable. It never
+ * reversibly stores salary amounts, employee IDs, wallet addresses, or ZK
+ * commitments — only structural metadata and the digest are retained.
+ */
+export interface DraftProvenanceEntry {
+  /** What happened: the draft was created or updated. */
+  action: DraftProvenanceAction;
+  /** Identity of the actor who made the change; defaults to "system" when omitted. */
+  actor: string;
+  /** ISO-8601 timestamp when the change was recorded. */
+  timestamp: string;
+  /**
+   * Privacy-safe content digest of the draft at change time.
+   * One-way hash of structural fields only — used to detect that the draft's
+   * contents changed between revisions. Never reversible to payroll data.
+   */
+  contentChecksum: string;
+  /** Human-readable summary of what changed; contains no personal data. */
+  changeSummary?: string;
+}

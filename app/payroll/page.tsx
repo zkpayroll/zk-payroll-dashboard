@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useContractPauseGuard } from "@/hooks/useContractPauseGuard";
@@ -16,7 +16,69 @@ import {
   Clock,
   ArrowRight,
   ShieldAlert,
+  SlidersHorizontal,
 } from "lucide-react";
+
+type RetryDecisionOutcome = "allowed" | "blocked" | "deferred";
+
+interface RetryDecisionLogEntry {
+  id: string;
+  payrollId: string;
+  outcome: RetryDecisionOutcome;
+  reason: string;
+  attempt: number;
+  timestamp: string;
+}
+
+const RETRY_DECISION_REASON_LABELS: Record<RetryDecisionOutcome, string> = {
+  allowed: "Retry permitted",
+  blocked: "Retry blocked",
+  deferred: "Retry deferred",
+};
+
+function evaluateRetryDecision(
+  payrollId: string,
+  attempt: number,
+  isMutationDisabled: boolean,
+): Omit<RetryDecisionLogEntry, "id" | "timestamp"> {
+  if (isMutationDisabled) {
+    return {
+      payrollId,
+      outcome: "blocked",
+      reason: "CONTRACT_PAUSED",
+      attempt,
+    };
+  }
+  if (attempt > 3) {
+    return {
+      payrollId,
+      outcome: "deferred",
+      reason: "MAX_ATTEMPTS_EXCEEDED",
+      attempt,
+    };
+  }
+  return {
+    payrollId,
+    outcome: "allowed",
+    reason: "RETRY_WITHIN_POLICY",
+    attempt,
+  };
+}
+
+const POST_SUBMISSION_ADJUSTMENT_LIMIT = 3;
+
+interface PostSubmissionAdjustmentState {
+  payrollId: string;
+  adjustmentsUsed: number;
+  lastAdjustedAt: string | null;
+}
+
+function getAdjustmentLimitError(adjustmentsUsed: number): string | null {
+  if (adjustmentsUsed >= POST_SUBMISSION_ADJUSTMENT_LIMIT) {
+    return `Adjustment limit reached (${POST_SUBMISSION_ADJUSTMENT_LIMIT} per payroll run). Contact an approver to request a new batch.`;
+  }
+  return null;
+}
 
 export default function PayrollDashboardPage() {
   const { isMutationDisabled, pauseReason, remediationHref } =
@@ -25,6 +87,63 @@ export default function PayrollDashboardPage() {
   const evaluations = usePayrollConcurrencyStore((s) => s.evaluations);
   const dismissedPayrollIds = usePayrollConcurrencyStore((s) => s.dismissedPayrollIds);
   const dismissWarning = usePayrollConcurrencyStore((s) => s.dismissWarning);
+
+  const [retryDecisionLog, setRetryDecisionLog] = useState<
+    RetryDecisionLogEntry[]
+  >([]);
+
+  const [adjustmentState, setAdjustmentState] = useState<
+    Record<string, PostSubmissionAdjustmentState>
+  >({});
+
+  const recordRetryDecision = useCallback(
+    (payrollId: string, attempt: number) => {
+      const decision = evaluateRetryDecision(
+        payrollId,
+        attempt,
+        isMutationDisabled,
+      );
+      setRetryDecisionLog((prev) => [
+        {
+          ...decision,
+          id: `${payrollId}-${attempt}-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+    },
+    [isMutationDisabled],
+  );
+
+  const recordAdjustment = useCallback(
+    (payrollId: string) => {
+      if (isMutationDisabled) {
+        return {
+          ok: false as const,
+          error: "Adjustments are disabled while payroll contracts are paused.",
+        };
+      }
+      const current = adjustmentState[payrollId] ?? {
+        payrollId,
+        adjustmentsUsed: 0,
+        lastAdjustedAt: null,
+      };
+      const limitError = getAdjustmentLimitError(current.adjustmentsUsed);
+      if (limitError) {
+        return { ok: false as const, error: limitError };
+      }
+      setAdjustmentState((prev) => ({
+        ...prev,
+        [payrollId]: {
+          payrollId,
+          adjustmentsUsed: current.adjustmentsUsed + 1,
+          lastAdjustedAt: new Date().toISOString(),
+        },
+      }));
+      return { ok: true as const };
+    },
+    [adjustmentState, isMutationDisabled],
+  );
 
   const activeConcurrentConflict = useMemo(() => {
     return (
@@ -107,6 +226,27 @@ export default function PayrollDashboardPage() {
           </div>
         )}
 
+        {/* Post-Submission Adjustment Limits */}
+        <div
+          data-testid="adjustment-limits-panel"
+          className="bg-white rounded-lg shadow-sm border p-4 space-y-3"
+        >
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+              <SlidersHorizontal className="w-4 h-4 text-indigo-600" />
+              Post-Submission Adjustments
+            </h2>
+            <span className="text-xs text-gray-500">
+              Limit: {POST_SUBMISSION_ADJUSTMENT_LIMIT} per run
+            </span>
+          </div>
+          <p className="text-xs text-gray-500">
+            Adjustments after submission are capped to protect payroll
+            integrity. Privacy-safe identifiers only; no salary or address data
+            is exposed.
+          </p>
+        </div>
+
         {/* Concurrent Payroll Edit Warnings */}
         {activeConcurrentConflict && (
           <ConcurrentPayrollEditWarningBanner
@@ -117,6 +257,62 @@ export default function PayrollDashboardPage() {
             }}
           />
         )}
+
+        {/* Retry Policy Decision Log */}
+        <div
+          data-testid="retry-decision-log"
+          className="bg-white rounded-lg shadow-sm border p-4 space-y-3"
+        >
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+              Retry Policy Decisions
+            </h2>
+            <span className="text-xs text-gray-500">
+              {retryDecisionLog.length} recorded
+            </span>
+          </div>
+          {retryDecisionLog.length === 0 ? (
+            <p className="text-xs text-gray-500">
+              No retry decisions recorded yet. Retry evaluations will appear
+              here with privacy-safe identifiers only.
+            </p>
+          ) : (
+            <ul className="divide-y divide-gray-100 border rounded-lg overflow-hidden">
+              {retryDecisionLog.map((entry) => (
+                <li
+                  key={entry.id}
+                  data-testid="retry-decision-entry"
+                  className="p-3 flex items-center justify-between text-xs"
+                >
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-medium text-gray-900">
+                        {entry.payrollId}
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full font-medium ${
+                          entry.outcome === "allowed"
+                            ? "bg-green-100 text-green-700"
+                            : entry.outcome === "blocked"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        {RETRY_DECISION_REASON_LABELS[entry.outcome]}
+                      </span>
+                    </div>
+                    <p className="text-gray-500">
+                      {entry.reason} · attempt {entry.attempt}
+                    </p>
+                  </div>
+                  <span className="text-gray-400">
+                    {new Date(entry.timestamp).toLocaleTimeString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         {/* Action Controls Toolbar */}
         <div className="bg-white rounded-lg shadow-sm border p-4">
@@ -279,6 +475,45 @@ export default function PayrollDashboardPage() {
                   View Details
                   <ArrowRight className="w-4 h-4" />
                 </Link>
+                <button
+                  type="button"
+                  data-testid={`retry-decision-${run.id}`}
+                  onClick={() => recordRetryDecision(run.id, 1)}
+                  className="ml-3 text-xs font-medium text-gray-600 hover:text-indigo-700 underline"
+                >
+                  Log Retry Decision
+                </button>
+                {(() => {
+                  const state = adjustmentState[run.id];
+                  const used = state?.adjustmentsUsed ?? 0;
+                  const limitError = getAdjustmentLimitError(used);
+                  return (
+                    <div className="ml-3 flex items-center gap-2">
+                      <span
+                        data-testid={`adjustment-count-${run.id}`}
+                        className="text-xs text-gray-500"
+                      >
+                        {used}/{POST_SUBMISSION_ADJUSTMENT_LIMIT} adjustments
+                      </span>
+                      <button
+                        type="button"
+                        data-testid={`adjustment-action-${run.id}`}
+                        disabled={Boolean(limitError) || isMutationDisabled}
+                        aria-disabled={Boolean(limitError) || isMutationDisabled}
+                        title={
+                          limitError ??
+                          (isMutationDisabled
+                            ? "Adjustments disabled: Payroll contracts are paused."
+                            : "Request a post-submission adjustment")
+                        }
+                        onClick={() => recordAdjustment(run.id)}
+                        className="text-xs font-medium text-gray-600 hover:text-indigo-700 underline disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed"
+                      >
+                        Adjust
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
             ))}
           </div>

@@ -25,9 +25,28 @@ async function resolveUserRole(): Promise<UserRole> {
   return session?.role ?? "operator";
 }
 
+/**
+ * Build a privacy-safe, auditable decision summary for the retry policy
+ * applied to this payroll run. Only non-sensitive metadata is logged.
+ */
+function logRetryPolicyDecision(runId: string, run: ReturnType<typeof findPayrollRun>): void {
+  if (!run) return;
+
+  const attempts = run.retryPolicy?.maxAttempts ?? 0;
+  const decision = attempts > 0 ? "allow" : "deny";
+  console.info("[payroll-run] retry policy decision", {
+    runId,
+    status: run.status,
+    decision,
+    maxAttempts: attempts,
+  });
+}
+
 async function PayrollRunPage({ params }: PayrollRunPageProps) {
   const run = findPayrollRun(params.id);
   if (!run) notFound();
+
+  logRetryPolicyDecision(params.id, run);
 
   const userRole = await resolveUserRole();
 

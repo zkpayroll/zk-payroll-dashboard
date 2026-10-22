@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Dashboard Import Duplicate Salary Commitments (#749)**: Highlights duplicate salary commitments while an employee CSV import is being previewed, and blocks the import until every duplicate is resolved.
+  - Pure domain module `src/payroll/importSalaryCommitmentDuplicates.ts` (re-exported from `lib/payroll/importSalaryCommitmentDuplicates.ts`) detecting rows that bind the same salary amount to the same wallet (`duplicate_salary_commitment`) and rows carrying the same commitment value (`identical_commitment_value`); both kinds are blocking, while the same salary on different wallets and the same wallet with different salaries stay out of scope
+  - Privacy-safe findings: raw salary amounts and full wallet addresses never reach a message, a group identifier, or a rendered field — groups only carry masked addresses (`GDQP2K…4W37`), truncated commitment values, and source row numbers
+  - Warning panel `components/features/employees/ImportSalaryCommitmentDuplicateWarning.tsx` listing each duplicate group with the affected rows, allowing the operator to keep a single row or exclude the group
+  - `CsvImport` integration: affected rows are highlighted and badged, `Import all valid` and the per-row import action stay disabled while a group is unresolved, and excluded rows are removed from the import set handed to the import conflict resolver
+  - Feature notes in `docs/IMPORT_SALARY_COMMITMENT_DUPLICATES.md`
+  - Focused test suites `__tests__/import-salary-commitment-duplicates.test.ts` and `__tests__/import-salary-commitment-duplicate-warning.test.tsx` covering success, rejected, boundary, and privacy cases
+
+- **Dashboard Payroll Operations Health Score (#738)**: Adds a 0-100 health score card to the main dashboard with a Healthy / Needs attention / Critical band and actionable contributing factors (failed, stuck pending and paused runs, reconciliation discrepancies, treasury funding against the next run).
+  - Pure scoring module `lib/payroll/operationsHealth.ts`; malformed runs and invalid funding values are excluded and reported, and an empty history returns an insufficient-data state instead of a score
+  - Card `components/features/dashboard/DashboardPayrollOperationsHealthCard.tsx`, mounted in `DashboardHome`
+  - Feature notes in `docs/PAYROLL_OPERATIONS_HEALTH.md`
+
 - **Dashboard Organization Settings Validation History**: Records a privacy-safe, capped history of organization settings validation runs in the dashboard layer.
   - Pure domain module `src/settings/validationHistory.ts` with `recordSettingsValidation` and `getSettingsValidationHistoryStats`, building on the existing `validateCompanyConfig` flow without modifying it
   - Entries capture `passed` / `failed` status, error and warning counts, failing check labels and messages, company id, and an ISO-8601 timestamp; wallet addresses, salary figures, and employee data never enter an entry

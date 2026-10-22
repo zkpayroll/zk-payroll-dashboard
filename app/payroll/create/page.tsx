@@ -9,9 +9,14 @@ import { validateBatchReferenceWithDuplicateCheck } from "@/lib/validation/batch
 import DraftDescriptionInput from "@/components/payroll/DraftDescriptionInput";
 import { validateDraftDescription } from "@/lib/validation/draftDescription";
 import { MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
-import { Coins, Shield, UserCheck, AlertTriangle } from "lucide-react";
+import { Coins, Shield, UserCheck, AlertTriangle, RotateCcw } from "lucide-react";
 import Link from "next/link";
-import { useContractPauseGuard } from "@/hooks/useContractPauseGuard";
+import { useContractPauseGuard } from "@hooks/useContractPauseGuard";
+import {
+  RetryPolicyDecisionLog,
+  type RetryPolicyDecisionEntry,
+  type RetryReasonCode,
+} from "@/lib/payroll/retryPolicyDecisionLog";
 
 // Known batch references for duplicate guidance — demo uses mock run ids plus example refs
 const KNOWN_BATCH_REFERENCES = [...MOCK_PAYROLL_RUNS.map((r) => r.id), "BATCH-2025-001", "payroll_q1_2025"];
@@ -151,12 +156,51 @@ export function redactSensitiveDiagnosticValue(value: string | null | undefined)
   return { redacted, wasRedacted: redacted !== original };
 }
 
+export interface AdjustmentLimitValidationResult {
+  isValid: boolean;
+  normalized: string;
+  message: string;
+}
+
+/**
+ * Validate the post-submission adjustment limit.
+ *
+ * An empty value is valid and means "no adjustments allowed".
+ * Otherwise the value must be a non-negative finite number.
+ */
+export function validateAdjustmentLimit(raw: string): AdjustmentLimitValidationResult {
+  const trimmed = (raw ?? "").trim();
+  if (trimmed.length === 0) {
+    return { isValid: true, normalized: "0", message: "No post-submission adjustments allowed." };
+  }
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) {
+    return {
+      isValid: false,
+      normalized: "",
+      message: `Adjustment limit "${trimmed}" is not a valid number. Enter a non-negative amount.`,
+    };
+  }
+  if (parsed < 0) {
+    return {
+      isValid: false,
+      normalized: "",
+      message: "Adjustment limit cannot be negative. Enter a non-negative amount.",
+    };
+  }
+  return { isValid: true, normalized: String(parsed), message: "Adjustment limit is valid." };
+}
+
 export default function PayrollCreatePage() {
   const [assetRaw, setAssetRaw] = useState("");
   const [batchRef, setBatchRef] = useState("");
   const [description, setDescription] = useState("");
-  const [submitted, setSubmitted] = useState<{ asset: string; batchRef: string; description: string } | null>(null);
+  const [submitted, setSubmitted] = useState<{ asset: string; batchRef: string; description: string; adjustmentLimit?: string } | null>(null);
+  const [adjustmentLimit, setAdjustmentLimit] = useState("");
+  const [adjustmentLimitError, setAdjustmentLimitError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retryLog] = useState(() => new RetryPolicyDecisionLog());
+  const [lastRetryDecision, setLastRetryDecision] = useState<RetryPolicyDecisionEntry | null>(null);
 
   // The operator driving this dashboard session. In a live app this would
   // come from the auth context; the default keeps the demo flow working.
@@ -169,6 +213,44 @@ export default function PayrollCreatePage() {
     [operator],
   );
 
+  /**
+   * Record a retry policy decision and surface it to the operator.
+   * The log is privacy-safe: only opaque ids and decision metadata.
+   */
+  const recordRetryDecision = (
+    reasonCode: RetryReasonCode,
+    retryable: boolean,
+    message: string,
+    batchReference?: string,
+  ) => {
+    try {
+      const entry = retryLog.record({
+        operatorId: operator.id,
+        batchReference,
+        retryable,
+        reasonCode,
+        message,
+      });
+      setLastRetryDecision(entry);
+      return entry;
+    } catch (decisionError) {
+      // Logging must never block the payroll flow. Surface the failure
+      // to the operator so it is actionable but keep the flow alive.
+      const message2 =
+        decisionError instanceof Error ? decisionError.message : "Unknown retry decision logging error.";
+      setLastRetryDecision({
+        id: "retry-dec-error",
+        timestamp: new Date().toISOString(),
+        decision: "blocked",
+        retryable: false,
+        reasonCode: reasonCode,
+        message: `Retry decision could not be logged: ${message2} Contact support if this persists.`,
+        operatorId: operator.id,
+      });
+      return null;
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -177,6 +259,7 @@ export default function PayrollCreatePage() {
     if (!pauseCheck.allowed) {
       setError(pauseCheck.message);
       setSubmitted(null);
+      recordRetryDecision("contract_paused", false, pauseCheck.message, batchRef);
       return;
     }
 
@@ -184,6 +267,7 @@ export default function PayrollCreatePage() {
     if (!permissionCheck.allowed) {
       setError(permissionCheck.message);
       setSubmitted(null);
+      recordRetryDecision("permission_denied", false, permissionCheck.message, batchRef);
       return;
     }
 
@@ -191,23 +275,46 @@ export default function PayrollCreatePage() {
     if (!assetResult.isValid) {
       setError(assetResult.validationError);
       setSubmitted(null);
+      recordRetryDecision("invalid_asset", true, assetResult.validationError, batchRef);
       return;
     }
     const batchResult = validateBatchReferenceWithDuplicateCheck(batchRef, KNOWN_BATCH_REFERENCES);
     if (!batchResult.isValid) {
       setError(batchResult.message);
       setSubmitted(null);
+      recordRetryDecision("invalid_batch_reference", true, batchResult.message, batchRef);
       return;
     }
     const descriptionResult = validateDraftDescription(description);
     if (!descriptionResult.isValid) {
       setError(descriptionResult.message);
       setSubmitted(null);
+      recordRetryDecision("invalid_description", true, descriptionResult.message, batchRef);
       return;
     }
+    const limitResult = validateAdjustmentLimit(adjustmentLimit);
+    if (!limitResult.isValid) {
+      setError(limitResult.message);
+      setAdjustmentLimitError(limitResult.message);
+      setSubmitted(null);
+      recordRetryDecision("invalid_adjustment_limit", true, limitResult.message, batchRef);
+      return;
+    }
+    setAdjustmentLimitError(null);
     setError(null);
     // Privacy-safe: only normalized asset + batch reference (opaque ID) — no amounts
-    setSubmitted({ asset: assetResult.normalized, batchRef: batchResult.normalized, description: description });
+    setSubmitted({
+      asset: assetResult.normalized,
+      batchRef: batchResult.normalized,
+      description: description,
+      adjustmentLimit: limitResult.normalized,
+    });
+    recordRetryDecision(
+      "validation_passed",
+      true,
+      "Draft batch validation passed; subsequent submission attempts are retryable.",
+      batchResult.normalized,
+    );
   };
 
   const result = normalizeAssetSymbol(assetRaw);
@@ -229,7 +336,7 @@ export default function PayrollCreatePage() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-2l mx-auto space-y-6">
         <header className="bg-white rounded-lg shadow-sm p-6">
           <div className="flex items-center gap-3">
             <div className="w-11 h-10 rounded-full bg-indigo-50 flex items-center justify-center">
@@ -248,7 +355,7 @@ export default function PayrollCreatePage() {
               <>
                 <UserCheck className="w-4 h-4 text-green-600" />
                 <span className="text-gray-700">
-                  Operator: <span className="font-medium">{operator.name || operator.id}</span> ({operator.role}) — authorized to create payroll batches.
+                  Operator: <span className="font-medium">{operator.name || operator.id}</span> (<span className="font-mono">{operator.role}</span>)— authorized to create payroll batches.
                 </span>
               </>
             ) : (
@@ -293,6 +400,37 @@ export default function PayrollCreatePage() {
             onChange={setDescription}
           />
 
+          <div className="space-y-1">
+            <label htmlFor="adjustment-limit" className="block text-sm font-medium text-gray-700">
+              Post-submission adjustment limit
+            </label>
+            <input
+              id="adjustment-limit"
+              type="number"
+              min="0"
+              step="any"
+              inputMode="decimal"
+              value={adjustmentLimit}
+              onChange={(e) => {
+                setAdjustmentLimit(e.target.value);
+                setAdjustmentLimitError(null);
+              }}
+              placeholder="e.g. 1000"
+              aria-invalid={adjustmentLimitError ? true : undefined}
+              aria-describedby={adjustmentLimitError ? "adjustment-limit-error" : undefined}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+            {adjustmentLimitError ? (
+              <p id="adjustment-limit-error" data-testid="adjustment-limit-error" className="text-xs text-red-600">
+                {adjustmentLimitError}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500">
+                Maximum amount that can be adjusted after submission. Leave empty to disallow adjustments.
+              </p>
+            )}
+          </div>
+
           <div className="rounded-lg bg-gray-50 border p-3 text-xs text-gray-600">
             <p className="font-medium text-gray-700 mb-1 flex items-center gap-1">
               <Shield className="w-3.5 h-3.5" /> Privacy &amp; validation
@@ -313,13 +451,61 @@ export default function PayrollCreatePage() {
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={!permissionCheck.allowed || isMutationDisabled}
-            className="w-full inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Create Draft Batch
-          </button>
+          {submitted && (
+            <div
+              data-testid="payroll-create-success"
+              role="status"
+              className="rounded-md bg-green-50 border border-green-200 p-3 text-sm text-green-800"
+            >
+              Payroll batch draft created for asset <span className="font-mono font-semibold">{submitted.asset}</span> with reference <span className="font-mono font-semibold">{submitted.batchRef}</span>. Normalized values will be used for on-chain submission.
+            </div>
+          )}
+
+          {lastRetryDecision && (
+            <div
+              data-testid="payroll-retry-decision"
+              data-decision={lastRetryDecision.decision}
+              data-reason-code={lastRetryDecision.reasonCode}
+              role="status"
+              aria-live="polite"
+              className={
+                lastRetryDecision.retryable
+                  ? "rounded-md bg-sky-50 border border-sky-200 p-3 text-sm text-sky-900"
+                  : "rounded-md bg-slate-50 border border-slate-200 p-3 text-sm text-slate-900"
+              }
+            >
+              <div className="flex items-center gap-2">
+                <RotateCcw className="w-4 h-4 shrink-0" />
+                <span className="font-medium">
+                  Retry policy: {lastRetryDecision.retryable ? "allowed" : "blocked"}
+                </span>
+                <span className="font-mono text-xs">({lastRetryDecision.reasonCode})</span>
+              </div>
+              <p className="mt-1">{lastRetryDecision.message}</p>
+              <p className="mt-1 text-xs opacity-70">
+                Decision logged at {lastRetryDecision.timestamp} for operator <span className="font-mono">{lastRetryDecision.operatorId}</span>.
+              </p>
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              type="submit"
+              disabled={!permissionCheck.allowed || isMutationDisabled}
+              aria-disabled={!permissionCheck.allowed || isMutationDisabled}
+              title={isMutationDisabled ? "Disabled: Payroll contracts are paused" : undefined}
+              className="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              data-testid="payroll-create-submit"
+            >
+              Create draft batch
+            </button>
+            <Link
+              href="/payroll/drafts"
+              className="px-4 py-2 rounded-md border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              View drafts
+            </Link>
+          </div>
         </form>
 
         {submitted && (
