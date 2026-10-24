@@ -13,6 +13,7 @@ import {
   parseBody,
 } from "@/lib/api/validation";
 import { MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
+import { generateUniqueExecutionReference } from "@/lib/payroll/executionReference";
 
 export async function OPTIONS(request: NextRequest) {
   return handleOptions(request);
@@ -62,8 +63,11 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date().toISOString();
+    const executionReference = generateUniqueExecutionReference(
+      MOCK_PAYROLL_RUNS.map((run) => run.id),
+    );
     const newPayroll = {
-      id: `pay_${Date.now()}`,
+      id: executionReference,
       ...parsed.data,
       status: "draft",
       executedAt: null,
