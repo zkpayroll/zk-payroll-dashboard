@@ -15,6 +15,37 @@ import {
 } from "@/lib/api/validation";
 import { MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 
+const RESERVE_THRESHOLD_MIN = 0;
+const RESERVE_THRESHOLD_MAX = 1_000_000_000;
+
+export function validateReserveThresholdException(input: {
+  requestedThreshold: unknown;
+  currentReserve: unknown;
+}): { valid: true; threshold: number } | { valid: false; message: string } {
+  const { requestedThreshold, currentReserve } = input;
+
+  if (typeof requestedThreshold !== "number" || !Number.isFinite(requestedThreshold)) {
+    return { valid: false, message: "requestedThreshold must be a finite number." };
+  }
+  if (requestedThreshold < RESERVE_THRESHOLD_MIN || requestedThreshold > RESERVE_THRESHOLD_MAX) {
+    return {
+      valid: false,
+      message: `requestedThreshold must be between ${RESERVE_THRESHOLD_MIN} and ${RESERVE_THRESHOLD_MAX}.`,
+    };
+  }
+  if (typeof currentReserve !== "number" || !Number.isFinite(currentReserve) || currentReserve < 0) {
+    return { valid: false, message: "currentReserve must be a non-negative finite number." };
+  }
+  if (requestedThreshold === currentReserve) {
+    return {
+      valid: false,
+      message: "requestedThreshold must differ from the current reserve; no exception is needed.",
+    };
+  }
+
+  return { valid: true, threshold: requestedThreshold };
+}
+
 export async function OPTIONS(request: NextRequest) {
   return handleOptions(request);
 }

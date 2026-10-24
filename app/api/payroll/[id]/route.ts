@@ -20,6 +20,29 @@ const MAX_ADJUSTMENTS_PER_PAYROLL = 5;
 const MAX_ADJUSTMENT_AMOUNT = 10000;
 const ADJUSTABLE_STATUSES = new Set<PayrollRun["status"]>(["draft", "pending", "failed"]);
 
+// Reserve threshold exception approvals.
+// A reserve threshold exception allows a payroll run to proceed when the
+// dashboard reserve balance would otherwise fall below the configured minimum.
+// Each exception must be explicitly approved by an admin, and the approval is
+// recorded with the approver's identity and a justification.
+const MAX_RESERVE_EXCEPTION_REASON_LENGTH = 500;
+const RESERVE_EXCEPTION_ALLOWED_STATUSES = new Set<PayrollRun["status"]>(["draft", "pending"]);
+
+export const reserveThresholdExceptionSchema = z.object({
+  reserveThresholdException: z.object({
+    action: z.literal("approve"),
+    requestedAmount: z.number().positive().finite(),
+    reason: z
+      .string()
+      .trim()
+      .min(1, "A justification is required for a reserve threshold exception.")
+      .max(
+        MAX_RESERVE_EXCEPTION_REASON_LENGTH,
+        `Reason must be at most ${MAX_RESERVE_EXCEPTION_REASON_LENGTH} characters.`,
+      ),
+  }),
+});
+
 export const adjustmentLimitsSchema = z.object({
   adjustments: z.array(
     z.object({
@@ -59,6 +82,54 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     if (!payroll) return withCors(notFoundResponse("Payroll run"), request);
 
     const body = await request.json();
+
+    // Reserve threshold exception approval flow.
+    if (body && typeof body === "object" && "reserveThresholdException" in body) {
+      const exceptionParsed = parseBody(reserveThresholdExceptionSchema, body);
+      if (!exceptionParsed.success) {
+        return withCors(validationErrorResponse(exceptionParsed.errors), request);
+      }
+
+      if (!RESERVE_EXCEPTION_ALLOWED_STATUSES.has(payroll.status)) {
+        return withCors(
+          errorResponse(
+            "RESERVE_EXCEPTION_NOT_ALLOWED",
+            `Payroll run in '${payroll.status}' status cannot receive a reserve threshold exception. Allowed statuses: ${Array.from(RESERVE_EXCEPTION_ALLOWED_STATUSES).join(", ")}.`,
+            409,
+          ),
+          request,
+        );
+      }
+
+      const existingException = (payroll as PayrollRun & { reserveThresholdException?: unknown })
+        .reserveThresholdException;
+      if (existingException) {
+        return withCors(
+          errorResponse(
+            "RESERVE_EXCEPTION_ALREADY_APPROVED",
+            "Payroll run already has an approved reserve threshold exception.",
+            409,
+          ),
+          request,
+        );
+      }
+
+      const now = new Date().toISOString();
+      const approval = {
+        id: `rte_${crypto.randomUUID()}`,
+        requestedAmount: exceptionParsed.data.reserveThresholdException.requestedAmount,
+        reason: exceptionParsed.data.reserveThresholdException.reason,
+        status: "approved" as const,
+        approvedAt: now,
+      };
+
+      const updated = {
+        ...payroll,
+        reserveThresholdException: approval,
+        updatedAt: now,
+      };
+      return withCors(successResponse(updated), request);
+    }
 
     // Support post-submission adjustments alongside the existing status update flow.
     if (body && typeof body === "object" && "adjustments" in body) {
