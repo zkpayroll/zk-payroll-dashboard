@@ -29,6 +29,10 @@ interface PayrollWizardStore extends PayrollWizardState {
   hasDraft: () => boolean;
   restoreDraft: () => void;
   clearDraft: () => void;
+  /** Whether the recovered draft was interrupted mid-submission (#755). */
+  wasInterrupted: () => boolean;
+  /** Clears the interruption marker once the operator has acknowledged it. */
+  acknowledgeInterruption: () => void;
 }
 
 const initialState: PayrollWizardState = {
@@ -43,6 +47,7 @@ const initialState: PayrollWizardState = {
   transactionHash: null,
   isProofNearingExpiration: false,
   treasuryBalanceOverride: null,
+  interruptedAtStep: null,
 };
 
 /**
@@ -100,7 +105,10 @@ export const usePayrollWizardStore = create<PayrollWizardStore>()(
           set({ currentStep: "review" });
         }
       },
-      clearDraft: () => set({ ...initialState, instructionVersion: null }),
+      clearDraft: () =>
+        set({ ...initialState, instructionVersion: null, interruptedAtStep: null }),
+      wasInterrupted: () => get().interruptedAtStep != null,
+      acknowledgeInterruption: () => set({ interruptedAtStep: null }),
     }),
     {
       name: "zk-payroll-wizard-draft",
@@ -116,6 +124,15 @@ export const usePayrollWizardStore = create<PayrollWizardStore>()(
         proof: null,
         isProofNearingExpiration: false,
         treasuryBalanceOverride: null,
+        // A settlement is "interrupted" (as opposed to a plain unsubmitted
+        // draft) when, at the moment of persisting, a proof or submission
+        // was actively in flight. Only the step name is kept — never the
+        // proof artifact or transaction hash — so the next load can warn
+        // the operator before they retry (#755).
+        interruptedAtStep:
+          state.proofStatus === "generating" || state.submissionStatus === "submitting"
+            ? state.currentStep
+            : state.interruptedAtStep ?? null,
       }),
     },
   ),

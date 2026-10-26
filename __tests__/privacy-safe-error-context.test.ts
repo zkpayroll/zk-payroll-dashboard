@@ -42,24 +42,24 @@ describe("filterErrorContext", () => {
     expect(maintainer.isPrivacySafe).toBe(false);
 
     const auditor = filterErrorContext(
-      { address: "GDQP2K…4W37", employeeId: "emp_001" },
+      { address: "GDQP2K...4W37", employeeId: "emp_001" },
       { audience: "auditor" },
     );
-    expect(auditor.filtered.address).toBe("GDQP2K…4W37");
+    expect(auditor.filtered.address).toBe("GDQP2K...4W37");
     expect(auditor.filtered.employeeId).toBe("emp_001");
     expect(auditor.isPrivacySafe).toBe(true);
   });
 
   it("applies explicit field rules over defaults", () => {
     const result = filterErrorContext(
-      { payoutDestination: "GABC123" },
+      { payoutDestination: "GAJBC123" },
       {
         audience: "contributor",
         rules: [{ field: "payoutDestination", sensitivity: "public" }],
       },
     );
 
-    expect(result.filtered.payoutDestination).toBe("GABC123");
+    expect(result.filtered.payoutDestination).toBe("GAJBC123");
     expect(result.redactedFields).not.toContain("payoutDestination");
     expect(result.isPrivacySafe).toBe(true);
   });

@@ -65,12 +65,21 @@ export interface ProofStatusCardProps {
   statusOverride?: ProofLifecycleState;
   onRegenerateProof?: () => void;
   onSubmitTransaction?: () => void;
+  /**
+   * True once the payroll period this run belongs to has been finalized
+   * and closed (see `PeriodFinalizationDialog`). A finalized period is
+   * immutable, so proof submission is no longer possible even if the
+   * proof is otherwise "ready" (#756). The submit action is disabled and
+   * replaced with an explanatory banner instead of silently vanishing.
+   */
+  isFinalized?: boolean;
 }
 
 export function ProofStatusCard({
   statusOverride,
   onRegenerateProof,
   onSubmitTransaction,
+  isFinalized = false,
 }: ProofStatusCardProps) {
   const store = useProofStatusStore();
 
@@ -132,6 +141,23 @@ export function ProofStatusCard({
         </div>
       )}
 
+      {/* Finalization Lock Notice (#756) */}
+      {isFinalized && (currentStatus === "ready" || currentStatus === "queued" || currentStatus === "generating") && (
+        <div
+          role="status"
+          data-testid="proof-submission-finalized-notice"
+          className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          <Lock className="h-3.5 w-3.5 shrink-0 text-amber-600 mt-0.5 dark:text-amber-400" aria-hidden="true" />
+          <span>
+            <strong className="font-semibold">Submission unavailable:</strong> this
+            payroll period has already been finalized and closed. Finalized
+            periods are immutable, so no further proof can be submitted
+            against them. Create a new payroll run in an open period instead.
+          </span>
+        </div>
+      )}
+
       {/* Explanation Box */}
       <div
         data-testid="proof-explanation-box"
@@ -182,8 +208,10 @@ export function ProofStatusCard({
           <button
             type="button"
             data-testid="submit-transaction-button"
+            disabled={isFinalized}
+            title={isFinalized ? "This payroll period has already been finalized. Submission is unavailable." : undefined}
             onClick={onSubmitTransaction || (() => store.markSubmitted("0x9a8f..."))}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-medium text-white shadow-sm hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-medium text-white shadow-sm hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-emerald-600 dark:hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Send className="h-3.5 w-3.5" aria-hidden="true" />
             Submit Transaction

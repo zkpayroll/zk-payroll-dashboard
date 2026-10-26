@@ -71,6 +71,7 @@ import { getPayoutLimitStatus } from "@/lib/payroll/payoutLimit";
 import { createPayrollDraftChecksum, matchesReviewedPayrollDraft } from "@/lib/payroll/draftChecksum";
 import PayerAccountStatus from "@/components/features/payroll/PayerAccountStatus";
 import { usePayrollPolicyStore } from "@/stores/payrollPolicy";
+import { ContractBatchLimitWarning } from "@/components/features/payroll/ContractBatchLimitWarning";
 import { PayrollInstructionVersionBadge } from "@/components/features/payroll/PayrollInstructionVersionBadge";
 import {
   getDraftInstructionVersion,
@@ -78,6 +79,8 @@ import {
 } from "@/src/payroll/instructionVersion";
 import PayrollSubmissionSequenceWarning from "./PayrollSubmissionSequenceWarning";
 import { validatePayrollOperatorPermission } from "@/lib/payroll/permissions";
+import { usePayrollUploadCheckpointStore } from "@/stores/payrollUploadCheckpoint";
+import { UploadRecoveryBanner } from "@/components/features/payroll/UploadRecoveryBanner";
 
 const STEPS: { key: PayrollWizardStep; label: string }[] = [
   { key: "review", label: "Review" },
@@ -152,10 +155,14 @@ function PayrollWizard() {
     hasDraft,
     restoreDraft,
     clearDraft,
+    wasInterrupted,
+    acknowledgeInterruption,
+    interruptedAtStep,
   } = usePayrollWizardStore();
   const logEvent = usePayrollAuditTrailStore((s) => s.logEvent);
   const [payrollRunId, setPayrollRunId] = useState<string | null>(null);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
+  const [showInterruptedBanner, setShowInterruptedBanner] = useState(false);
   const draftResolvedRef = useRef(false);
   const initialEventRecordedRef = useRef(false);
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
@@ -165,6 +172,12 @@ function PayrollWizard() {
   const walletPublicKey = useWalletStore((s) => s.publicKey) ?? "unknown";
   const addApprovalEvent = useApprovalHistory((s) => s.addEvent);
   const clearApprovalHistory = useApprovalHistory((s) => s.clearHistory);
+
+  // Upload recovery checkpoints
+  const saveCheckpoint = usePayrollUploadCheckpointStore((s) => s.saveCheckpoint);
+  const markCheckpointCompleted = usePayrollUploadCheckpointStore((s) => s.markCompleted);
+  const clearCheckpoint = usePayrollUploadCheckpointStore((s) => s.clearCheckpoint);
+  const evictStaleCheckpoint = usePayrollUploadCheckpointStore((s) => s.evictStaleCheckpoint);
 
   // #534 — the saved policy governs the run; the wizard reads the saved
   // policy (not unsaved edits), mirroring the payout limit indicator.
@@ -180,6 +193,19 @@ function PayrollWizard() {
       setShowDraftBanner(true);
     }
   }, [employeeIds.length, hasDraft, submissionStatus]);
+
+<<<<<<< Updated upstream
+  useEffect(() => {
+    if (!draftResolvedRef.current && wasInterrupted()) {
+      setShowInterruptedBanner(true);
+    }
+  }, [wasInterrupted]);
+=======
+  // Evict checkpoints older than 24 h so stale recovery banners never linger.
+  useEffect(() => {
+    evictStaleCheckpoint();
+  }, [evictStaleCheckpoint]);
+>>>>>>> Stashed changes
 
   const { sessionState } = useSession();
   const network = useWalletStore((s) => s.network);
@@ -215,6 +241,9 @@ function PayrollWizard() {
     draftResolvedRef.current = true;
     initialEventRecordedRef.current = true;
 
+    // Checkpoint: employee selection complete — step 1 of upload.
+    saveCheckpoint(runId, "draft_started", selected.length, false);
+
     addApprovalEvent(
       "draft_created",
       walletPublicKey,
@@ -240,6 +269,7 @@ function PayrollWizard() {
     addApprovalEvent,
     walletPublicKey,
     logEvent,
+    saveCheckpoint,
   ]);
 
   const handleGenerateProof = useCallback(async () => {
@@ -273,6 +303,8 @@ function PayrollWizard() {
           actorRole: "admin",
           details: `ZK proof generated successfully for ${selectedEmployees.length} employees totaling $${totalAmount.toLocaleString()}`,
         });
+        // Checkpoint: proof ready — safe to resume from Confirmation.
+        saveCheckpoint(payrollRunId, "proof_generated", selectedEmployees.length, true);
       }
       addApprovalEvent(
         "proof_generation_completed",
@@ -316,6 +348,7 @@ function PayrollWizard() {
     logEvent,
     selectedEmployees.length,
     totalAmount,
+    saveCheckpoint,
   ]);
 
   const handleSubmit = useCallback(async () => {
@@ -364,11 +397,18 @@ function PayrollWizard() {
         actorRole: "admin",
         details: `Wallet signing initiated for payroll run: ${selectedEmployees.length} employees, $${totalAmount.toLocaleString()} total`,
       });
+      // Checkpoint: operator confirmed and dispatch is about to start.
+      saveCheckpoint(payrollRunId, "confirmed", selectedEmployees.length, true);
     }
 
     setSubmissionStatus("submitting");
     setSubmissionError(null);
     nextStep();
+
+    // Checkpoint: transaction dispatch in flight — recoverable if the tab closes now.
+    if (payrollRunId) {
+      saveCheckpoint(payrollRunId, "submitting", selectedEmployees.length, true);
+    }
 
     addApprovalEvent(
       "payroll_confirmed",
@@ -397,6 +437,9 @@ function PayrollWizard() {
           actorRole: "admin",
           details: `Payroll submitted successfully. Transaction hash: ${txHash}`,
         });
+        // Checkpoint: run finished — clear the recovery entry so the banner
+        // does not reappear on the next page load.
+        markCheckpointCompleted(payrollRunId);
       }
       addApprovalEvent(
         "submission_completed",
@@ -453,6 +496,8 @@ function PayrollWizard() {
     payrollRunId,
     logEvent,
     selectedEmployees.length,
+    saveCheckpoint,
+    markCheckpointCompleted,
   ]);
 
   const handleReviewNext = useCallback(async () => {
@@ -512,7 +557,10 @@ function PayrollWizard() {
     reviewedDraftChecksum.current = null;
     setDraftChecksumWarning(null);
     clearApprovalHistory();
-  }, [payrollRunId, logEvent, reset, submissionStatus, clearApprovalHistory]);
+    // Clear any stored upload checkpoint so the recovery banner does not
+    // reappear after the operator has deliberately started over.
+    clearCheckpoint();
+  }, [payrollRunId, logEvent, reset, submissionStatus, clearApprovalHistory, clearCheckpoint]);
 
   const idx = stepIndex(currentStep);
 
@@ -553,7 +601,102 @@ function PayrollWizard() {
       {/* Wallet Reconnect Recovery Banner */}
       <WalletReconnectRecoveryBanner />
 
+<<<<<<< Updated upstream
+      {/* Interrupted Settlement Recovery Banner (#755) */}
+      {showInterruptedBanner && (
+        <div
+          role="alert"
+          data-testid="interrupted-settlement-banner"
+          className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3"
+        >
+          <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <h3 className="text-sm font-medium text-red-800">
+              Interrupted Settlement Detected
+            </h3>
+            <p className="text-sm text-red-700 mt-1">
+              A previous payroll settlement was interrupted while at the{" "}
+              <strong>{interruptedAtStep ?? "proof/submission"}</strong> step —
+              the browser may have closed or the network dropped mid-flow. We
+              could not confirm whether a proof or transaction had already
+              been submitted before the interruption.
+            </p>
+            <p className="text-xs text-red-600 mt-2">
+              Check the transaction history and on-chain status for this run
+              before retrying, to avoid a duplicate submission.
+            </p>
+            <div className="flex items-center gap-2 mt-3">
+              <button
+                type="button"
+                data-testid="resume-interrupted-settlement"
+                onClick={() => {
+                  acknowledgeInterruption();
+                  setShowInterruptedBanner(false);
+                  draftResolvedRef.current = true;
+                  goToStep("review");
+                  if (payrollRunId) {
+                    logEvent({
+                      payrollRunId,
+                      action: "draft_created",
+                      actor: walletPublicKey,
+                      actorRole: "admin",
+                      details: `Resumed an interrupted settlement that was previously at the ${interruptedAtStep ?? "unknown"} step.`,
+                    });
+                  }
+                }}
+                className="px-3 py-1.5 rounded-md text-xs font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
+              >
+                Review and resume
+              </button>
+              <button
+                type="button"
+                data-testid="discard-interrupted-settlement"
+                onClick={() => {
+                  if (payrollRunId) {
+                    logEvent({
+                      payrollRunId,
+                      action: "cancelled",
+                      actor: "Current Admin",
+                      actorRole: "admin",
+                      details: `Interrupted settlement discarded after manual review (was at the ${interruptedAtStep ?? "unknown"} step).`,
+                    });
+                  }
+                  clearDraft();
+                  clearApprovalHistory();
+                  setShowInterruptedBanner(false);
+                  draftResolvedRef.current = true;
+                }}
+                className="px-3 py-1.5 rounded-md text-xs font-medium bg-white text-red-700 hover:bg-red-50 border border-red-300 transition-colors inline-flex items-center gap-1"
+              >
+                <Trash2 className="w-3 h-3" />
+                Discard draft
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!showInterruptedBanner && showDraftBanner && (
+=======
+      {/* Upload Recovery Banner — shown when a previous upload was interrupted */}
+      <UploadRecoveryBanner
+        runId={payrollRunId ?? undefined}
+        onResume={() => {
+          restoreDraft();
+          setShowDraftBanner(false);
+          draftResolvedRef.current = true;
+        }}
+        onDiscard={() => {
+          clearDraft();
+          clearCheckpoint();
+          clearApprovalHistory();
+          setShowDraftBanner(false);
+          draftResolvedRef.current = true;
+        }}
+      />
+
       {showDraftBanner && (
+>>>>>>> Stashed changes
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
           <Save className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
           <div className="flex-1">
@@ -815,6 +958,8 @@ function ReviewStep({
         generating the ZK proof.
       </p>
       <PayoutCountLimitIndicator count={selectedEmployees.length} limit={maxBatchSize} />
+      {/* #752 — the contract accepts fewer payouts per submission than the policy may allow. */}
+      <ContractBatchLimitWarning count={selectedEmployees.length} policyMaxBatchSize={maxBatchSize} />
       {/* #534 — which payroll instruction (policy version) governs this run. */}
       {versionStatus.state !== "unconfigured" && (
         <div className="flex items-center gap-2">

@@ -246,6 +246,7 @@ export const MOCK_PAYROLL_RUNS: PayrollRun[] = MOCK_TRANSACTIONS.map((tx) => ({
   receiptId: tx.status === "verified" ? `rcpt_${tx.id}` : null,
   executedAt: tx.status === "verified" ? tx.timestamp : null,
   transactionHash: tx.txHash || null,
+  policyRevision: tx.status === "verified" ? 2 : null,
 }));
 
 export const MOCK_PAYROLL_RUNS_EMPTY: PayrollRun[] = [];
@@ -1207,4 +1208,18 @@ export const MOCK_FUNDING_RESERVATIONS: FundingReservation[] = [
 export const MOCK_EXPORTED_AUDIT_TIMELINE_RUN_IDS: string[] = [
   "tx_001",
   "tx_004",
+];
+
+/** Sample partially failed treasury release for the incidents view (#760). */
+export const MOCK_PARTIAL_RELEASE_FAILURES: import("@/lib/treasury/partialRelease").PartialReleaseFailure[] = [
+  {
+    releaseId: "rel_2026_10_001",
+    requested: 12,
+    released: 9,
+    failures: [
+      { reason: "insufficient_balance", count: 2 },
+      { reason: "timeout", count: 1 },
+    ],
+    occurredAt: "2026-10-20T09:30:00Z",
+  },
 ];

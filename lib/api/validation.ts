@@ -81,6 +81,38 @@ export const resumePayrollSchema = z.object({
 
 export type ResumePayrollInput = z.infer<typeof resumePayrollSchema>;
 
+// ─── Upload Checkpoint Schema ─────────────────────────────────────────────────
+
+/**
+ * Body sent by the dashboard when recording a payroll upload checkpoint.
+ *
+ * Privacy contract: salary amounts, employee IDs, wallet addresses, and ZK
+ * proof data are explicitly excluded from this payload. Only structural
+ * progress metadata is accepted.
+ */
+export const saveUploadCheckpointSchema = z.object({
+  /** Opaque run identifier generated when the wizard session started. */
+  runId: z.string().min(1, "runId is required"),
+  /** Upload stage at which the checkpoint is being written. */
+  stage: z.enum(
+    ["draft_started", "proof_generated", "confirmed", "submitting", "completed"],
+    { message: "stage must be a valid UploadCheckpointStage" },
+  ),
+  /**
+   * Number of employees in the batch.
+   * Must be a non-negative integer — zero is valid for an empty-batch edge case.
+   * Raw salary amounts must NOT be sent.
+   */
+  employeeCount: z
+    .number()
+    .int("employeeCount must be an integer")
+    .nonnegative("employeeCount cannot be negative"),
+  /** Whether a valid ZK proof existed at checkpoint time. */
+  proofReady: z.boolean(),
+});
+
+export type SaveUploadCheckpointInput = z.infer<typeof saveUploadCheckpointSchema>;
+
 // ─── Validation Helper ────────────────────────────────────────────────────────
 
 export function parseBody<T>(

@@ -4,7 +4,7 @@ import PayrollSimulationReview from "@/components/features/simulation/PayrollSim
 function PayrollSimulationPage() {
   return (
     <DashboardLayout>
-      <PayrollSimulationReview />
+      <PayrollSimulationReview fallbackFundingSource="treasury" />;
     </DashboardLayout>
   );
 }

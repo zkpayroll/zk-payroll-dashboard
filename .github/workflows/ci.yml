@@ -29,6 +29,8 @@ jobs:
 
       - name: Lint
         run: npm run lint
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
 
       - name: Typecheck
         run: npm run typecheck
