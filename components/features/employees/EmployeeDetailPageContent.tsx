@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -10,12 +10,14 @@ import {
   Circle,
   CheckCircle2,
   XCircle,
+  RefreshCcw,
 } from "lucide-react";
 import { useEmployeeStore } from "@/stores/employees";
 import { MOCK_EMPLOYEES, MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import type { Employee } from "@/types";
 import EmptyState from "@/components/ui/EmptyState";
 import EmployeeAuditSidebar from "./EmployeeAuditSidebar";
+import { CommitmentReplacementDialog } from "./CommitmentReplacementDialog";
 
 interface CommitmentEntry {
   id: string;
@@ -72,6 +74,8 @@ function buildCommitmentHistory(employee: Employee): CommitmentEntry[] {
 function EmployeeDetailPageContent({ employeeId }: { employeeId: string }) {
   const router = useRouter();
   const { employees: storedEmployees, isLoading } = useEmployeeStore();
+  const [isReplacementDialogOpen, setIsReplacementDialogOpen] = useState(false);
+  const [pendingCommitment, setPendingCommitment] = useState("");
 
   const employees =
     storedEmployees.length > 0 ? storedEmployees : MOCK_EMPLOYEES;
@@ -199,11 +203,29 @@ function EmployeeDetailPageContent({ employeeId }: { employeeId: string }) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
       <div className="lg:col-span-2 space-y-6">
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b flex items-center gap-2">
-          <Shield className="w-4 h-4 text-gray-500" aria-hidden="true" />
-          <h3 className="text-sm font-medium text-gray-900">
-            Salary Commitment History
-          </h3>
+        <div className="px-6 py-4 border-b flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-gray-500" aria-hidden="true" />
+            <h3 className="text-sm font-medium text-gray-900">
+              Salary Commitment History
+            </h3>
+          </div>
+          <button
+            type="button"
+            data-testid="open-commitment-replacement"
+            onClick={() => {
+              // Regenerated commitment hash the operator is reviewing before
+              // it replaces the current one — in a real integration this
+              // comes from the proof-generation pipeline, never typed by a
+              // human, and never derived from the raw salary value here.
+              setPendingCommitment(`${employee.salaryCommitment}_replacement`);
+              setIsReplacementDialogOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+          >
+            <RefreshCcw className="w-3.5 h-3.5" aria-hidden="true" />
+            Replace Commitment
+          </button>
         </div>
 
         {commitmentHistory.length === 0 ? (
@@ -341,6 +363,14 @@ function EmployeeDetailPageContent({ employeeId }: { employeeId: string }) {
 
       <EmployeeAuditSidebar employee={employee} />
       </div>
+
+      <CommitmentReplacementDialog
+        isOpen={isReplacementDialogOpen}
+        employee={employee}
+        nextCommitment={pendingCommitment}
+        onCancel={() => setIsReplacementDialogOpen(false)}
+        onConfirmed={() => setIsReplacementDialogOpen(false)}
+      />
     </section>
   );
 }

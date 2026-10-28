@@ -9,6 +9,7 @@ import type { UserRole } from "@/types";
 import { canCancelPayroll, getCancellationRestrictionReason } from "@/lib/auth/roles";
 import { CancellationReasonSelect } from "@/components/payroll/CancellationReasonSelect";
 import { CancellationReasonCode, getCancellationReason } from "@/lib/constants/cancellationReasons";
+import { usePayrollAuditTrailStore } from "@/stores/payrollAuditTrail";
 
 interface CancelPayrollDialogProps {
   isOpen: boolean;
@@ -32,6 +33,7 @@ export function CancelPayrollDialog({
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const { publicKey } = useWalletStore();
+  const logEvent = usePayrollAuditTrailStore((s) => s.logEvent);
 
   if (!isOpen) return null;
 
@@ -84,6 +86,17 @@ export function CancelPayrollDialog({
         const data = await response.json();
         throw new Error(data.error?.message || "Failed to cancel payroll");
       }
+
+      // #769 — surface cancellation in the payroll activity timeline. Only
+      // the reason label and public key (actor) are recorded; no salary or
+      // raw signature data enters the audit trail.
+      logEvent({
+        payrollRunId: payroll.id,
+        action: "cancelled",
+        actor: publicKey,
+        actorRole: userRole,
+        details: reasonObj?.label ?? selectedReason,
+      });
 
       onSuccess();
     } catch (err) {
