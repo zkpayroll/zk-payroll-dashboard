@@ -23,6 +23,7 @@ import {
   formatRevocationTimestamp,
   isAuditGrantRevoked,
 } from "./AuditGrantRevocationStatus";
+import { AdjacentPeriodBoundariesCard } from "./AdjacentPeriodBoundariesCard";
 
 export interface AuditGrantScopeItem {
   id: string;
@@ -359,6 +360,9 @@ export function AuditGrantScopeDetailsDrawer({
               ))}
             </div>
           </div>
+
+          {/* Adjacent Payroll Period Boundaries Explanation */}
+          <AdjacentPeriodBoundariesCard />
 
           {/* Zero Knowledge Safeguard Banner */}
           <div className="p-3.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
