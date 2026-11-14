@@ -25,6 +25,8 @@ import {
   AuditGrantRevocationStatus,
   formatRevocationTimestamp,
 } from "@/components/features/audit/AuditGrantRevocationStatus";
+import { MOCK_ARCHIVED_RUNS } from "@/stores/archive";
+import { evaluateAuditorArchivedPeriodAccess } from "@/lib/audit/archivedPeriodAccess";
 
 // Initial seeded audit grants for operators and integrators
 export const MOCK_AUDIT_GRANTS: AuditGrantDetail[] = [
@@ -285,6 +287,12 @@ export default function AuditGrantsPage() {
   const totalGrants = grants.length;
   const activeGrants = grants.filter((g) => g.status === "active" || g.status === "expiring_soon").length;
   const revokedGrants = grants.filter((g) => g.status === "revoked" || Boolean(g.revokedAt)).length;
+  const activeAuditorGrant = selectedGrant ?? grants.find((g) => g.status === "active") ?? grants[0];
+  const archivedAuditEvaluation = evaluateAuditorArchivedPeriodAccess({
+    role: "auditor",
+    grant: activeAuditorGrant,
+    runs: MOCK_ARCHIVED_RUNS,
+  });
 
   return (
     <DashboardLayout>
@@ -516,6 +524,63 @@ export default function AuditGrantsPage() {
         </div>
 
         {/* Scope Details Drawer */}
+        <div
+          data-testid="auditor-archived-periods-panel"
+          className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h2 className="text-base font-bold text-gray-900">
+                Archived Payroll Periods (Auditor View)
+              </h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Zero-knowledge redacted view of finalized archived periods accessible under{" "}
+                <span className="font-mono font-medium text-gray-700">
+                  {activeAuditorGrant?.id ?? "none"}
+                </span>
+                .
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              {archivedAuditEvaluation.periods.length} Eligible Archived Periods
+            </span>
+          </div>
+
+          {!archivedAuditEvaluation.allowed ? (
+            <div
+              data-testid="auditor-archived-access-denied"
+              className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-800 flex items-center gap-2"
+            >
+              <ShieldAlert className="w-4 h-4 text-red-600 shrink-0" />
+              <span>{archivedAuditEvaluation.issues[0]?.message}</span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {archivedAuditEvaluation.periods.map((period) => (
+                <div
+                  key={period.id}
+                  data-testid={`auditor-archived-period-${period.id}`}
+                  className="p-3.5 rounded-lg border border-gray-200 bg-gray-50/60 space-y-1.5 text-xs"
+                >
+                  <div className="flex items-center justify-between font-semibold text-gray-900">
+                    <span>Period {period.payPeriod}</span>
+                    <span className="font-mono text-[11px] text-indigo-700">
+                      {period.bundleId ?? "Verified"}
+                    </span>
+                  </div>
+                  <p className="text-gray-600">
+                    {period.employerName} &middot; {period.asset} &middot; {period.employeeCount} employees
+                  </p>
+                  <p className="font-mono text-[11px] text-gray-500">
+                    Tx: {period.maskedTransactionHash} &middot; Salary: {period.compensationDisplay}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <AuditGrantScopeDetailsDrawer
           isOpen={isDrawerOpen}
           grant={selectedGrant ?? undefined}
