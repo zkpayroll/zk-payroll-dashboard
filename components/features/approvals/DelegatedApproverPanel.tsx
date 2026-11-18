@@ -19,6 +19,7 @@ import {
   type DelegatedApprover,
 } from "@/stores/delegatedApprovers";
 import { validateDelegatedApproverInput } from "@/lib/validation/delegatedApprover";
+import { resolveDelegatedApprovalParentExpiry } from "@/lib/payroll/delegatedApprovalExpiry";
 
 const DEFAULT_APPROVAL_EXPIRY_MS = 24 * 60 * 60 * 1000;
 const EXPIRING_SOON_THRESHOLD_MS = 60 * 60 * 1000;
@@ -319,6 +320,20 @@ export default function DelegatedApproverPanel({
                     approvalExpiryMs,
                     now,
                   );
+                  // #778 — a delegated approval granted under a parent role
+                  // lapses with that role, even inside its own 24h window.
+                  const safeExpiry =
+                    Number.isFinite(approvalExpiryMs) && approvalExpiryMs > 0
+                      ? approvalExpiryMs
+                      : DEFAULT_APPROVAL_EXPIRY_MS;
+                  const ownExpiresAt = new Date(
+                    new Date(approver.addedAt).getTime() + safeExpiry,
+                  ).toISOString();
+                  const parentExpiry = resolveDelegatedApprovalParentExpiry(
+                    ownExpiresAt,
+                    approver.parentRole,
+                    now,
+                  );
                   return (
                     <>
                 <div className="space-y-1 min-w-0">
@@ -379,6 +394,24 @@ export default function DelegatedApproverPanel({
                       ).toLocaleString()}
                     </span>
                   </div>
+                  {parentExpiry.warningMessage && (
+                    <p
+                      role={
+                        parentExpiry.status === "expired_with_parent"
+                          ? "alert"
+                          : "status"
+                      }
+                      data-testid={`parent-role-warning-${approver.id}`}
+                      className={`flex items-start gap-1 text-[11px] leading-snug ${
+                        parentExpiry.status === "expired_with_parent"
+                          ? "text-red-700"
+                          : "text-amber-700"
+                      }`}
+                    >
+                      <AlertCircle className="h-3 w-3 shrink-0 mt-px" />
+                      <span>{parentExpiry.warningMessage}</span>
+                    </p>
+                  )}
                 </div>
 
                 <Button
