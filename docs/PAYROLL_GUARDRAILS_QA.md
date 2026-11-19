@@ -183,6 +183,7 @@ npx vitest run \
 - Approval status validates timestamps before showing an active or expiring state. If an approval record has a missing, malformed, future, or inconsistent timestamp, execution is blocked and a recovery message is shown; no payroll values are included.
 - The payer status indicator checks account existence against the configured Horizon endpoint. It distinguishes disconnected, checking, active, missing, network-mismatch, and unavailable states. It never renders the wallet address or balance.
 - The approvals page lists pending runs using period and recipient-count metadata only. It does not show payroll amounts, employee names, employee IDs, or wallet addresses.
+- Approval invalidation is evaluated after timestamp validation. A revision mismatch, missing approved snapshot, invalid diff, commitment rotation, or removed recipient blocks execution and routes the operator back to the safe draft comparison. The panel reports only a reason category and blocked-row count.
 
 | # | Steps | Expected |
 |---|-------|----------|
@@ -191,3 +192,4 @@ npx vitest run \
 | 3 | Open a payroll run whose approval has a malformed or future timestamp | The approval badge shows a blocking validation error and links to the approval workflow. |
 | 4 | Open confirmation with the payer wallet disconnected, then connect it | The status changes from a connection prompt to a Horizon account check and then to active or an actionable error state. |
 | 5 | Open Payroll → Approvals with pending runs | Pending count, period, recipient count, and review links appear; amounts and employee details remain absent. |
+| 6 | After approval, rotate a salary commitment or remove a previously approved recipient, then open Payroll → Review | The invalidation panel shows a blocking status, reason category, and blocked-row count only; recovery reopens comparison and requires a fresh approval. |

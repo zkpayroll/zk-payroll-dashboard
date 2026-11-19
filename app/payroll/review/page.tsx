@@ -4,6 +4,8 @@ import { RemovedEmployeesReview } from "@/components/payroll/RemovedEmployeesRev
 import { InactiveEmployeeWarning } from "@/components/warnings/InactiveEmployeeWarning";
 import { MOCK_PAYROLL_RUNS, MOCK_EMPLOYEES } from "@/lib/api/mockData";
 import { MOCK_DRAFT_REMOVED_EMPLOYEES } from "@/lib/payroll/removedEmployees";
+import { getBatchDiffFixture } from "@/lib/payroll/batchDiffFixtures";
+import { ApprovalInvalidationPanel } from "@/components/features/payroll/ApprovalInvalidationPanel";
 
 export default function PayrollReviewPage() {
   const pendingRun = MOCK_PAYROLL_RUNS.find(
@@ -15,6 +17,8 @@ export default function PayrollReviewPage() {
   const reviewRun = pendingRun ?? fallbackRun;
 
   const payload = reviewRun as unknown as Record<string, unknown>;
+
+  const invalidationFixture = getBatchDiffFixture("commitment-change");
 
   return (
     <DashboardLayout>
@@ -28,6 +32,20 @@ export default function PayrollReviewPage() {
             redacted by default to protect employee data.
           </p>
         </div>
+
+        <ApprovalInvalidationPanel
+          input={{
+            hasApproval: true,
+            approvalStatus: "approved",
+            approvedAt: "2026-11-18T09:00:00Z",
+            currentRows: invalidationFixture.currentRows,
+            approvedRows: invalidationFixture.approvedRows,
+            currentRevisionNumber: 2,
+            approvedRevisionNumber: 2,
+            expectedRevisionNumber: 2,
+          }}
+          title="Approval validation"
+        />
 
         <InactiveEmployeeWarning
           employees={MOCK_EMPLOYEES}
