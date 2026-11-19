@@ -7,6 +7,8 @@ const PROOF_REFERENCE_PATTERN = /^zkp_ref_\d{8}_\d{3,}$/;
 
 export const PROOF_REFERENCE_FORMAT_HINT =
   "Expected format: zkp_ref_YYYYMMDD_NNN (e.g. zkp_ref_20250228_001)";
+export const PROOF_REFERENCE_RECOVERY_HINT =
+  "Re-copy the full reference from the proof receipt and paste it again, or clear the field to start over.";
 
 export interface ProofReferenceValidationResult {
   isValid: boolean;
@@ -34,7 +36,7 @@ export function validateProofReference(raw: string): ProofReferenceValidationRes
     return {
       isValid: false,
       normalized,
-      message: `Invalid proof reference. ${PROOF_REFERENCE_FORMAT_HINT}`,
+      message: `Invalid proof reference. ${PROOF_REFERENCE_FORMAT_HINT} ${PROOF_REFERENCE_RECOVERY_HINT}`,
     };
   }
 
