@@ -46,6 +46,7 @@ interface PayrollDraftsStore {
   addDraft: (draft: Omit<PayrollDraft, "id" | "createdAt" | "updatedAt" | "expiresAt" | "status">) => PayrollDraft;
   updateDraft: (id: string, updates: Partial<PayrollDraft>) => void;
   lockForApproval: (id: string) => PayrollDraft | null;
+  invalidateApproval: (id: string, reason?: string) => PayrollDraft | null;
   removeDraft: (id: string) => void;
   setActiveDraft: (id: string | null) => void;
   recoverDraft: (id: string) => void;
@@ -132,6 +133,29 @@ export const usePayrollDraftsStore = create<PayrollDraftsStore>()(
           }),
         }));
         return locked;
+      },
+      invalidateApproval: (id, reason) => {
+        let invalidated: PayrollDraft | null = null;
+        const safeReason =
+          typeof reason === "string" && /^[a-z_]+$/.test(reason)
+            ? reason
+            : "approval_invalid";
+        set((state) => ({
+          drafts: state.drafts.map((draft) => {
+            if (draft.id !== id || !draft.approvalLockedAt) return draft;
+            const next: PayrollDraft = {
+              ...draft,
+              status: "recovering",
+              approvalSnapshot: undefined,
+              approvalLockedAt: undefined,
+              error: `Approval invalidated (${safeReason}). Review the draft and request a fresh approval.`,
+              updatedAt: new Date().toISOString(),
+            };
+            invalidated = next;
+            return next;
+          }),
+        }));
+        return invalidated;
       },
       removeDraft: (id) =>
         set((state) => ({

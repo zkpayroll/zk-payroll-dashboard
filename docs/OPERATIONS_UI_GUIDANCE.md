@@ -28,6 +28,20 @@ status indicator and explain that new affected actions are temporarily blocked.
 Existing records remain visible. Resuming should require the same permission
 level as pausing and should be reflected in the audit trail.
 
+## Approval invalidation
+
+A prior approval is invalid when the approved batch snapshot cannot be verified,
+the current revision differs from the approved revision, or blocked row changes
+are detected after approval. Blocked rows are commitment rotations and removals
+of previously approved recipients; additions, wallet-only edits, and asset-only
+edits do not invalidate the prior approval by themselves.
+
+The validation panel must show a single blocking status, the reason category,
+the number of blocked rows when applicable, and an actionable next step. It must
+never show employee identities, wallet addresses, salary amounts, or proof
+values. Recovery reopens the safe draft comparison, clears the stale approval
+lock, and directs the operator to request a fresh approval before execution.
+
 ## Component-test baseline
 
 Component coverage for these states should assert the visible status, the

@@ -25,11 +25,13 @@ const STATUS_CONFIG: Record<DraftStatus, { label: string; color: string; bg: str
   recovered: { label: "Recovered", color: "text-green-700", bg: "bg-green-50 border-green-200", icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
   expired: { label: "Expired", color: "text-red-700", bg: "bg-red-50 border-red-200", icon: <Clock className="w-3.5 h-3.5" /> },
   discarded: { label: "Discarded", color: "text-gray-500", bg: "bg-gray-50 border-gray-200", icon: <Trash2 className="w-3.5 h-3.5" /> },
+  pending_approval: { label: "Approval required", color: "text-amber-700", bg: "bg-amber-50 border-amber-200", icon: <AlertTriangle className="w-3.5 h-3.5" /> },
 };
 
-function DraftRow({ draft, onRecover, onDiscard, onDelete }: {
+function DraftRow({ draft, onRecover, onInvalidateApproval, onDiscard, onDelete }: {
   draft: PayrollDraft;
   onRecover: () => void;
+  onInvalidateApproval: () => void;
   onDiscard: () => void;
   onDelete: () => void;
 }) {
@@ -108,6 +110,15 @@ function DraftRow({ draft, onRecover, onDiscard, onDelete }: {
               Recovering...
             </span>
           )}
+          {draft.status === "pending_approval" && (
+            <button
+              onClick={onInvalidateApproval}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Reopen comparison
+            </button>
+          )}
           {draft.status === "draft" && (
             <button
               onClick={onDiscard}
@@ -148,6 +159,7 @@ export default function PayrollDraftRecovery({ showLastUpdated }: PayrollDraftRe
     setSortField,
     toggleSortDirection,
     recoverDraft,
+    invalidateApproval,
     discardDraft,
     removeDraft,
     cleanupExpired,
@@ -259,6 +271,7 @@ export default function PayrollDraftRecovery({ showLastUpdated }: PayrollDraftRe
               <option value="recovered">Recovered</option>
               <option value="expired">Expired</option>
               <option value="discarded">Discarded</option>
+              <option value="pending_approval">Approval required</option>
             </select>
           </div>
           <button
@@ -285,6 +298,9 @@ export default function PayrollDraftRecovery({ showLastUpdated }: PayrollDraftRe
               key={draft.id}
               draft={draft}
               onRecover={() => handleRecover(draft.id)}
+              onInvalidateApproval={() =>
+                invalidateApproval(draft.id, "approval_invalid")
+              }
               onDiscard={() => discardDraft(draft.id)}
               onDelete={() => removeDraft(draft.id)}
             />
