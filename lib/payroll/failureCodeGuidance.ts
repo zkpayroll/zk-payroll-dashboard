@@ -107,6 +107,34 @@ const PAYROLL_FAILURE_REGISTRY: Record<string, PayrollFailureGuidance> = {
     ],
     affectedArea: "validation",
   },
+  COMPANY_INACTIVE: {
+    code: "COMPANY_INACTIVE",
+    title: "Referenced company is inactive",
+    severity: "critical",
+    summary: "The payroll run references an inactive or archived company profile.",
+    userFacingMessage:
+      "This payroll run references an inactive company. Payroll actions and disbursements are restricted until the company is reactivated.",
+    remediation: [
+      "Reactivate the company in Company Settings or switch company context.",
+      "Verify administrative signing authority and smart contract configuration.",
+      "Ensure all organization compliance and identity requirements are satisfied.",
+    ],
+    affectedArea: "validation",
+  },
+  COMPANY_NOT_FOUND: {
+    code: "COMPANY_NOT_FOUND",
+    title: "Referenced company not found",
+    severity: "error",
+    summary: "The company ID referenced by the payroll run does not exist in the directory.",
+    userFacingMessage:
+      "The company referenced by this payroll run could not be found in the organization directory.",
+    remediation: [
+      "Confirm the company identifier is registered in company settings.",
+      "Switch to an active company context.",
+      "Re-import or recreate the payroll batch under a valid company profile.",
+    ],
+    affectedArea: "validation",
+  },
 };
 
 export function getPayrollFailureGuidance(

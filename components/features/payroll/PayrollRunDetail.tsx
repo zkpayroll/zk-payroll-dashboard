@@ -16,7 +16,10 @@ import {
   EyeOff,
   AlertTriangle,
   Lock,
+  Building2,
 } from "lucide-react";
+import { evaluatePayrollRunCompany } from "@/lib/payroll/inactiveCompanyWarning";
+import { InactiveCompanyWarningBanner } from "@/components/payroll/InactiveCompanyWarningBanner";
 import { MOCK_EMPLOYEES, MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import type { PayrollRun, ProofReference } from "@/types/models";
 import type { UserRole } from "@/types";
@@ -231,6 +234,9 @@ export default function PayrollRunDetail({ run: propRun, proofReference, userRol
   const freshness = evaluateProofFreshness({ reference: proofReference });
   const approvalState = evaluateApprovalExpiry(approvalInput);
   const lastUpdated = getPayrollLastUpdated(run);
+  const companyEvaluation = useMemo(() => {
+    return evaluatePayrollRunCompany(run);
+  }, [run]);
 
   return (
     <section aria-labelledby="payroll-run-detail-heading" className="space-y-6">
@@ -244,6 +250,11 @@ export default function PayrollRunDetail({ run: propRun, proofReference, userRol
           Back
         </button>
       </div>
+
+      {/* Inactive company reference warning (#762) */}
+      {companyEvaluation.hasWarning && (
+        <InactiveCompanyWarningBanner evaluation={companyEvaluation} />
+      )}
 
       {/* Submission progress stepper (issue #295): lifecycle stages derived
           from run state only — no amounts, proofs, or hashes rendered. */}
@@ -361,13 +372,24 @@ export default function PayrollRunDetail({ run: propRun, proofReference, userRol
                 Execution blocked — proof expired
               </span>
             )}
-            {kind === "scheduled" && !lockState && !freshness.blocksExecution && freshness.state !== "missing" && approvalState.state !== "invalid" && (
+            {kind === "scheduled" && !lockState && !freshness.blocksExecution && freshness.state !== "missing" && approvalState.state !== "invalid" && !companyEvaluation.blocking && (
               <Link
                 href="/payroll/execute"
                 className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors"
               >
                 Process payroll
               </Link>
+            )}
+            {kind === "scheduled" && lockState !== "cancellation" && companyEvaluation.blocking && (
+              <span
+                data-testid="execution-blocked-by-company"
+                role="alert"
+                title={companyEvaluation.message ?? "Company inactive"}
+                className="inline-flex flex-col items-start justify-center px-4 py-2 rounded-md bg-gray-100 text-gray-500 text-sm font-medium cursor-not-allowed max-w-xs"
+              >
+                Execution blocked — company inactive
+                <span className="text-xs font-normal">Reactivate company before processing</span>
+              </span>
             )}
             {kind === "scheduled" && !lockState && approvalState.state === "invalid" && (
               <span
@@ -524,6 +546,24 @@ export default function PayrollRunDetail({ run: propRun, proofReference, userRol
             <span className="font-mono text-xs text-gray-900 truncate">
               {txHash}
             </span>
+          </div>
+        )}
+
+        {run.companyId && (
+          <div className="flex items-center gap-2 text-sm" data-testid="run-company-info">
+            <Building2 className="w-4 h-4 text-gray-400" />
+            <span className="text-gray-600">Company:</span>
+            <span className="font-medium text-gray-900">
+              {companyEvaluation.companyName ?? run.companyId}
+            </span>
+            {companyEvaluation.hasWarning && (
+              <span
+                data-testid="run-company-inactive-badge"
+                className="inline-flex px-1.5 py-0.5 text-xs font-semibold rounded bg-rose-100 text-rose-800"
+              >
+                Inactive
+              </span>
+            )}
           </div>
         )}
 
