@@ -992,3 +992,43 @@ npm test
 - **Zero Compensation Leaks:** Warning objects and audit summaries never contain employee salary figures, dollar amounts, recipient arrays, or cryptographic keys.
 - **Masked Identifiers:** Operator IDs and Stellar addresses are systematically truncated (e.g., `GBBD...FLA5`).
 - **Audit-Safe Serialization:** `sanitizeConcurrentWarningForAudit` strips all contextual draft data, recording only opaque version stamps and collision counts.
+
+## Proof Input Validation UI Behavior
+
+- `ProofReferenceInput` trims and lowercases pasted values before validating against `zkp_ref_YYYYMMDD_NNN`.
+- Errors surface only after the field is touched and non-empty, keeping empty states quiet.
+- Invalid input shows the expected format plus recovery guidance: re-copy the full reference from the proof receipt, or clear the field to start over.
+- Valid input shows inline confirmation and reports validity to the parent via `onValidityChange`.
+
+## #762 — Inactive Company Payroll Run Warning
+
+### Files
+
+- `lib/payroll/inactiveCompanyWarning.ts`
+- `components/payroll/InactiveCompanyWarningBanner.tsx`
+- `components/features/payroll/PayrollRunDetail.tsx`
+- `app/payroll/page.tsx`
+- `stores/companyWarnings.ts`
+
+### Overview & Rationale
+
+When a payroll run references an inactive or archived company, executing payouts or submitting on-chain transactions could lead to invalid disbursements or failed settlements. The dashboard surfaces prominent, actionable warnings whenever a payroll run references an inactive company, blocks execution actions, and guides operators to reactivate the company profile or switch contexts.
+
+### Warning Codes & Behavior
+
+1. **`COMPANY_INACTIVE` (Critical, Blocking):**
+   - Triggered when `run.companyId` references a registered company where `isActive === false`.
+   - Surfaces `InactiveCompanyWarningBanner` with actionable remediation to reactivate the company or switch company context (`/company/switch`).
+   - Disables execution actions in `PayrollRunDetail` and displays an `Execution blocked — company inactive` badge.
+2. **`COMPANY_NOT_FOUND` (Critical, Blocking):**
+   - Triggered when `run.companyId` cannot be resolved against the registered company catalog.
+   - Blocks execution and prompts the operator to verify company configuration or switch company context.
+3. **`COMPANY_ID_MISSING` (Critical, Blocking):**
+   - Triggered when the payroll run record lacks a valid company identifier.
+   - Blocks execution and directs the operator back to the payroll overview.
+
+### Privacy Guarantees
+
+- **Zero Compensation Leaks:** Warning banners and failure guidance never contain employee salary figures, compensation commitments, individual payout amounts, or cryptographic keys.
+- **Privacy-Safe Identifiers:** Only sanitized company identifiers and registered company display names are presented.
+- **Audit-Safe Serialization:** `sanitizeCompanyWarningForAudit` records only warning codes, company IDs, severity levels, and blocking flags, stripping any ambient payroll draft data.

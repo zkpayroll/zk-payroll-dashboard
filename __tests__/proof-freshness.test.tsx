@@ -7,6 +7,7 @@ import {
   PROOF_EXPIRING_WINDOW_MS,
 } from "@/lib/formatting/proofFreshness";
 import ProofFreshnessBadge from "@/components/features/proofs/ProofFreshnessBadge";
+import { validateProofReference } from "@/lib/validation/proofReference";
 import PayrollRunDetail from "@/components/features/payroll/PayrollRunDetail";
 
 const NOW = Date.parse("2026-08-20T12:00:00Z");
@@ -173,5 +174,12 @@ describe("ProofFreshnessBadge integration in payroll run detail", () => {
     expect(evaluateProofFreshness({
       reference: { expiresAt: new Date(NOW - 1000).toISOString(), proofStatus: "expired" },
     }, NOW).blocksExecution).toBe(true);
+  });
+});
+
+describe("validateProofReference", () => {
+  it("accepts canonical ids and guides recovery on invalid input", () => {
+    expect(validateProofReference("zkp_ref_20250228_001").isValid).toBe(true);
+    expect(validateProofReference("nope").message).toMatch(/Re-copy the full reference/);
   });
 });

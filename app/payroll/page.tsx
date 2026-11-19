@@ -17,7 +17,9 @@ import {
   ArrowRight,
   ShieldAlert,
   SlidersHorizontal,
+  Building2,
 } from "lucide-react";
+import { evaluatePayrollRunCompany } from "@/lib/payroll/inactiveCompanyWarning";
 
 type RetryDecisionOutcome = "allowed" | "blocked" | "deferred";
 
@@ -155,6 +157,10 @@ export default function PayrollDashboardPage() {
 
   const runs = useMemo(() => MOCK_PAYROLL_RUNS, []);
 
+  const inactiveCompanyRunsCount = useMemo(() => {
+    return runs.filter((r) => evaluatePayrollRunCompany(r).hasWarning).length;
+  }, [runs]);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -256,6 +262,40 @@ export default function PayrollDashboardPage() {
               if (payrollId) dismissWarning(payrollId);
             }}
           />
+        )}
+
+        {/* Inactive Company Reference Alert (#762) */}
+        {inactiveCompanyRunsCount > 0 && (
+          <div
+            role="alert"
+            data-testid="inactive-company-runs-alert"
+            className="p-4 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 shadow-sm"
+          >
+            <div className="flex items-start gap-3">
+              <Building2
+                className="w-5 h-5 text-rose-600 shrink-0 mt-0.5"
+                aria-hidden="true"
+              />
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-semibold text-rose-900">
+                  Inactive Company References Detected
+                </h3>
+                <p className="text-sm text-rose-700 mt-1">
+                  {inactiveCompanyRunsCount} payroll run(s) reference an inactive
+                  company. Payout execution and disbursements are restricted until
+                  the referenced company is reactivated.
+                </p>
+                <div className="mt-2">
+                  <Link
+                    href="/company/switch"
+                    className="text-xs font-semibold text-rose-800 underline hover:text-rose-900"
+                  >
+                    Switch company context or review company status
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         
@@ -458,6 +498,15 @@ export default function PayrollDashboardPage() {
                     >
                       {run.status}
                     </span>
+                    {evaluatePayrollRunCompany(run).hasWarning && (
+                      <span
+                        data-testid={`inactive-company-badge-${run.id}`}
+                        className="px-2 py-0.5 text-xs font-semibold rounded-full bg-rose-100 text-rose-700"
+                        title="Referenced company is inactive"
+                      >
+                        Inactive Company
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-4 text-xs text-gray-500">
                     <span className="flex items-center gap-1">

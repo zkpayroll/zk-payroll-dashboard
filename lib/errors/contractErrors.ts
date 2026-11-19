@@ -69,6 +69,39 @@ const CONTRACT_ERROR_REGISTRY: Record<string, ContractErrorHelp> = {
       "Regenerate the payroll proof against the current commitment set.",
     ],
   },
+  "#6": {
+    code: "#6",
+    title: "Duplicate commitment detected",
+    summary:
+      "The payroll import contains duplicate salary commitments for the same employee or wallet.",
+    remediation: [
+      "Review the import to identify duplicate rows with identical employee addresses and amounts.",
+      "Remove all but one instance of each duplicate commitment.",
+      "Resubmit the corrected payroll batch.",
+    ],
+  },
+  "#7": {
+    code: "#7",
+    title: "Segregation of duties violation",
+    summary:
+      "The payroll operation violates segregation of duties policy — the same operator cannot both create and approve the same batch.",
+    remediation: [
+      "Request approval from a different operator with approval authority.",
+      "Review the company segregation of duties policy in settings.",
+      "Contact an administrator if roles need to be adjusted.",
+    ],
+  },
+  "#8": {
+    code: "#8",
+    title: "Invalid event schema version",
+    summary:
+      "The payroll event references an unsupported schema version.",
+    remediation: [
+      "Check the audit exports for schema version compatibility.",
+      "Update the dashboard to the latest version if available.",
+      "Escalate to a maintainer with the event schema version.",
+    ],
+  },
 };
 
 /** Fallback shown when the error does not match a known contract code. */

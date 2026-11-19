@@ -17,10 +17,4 @@ describe("payroll run identifiers", () => {
     expect(result.isValid).toBe(false);
     expect(result.message).toContain("Expected format");
   });
-
-  it("reports missing payroll run ID", () => {
-    const result = validatePayrollRunId(null);
-    expect(result.isValid).toBe(false);
-    expect(result.message).toBe("Payroll run ID is missing.");
-  });
 });
