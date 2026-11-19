@@ -179,6 +179,8 @@ export default function MultiAssetPayrollReview({
     paymentCount: g.transactionCount,
   }));
 
+  const hasUnsafeTotal = totalByAsset.some((t) => t.total > Number.MAX_SAFE_INTEGER);
+
   // Map run.proofStatus to 7-state lifecycle for card
   const mappedProofState: ProofLifecycleState =
     run.proofStatus === "ready"
@@ -229,6 +231,13 @@ export default function MultiAssetPayrollReview({
               without re-processing already completed payments.
             </p>
           </div>
+        </div>
+      )}
+
+      {hasUnsafeTotal && (
+        <div className="flex items-start gap-3 rounded-lg bg-orange-50 border border-orange-200 p-4 text-sm text-orange-800">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <p className="font-semibold">Aggregate payout total exceeds safe precision — amounts above {Number.MAX_SAFE_INTEGER.toLocaleString()} cannot be represented exactly, so verify each asset total before submitting.</p>
         </div>
       )}
 

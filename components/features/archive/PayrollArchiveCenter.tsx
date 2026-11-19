@@ -535,6 +535,9 @@ export default function PayrollArchiveCenter() {
                           ? "Archived"
                           : "Ready to archive"}
                     </span>
+                    {run.isArchived && (
+                      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full border bg-slate-100 text-slate-600 border-slate-200">Read only</span>
+                    )}
 <span
                       className={`text-xs font-bold px-2.5 py-0.5 rounded-full border uppercase ${getStatusBadgeClass(
                         run.status
@@ -554,7 +557,11 @@ export default function PayrollArchiveCenter() {
                 </div>
 
                 {/* Details Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4 text-xs">
+                <div
+                  className={`grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4 text-xs ${run.isArchived ? "opacity-70 grayscale select-none" : ""}`}
+                  aria-readonly={run.isArchived || undefined}
+                  data-testid={`archived-details-${run.id}`}
+                >
                   {/* Total Disbursement Amount (Privacy Masked) */}
                   <div className="bg-gray-50/70 p-3 rounded-lg border border-gray-100 space-y-1">
                     <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
