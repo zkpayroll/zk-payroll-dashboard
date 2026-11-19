@@ -373,9 +373,11 @@ export default function PayrollRunDetail({ run: propRun, proofReference, userRol
               <span
                 data-testid="execution-blocked-by-approval"
                 role="alert"
-                className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-gray-100 text-gray-500 text-sm font-medium cursor-not-allowed"
+                title={approvalState.message}
+                className="inline-flex flex-col items-start justify-center px-4 py-2 rounded-md bg-gray-100 text-gray-500 text-sm font-medium cursor-not-allowed max-w-xs"
               >
-                Execution blocked — approval needs attention
+                Execution blocked — {approvalState.label}
+                <span className="text-xs font-normal">{approvalState.message}</span>
               </span>
             )}
             {run.status === "pending" && (

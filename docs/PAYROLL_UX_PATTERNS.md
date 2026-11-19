@@ -992,3 +992,10 @@ npm test
 - **Zero Compensation Leaks:** Warning objects and audit summaries never contain employee salary figures, dollar amounts, recipient arrays, or cryptographic keys.
 - **Masked Identifiers:** Operator IDs and Stellar addresses are systematically truncated (e.g., `GBBD...FLA5`).
 - **Audit-Safe Serialization:** `sanitizeConcurrentWarningForAudit` strips all contextual draft data, recording only opaque version stamps and collision counts.
+
+## Proof Input Validation UI Behavior
+
+- `ProofReferenceInput` trims and lowercases pasted values before validating against `zkp_ref_YYYYMMDD_NNN`.
+- Errors surface only after the field is touched and non-empty, keeping empty states quiet.
+- Invalid input shows the expected format plus recovery guidance: re-copy the full reference from the proof receipt, or clear the field to start over.
+- Valid input shows inline confirmation and reports validity to the parent via `onValidityChange`.
