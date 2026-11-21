@@ -18,53 +18,46 @@ import {
   ShieldAlert,
   SlidersHorizontal,
   Building2,
+  RotateCcw,
 } from "lucide-react";
 import { evaluatePayrollRunCompany } from "@/lib/payroll/inactiveCompanyWarning";
+import {
+  evaluatePayoutBatchRetryGuidance,
+  type PayoutBatchRetryGuidance,
+  type RetryDecisionOutcome,
+  type PayoutBatchRetryEvaluationInput,
+  RETRY_DECISION_OUTCOME_LABELS,
+} from "@/lib/payroll/payoutBatchRetryGuidance";
+import type { PayrollRun } from "@/types";
 
-type RetryDecisionOutcome = "allowed" | "blocked" | "deferred";
-
-interface RetryDecisionLogEntry {
+interface RetryDecisionLogEntry extends PayoutBatchRetryGuidance {
   id: string;
-  payrollId: string;
-  outcome: RetryDecisionOutcome;
-  reason: string;
-  attempt: number;
   timestamp: string;
 }
 
-const RETRY_DECISION_REASON_LABELS: Record<RetryDecisionOutcome, string> = {
-  allowed: "Retry permitted",
-  blocked: "Retry blocked",
-  deferred: "Retry deferred",
-};
+const RETRY_DECISION_REASON_LABELS: Record<RetryDecisionOutcome, string> =
+  RETRY_DECISION_OUTCOME_LABELS;
 
 function evaluateRetryDecision(
   payrollId: string,
   attempt: number,
   isMutationDisabled: boolean,
+  options: Partial<PayoutBatchRetryEvaluationInput> = {},
 ): Omit<RetryDecisionLogEntry, "id" | "timestamp"> {
-  if (isMutationDisabled) {
-    return {
-      payrollId,
-      outcome: "blocked",
-      reason: "CONTRACT_PAUSED",
-      attempt,
-    };
-  }
-  if (attempt > 3) {
-    return {
-      payrollId,
-      outcome: "deferred",
-      reason: "MAX_ATTEMPTS_EXCEEDED",
-      attempt,
-    };
-  }
-  return {
+  return evaluatePayoutBatchRetryGuidance({
     payrollId,
-    outcome: "allowed",
-    reason: "RETRY_WITHIN_POLICY",
     attempt,
-  };
+    isMutationDisabled,
+    pauseReason: options.pauseReason,
+    hasInactiveCompany: options.hasInactiveCompany,
+    isSettled: options.isSettled,
+    receiptId: options.receiptId,
+    transactionHash: options.transactionHash,
+    status: options.status,
+    cancellationReason: options.cancellationReason,
+    reconciliationStatus: options.reconciliationStatus,
+    discrepancies: options.discrepancies,
+  });
 }
 
 const POST_SUBMISSION_ADJUSTMENT_LIMIT = 3;
@@ -94,27 +87,62 @@ export default function PayrollDashboardPage() {
     RetryDecisionLogEntry[]
   >([]);
 
+  const [retryAttempts, setRetryAttempts] = useState<Record<string, number>>({});
+
   const [adjustmentState, setAdjustmentState] = useState<
     Record<string, PostSubmissionAdjustmentState>
   >({});
 
+  const runs = useMemo(() => MOCK_PAYROLL_RUNS, []);
+
   const recordRetryDecision = useCallback(
-    (payrollId: string, attempt: number) => {
+    (target: PayrollRun | string, attemptOverride?: number) => {
+      const isRunObject = typeof target === "object" && target !== null;
+      const payrollId = isRunObject ? target.id : target;
+      const nextAttempt =
+        attemptOverride ?? ((retryAttempts[payrollId] ?? 0) + 1);
+
+      setRetryAttempts((prev) => ({ ...prev, [payrollId]: nextAttempt }));
+
+      const run = isRunObject
+        ? target
+        : runs.find((r) => r.id === payrollId);
+
+      const hasInactiveCompany = run
+        ? evaluatePayrollRunCompany(run).hasWarning
+        : false;
+
+      const isSettled = run
+        ? Boolean(run.receiptId || run.status === "verified")
+        : false;
+
       const decision = evaluateRetryDecision(
         payrollId,
-        attempt,
+        nextAttempt,
         isMutationDisabled,
+        {
+          pauseReason,
+          hasInactiveCompany,
+          isSettled,
+          receiptId: run?.receiptId,
+          transactionHash: run?.transactionHash,
+          status: run?.status,
+          cancellationReason: run?.cancellationReason,
+          reconciliationStatus: run?.reconciliationStatus,
+          discrepancies: run?.reconciliationDetails?.discrepancies,
+        },
       );
+
       setRetryDecisionLog((prev) => [
         {
           ...decision,
-          id: `${payrollId}-${attempt}-${Date.now()}`,
+          id: `${payrollId}-${nextAttempt}-${Date.now()}`,
           timestamp: new Date().toISOString(),
         },
         ...prev,
       ]);
     },
-    [isMutationDisabled],
+    [isMutationDisabled, pauseReason, retryAttempts, runs],
   );
 
   const recordAdjustment = useCallback(
@@ -154,8 +182,6 @@ export default function PayrollDashboardPage() {
       ) ?? null
     );
   }, [evaluations, dismissedPayrollIds]);
-
-  const runs = useMemo(() => MOCK_PAYROLL_RUNS, []);
 
   const inactiveCompanyRunsCount = useMemo(() => {
     return runs.filter((r) => evaluatePayrollRunCompany(r).hasWarning).length;
@@ -298,13 +324,14 @@ export default function PayrollDashboardPage() {
           </div>
         )}
 
-        
+        {/* Retry Policy Decision Log */}
         <div
           data-testid="retry-decision-log"
           className="bg-white rounded-lg shadow-sm border p-4 space-y-3"
         >
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
+              <RotateCcw className="w-4 h-4 text-indigo-600" />
               Retry Policy Decisions
             </h2>
             <span className="text-xs text-gray-500">
@@ -314,7 +341,7 @@ export default function PayrollDashboardPage() {
           {retryDecisionLog.length === 0 ? (
             <p className="text-xs text-gray-500">
               No retry decisions recorded yet. Retry evaluations will appear
-              here with privacy-safe identifiers only.
+              here with privacy-safe identifiers and actionable operator guidance.
             </p>
           ) : (
             <ul className="divide-y divide-gray-100 border rounded-lg overflow-hidden">
@@ -322,10 +349,10 @@ export default function PayrollDashboardPage() {
                 <li
                   key={entry.id}
                   data-testid="retry-decision-entry"
-                  className="p-3 flex items-center justify-between text-xs"
+                  className="p-3.5 space-y-2 text-xs"
                 >
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono font-medium text-gray-900">
                         {entry.payrollId}
                       </span>
@@ -338,16 +365,56 @@ export default function PayrollDashboardPage() {
                             : "bg-amber-100 text-amber-700"
                         }`}
                       >
-                        {RETRY_DECISION_REASON_LABELS[entry.outcome]}
+                        {RETRY_DECISION_REASON_LABELS[entry.outcome] ?? entry.outcome}
+                      </span>
+                      <span className="text-gray-500 font-mono text-[11px]">
+                        {entry.reason} · attempt {entry.attempt} of {entry.maxAttempts}
                       </span>
                     </div>
-                    <p className="text-gray-500">
-                      {entry.reason} · attempt {entry.attempt}
-                    </p>
+                    <span className="text-gray-400 shrink-0">
+                      {new Date(entry.timestamp).toLocaleTimeString()}
+                    </span>
                   </div>
-                  <span className="text-gray-400">
-                    {new Date(entry.timestamp).toLocaleTimeString()}
-                  </span>
+
+                  {entry.guidance && (
+                    <div
+                      data-testid={`retry-guidance-${entry.payrollId}`}
+                      className="rounded-md bg-gray-50 border border-gray-200 p-2.5 text-xs text-gray-800 space-y-1.5"
+                    >
+                      <p
+                        data-testid={`retry-guidance-text-${entry.payrollId}`}
+                        className="font-medium"
+                      >
+                        {entry.guidance}
+                      </p>
+                      {entry.nextSteps && entry.nextSteps.length > 0 && (
+                        <div className="mt-1">
+                          <p className="font-semibold text-gray-600 text-[11px] uppercase tracking-wider">
+                            Next Steps:
+                          </p>
+                          <ol
+                            data-testid={`retry-guidance-next-steps-${entry.payrollId}`}
+                            className="list-decimal pl-4 mt-0.5 space-y-0.5 text-gray-600 text-[11px]"
+                          >
+                            {entry.nextSteps.map((step, idx) => (
+                              <li key={idx}>{step}</li>
+                            ))}
+                          </ol>
+                        </div>
+                      )}
+                      {entry.remediationHref && (
+                        <div className="pt-1">
+                          <Link
+                            href={entry.remediationHref}
+                            className="text-xs font-semibold text-indigo-600 underline hover:text-indigo-800 inline-flex items-center gap-1"
+                          >
+                            {entry.remediationLabel ?? "Take Action"}
+                            <ArrowRight className="w-3 h-3" />
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -527,7 +594,7 @@ export default function PayrollDashboardPage() {
                 <button
                   type="button"
                   data-testid={`retry-decision-${run.id}`}
-                  onClick={() => recordRetryDecision(run.id, 1)}
+                  onClick={() => recordRetryDecision(run)}
                   className="ml-3 text-xs font-medium text-gray-600 hover:text-indigo-700 underline"
                 >
                   Log Retry Decision
