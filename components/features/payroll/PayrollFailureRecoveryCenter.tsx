@@ -5,6 +5,7 @@ import { AlertTriangle, XCircle, RotateCcw, Ban, ChevronDown, ChevronUp } from "
 import { MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import { resolveReconciliationStatus } from "@/lib/reconciliation/status";
 import { diagnosePayrollRunRetry } from "@/src/payroll/payoutRetryDiagnostics";
+import type { PayoutRetryDiagnosticsReport } from "@/src/payroll/payoutRetryDiagnostics";
 import type { PayrollRun } from "@/types";
 
 type FailureGroup = {
@@ -12,6 +13,11 @@ type FailureGroup = {
   reasonLabel: string;
   runs: PayrollRun[];
 };
+
+interface PayrollFailureRecoveryCenterProps {
+  onRetryPolicyDecision?: (runId: string, report: PayoutRetryDiagnosticsReport) => void;
+  initialRuns?: PayrollRun[];
+}
 
 function classifyFailure(run: PayrollRun): { key: string; label: string } {
   if (resolveReconciliationStatus(run) === "failed") {
@@ -26,9 +32,12 @@ function classifyFailure(run: PayrollRun): { key: string; label: string } {
   return { key: "unknown", label: "Unknown failure" };
 }
 
-export default function PayrollFailureRecoveryCenter() {
+export default function PayrollFailureRecoveryCenter({
+  onRetryPolicyDecision,
+  initialRuns,
+}: PayrollFailureRecoveryCenterProps = {}) {
   const [runs, setRuns] = useState<PayrollRun[]>(() =>
-    MOCK_PAYROLL_RUNS.filter((r) => resolveReconciliationStatus(r) === "failed"),
+    (initialRuns ?? MOCK_PAYROLL_RUNS).filter((r) => resolveReconciliationStatus(r) === "failed"),
   );
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -48,6 +57,22 @@ export default function PayrollFailureRecoveryCenter() {
   }, [runs]);
 
   async function updateStatus(runId: string, status: "pending" | "cancelled") {
+    const run = runs.find((item) => item.id === runId);
+    if (!run) return;
+
+    const report = diagnosePayrollRunRetry(run, {
+      retryCount: retryAttempts[runId] ?? 0,
+    });
+    onRetryPolicyDecision?.(runId, report);
+
+    // A settled transaction must never be re-queued from the recovery UI.
+    // The check is repeated here, rather than relying only on the button's
+    // disabled state, because callers can invoke the handler programmatically.
+    if (status === "pending" && (run.transactionHash || run.receiptId || !report.canRetry)) {
+      setActionError(report.summary);
+      return;
+    }
+
     setPendingAction(runId + status);
     setActionError(null);
     try {
@@ -57,7 +82,14 @@ export default function PayrollFailureRecoveryCenter() {
         body: JSON.stringify({ status }),
       });
       if (!res.ok) {
-        throw new Error("Request failed");
+        let detail = "Request failed";
+        try {
+          const payload = (await res.json()) as { error?: string; message?: string };
+          detail = payload.error ?? payload.message ?? detail;
+        } catch {
+          // Keep the privacy-safe fallback when the server returns no JSON.
+        }
+        throw new Error(detail);
       }
       setRuns((prev) => prev.filter((r) => r.id !== runId));
     } catch {
@@ -146,6 +178,7 @@ export default function PayrollFailureRecoveryCenter() {
                     const diagnostics = diagnosePayrollRunRetry(run, {
                       retryCount: retryAttempts[run.id] ?? 0,
                     });
+                    const settlementAlreadyRecorded = Boolean(run.transactionHash || run.receiptId);
                     return (
                     <li
                       key={run.id}
@@ -201,9 +234,17 @@ export default function PayrollFailureRecoveryCenter() {
                         <button
                           type="button"
                           disabled={
-                            pendingAction === run.id + "pending" || !diagnostics.canRetry
+                            pendingAction === run.id + "pending" ||
+                            !diagnostics.canRetry ||
+                            settlementAlreadyRecorded
                           }
-                          title={diagnostics.canRetry ? undefined : diagnostics.summary}
+                          title={
+                            settlementAlreadyRecorded
+                              ? "Retry blocked — this payout already has a settlement receipt. Verify its final status before taking further action."
+                              : diagnostics.canRetry
+                                ? undefined
+                                : diagnostics.summary
+                          }
                           onClick={() => updateStatus(run.id, "pending")}
                           className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
                         >

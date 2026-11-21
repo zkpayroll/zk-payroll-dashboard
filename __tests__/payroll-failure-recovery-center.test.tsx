@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import PayrollFailureRecoveryCenter from "@/components/features/payroll/PayrollFailureRecoveryCenter";
+import type { PayrollRun } from "@/types";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -89,5 +90,47 @@ describe("PayrollFailureRecoveryCenter", () => {
     expect(
       await screen.findByText("Failed to retry run tx_005. Please try again."),
     ).toBeInTheDocument();
+  });
+
+  it("records the retry decision before dispatching the recovery request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+    const onDecision = vi.fn();
+    const user = userEvent.setup();
+
+    render(<PayrollFailureRecoveryCenter onRetryPolicyDecision={onDecision} />);
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(onDecision).toHaveBeenCalledWith("tx_005", expect.objectContaining({ canRetry: true }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/payroll/tx_005",
+      expect.objectContaining({ method: "PATCH" }),
+    );
+  });
+
+  it("blocks a retry for a batch that already has a settlement receipt", async () => {
+    const settledRun = {
+      id: "tx_settled",
+      companyId: "company_001",
+      timestamp: "2025-05-31T09:00:00Z",
+      createdAt: "2025-05-31T09:00:00Z",
+      totalAmount: 100,
+      employeeCount: 1,
+      employeeIds: ["emp_001"],
+      proof: "",
+      status: "failed" as const,
+      reconciliationStatus: "failed" as const,
+      receiptId: "receipt_already_settled",
+    } satisfies PayrollRun;
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<PayrollFailureRecoveryCenter initialRuns={[settledRun]} />);
+    const retryButton = screen.getByRole("button", { name: "Retry" });
+    expect(retryButton).toBeDisabled();
+    expect(retryButton).toHaveAttribute("title", expect.stringContaining("Retry blocked"));
+    await user.click(retryButton);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

@@ -285,6 +285,8 @@ export default function AuditGrantsPage() {
   const totalGrants = grants.length;
   const activeGrants = grants.filter((g) => g.status === "active" || g.status === "expiring_soon").length;
   const revokedGrants = grants.filter((g) => g.status === "revoked" || Boolean(g.revokedAt)).length;
+  const expiredGrants = grants.filter((g) => g.status === "expired");
+  const expiringGrants = grants.filter((g) => g.status === "expiring_soon");
 
   return (
     <DashboardLayout>
@@ -310,6 +312,29 @@ export default function AuditGrantsPage() {
             </Link>
           </div>
         </div>
+
+        {(expiredGrants.length > 0 || expiringGrants.length > 0) && (
+          <section
+            role="status"
+            data-testid="grant-expiry-guidance"
+            className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"
+          >
+            <div className="flex items-start gap-3">
+              <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
+              <div>
+                <h2 className="font-semibold">Auditor access needs attention</h2>
+                <p className="mt-1 text-amber-800">
+                  {expiredGrants.length > 0
+                    ? `${expiredGrants.length} auditor grant${expiredGrants.length === 1 ? " has" : "s have"} expired and can no longer be used. Extend or re-issue the grant before requesting audit exports.`
+                    : `${expiringGrants.length} auditor grant${expiringGrants.length === 1 ? " expires" : "s expire"} soon. Extend the grant before its expiry to avoid interrupting audit access.`}
+                </p>
+                <p className="mt-2 text-xs text-amber-700">
+                  Select <strong>Inspect Scope</strong> below to review the expiry date and available actions.
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Overview Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
