@@ -82,6 +82,9 @@ export function AuditRetentionPolicySection({
               type="number"
               min="30"
               max="3650"
+              step="1"
+              aria-invalid={!validDays}
+              aria-describedby="retention-update-guidance"
               value={auditRetention.retentionPeriodDays}
               onChange={(e) =>
                 updateDays(Number(e.target.value))
@@ -106,7 +109,7 @@ export function AuditRetentionPolicySection({
               ))}
             </div>
           </div>
-          <div role="note" className="mt-2 text-xs text-gray-600 space-y-1">
+          <div id="retention-update-guidance" role="note" className="mt-2 text-xs text-gray-600 space-y-1">
             <p>Choose 30–3650 whole days. Increasing retention keeps audit records longer; reducing it may make older records eligible for pruning. Review compliance obligations before saving.</p>
             <p>Changing this setting does not delete existing records automatically. Immutable records and legal holds remain protected.</p>
           </div>
