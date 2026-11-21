@@ -138,6 +138,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Pause status refresh on long-lived audit pages (#842)**: `PauseStatusBanner` (mounted in the root layout, so on every audit page) no longer goes stale when a page stays open for hours.
+  - Re-syncs immediately when the tab becomes visible or the window regains focus, and when another tab changes the persisted company pause state
+  - A dismissal now applies only to the pause it was made for, so a later pause is shown again without a reload
+  - A failed refresh keeps the last known pause status instead of hiding an active pause
+  - Regression tests in `__tests__/components/status/PauseStatusBanner.test.tsx`
 - **Dashboard home compile errors**: `DashboardHome` no longer fails to parse (unterminated `"USDC` string, `lucide/react` import, two malformed class names) and no longer imports three dashboard panels and two `lib/payroll` evaluators that were never added to the repository.
 - **Blocked-execution test mocks** (#605): Corrected all five `PayrollRun` object literals in `__tests__/blocked-execution-diagnostics.test.ts` that would have failed `tsc --noEmit` under `strict: true`:
   - Added missing required `PayrollTransaction` fields (`companyId`, `timestamp`, `createdAt`) to every mock.
