@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Employee } from "@/types/models";
+import type { PayoutRetryDiagnosticsReport } from "@/src/payroll/payoutRetryDiagnostics";
 import DuplicateWarningPanel from "@/components/employees/DuplicateWarningPanel";
 import { usePayrollWizardStore } from "@/stores/payrollWizard";
 import { useWalletStore } from "@/stores/walletStore";
@@ -128,7 +129,11 @@ function findDuplicateRunWarnings(employeeIds: string[]): PayrollRun[] {
   });
 }
 
-function PayrollWizard() {
+interface PayrollWizardProps {
+  onRetryPolicyDecision?: (runId: string, report: PayoutRetryDiagnosticsReport) => void;
+}
+
+function PayrollWizard(_props: PayrollWizardProps = {}) {
   const {
     currentStep,
     employeeIds,

@@ -196,6 +196,13 @@ describe("Audit Grant Revocation Status & Timestamp (#515)", () => {
 
       render(<AuditGrantsPage />);
 
+      expect(screen.getByTestId("grant-expiry-guidance")).toHaveTextContent(
+        /auditor grant expires soon/i,
+      );
+      expect(screen.getByTestId("grant-expiry-guidance")).toHaveTextContent(
+        /Inspect Scope/i,
+      );
+
       // Verify table rendered with seeded grants
       expect(screen.getByTestId("audit-grants-table")).toBeInTheDocument();
       expect(screen.getByTestId("revoked-grants-count")).toBeInTheDocument();
