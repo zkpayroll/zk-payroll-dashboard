@@ -7,6 +7,10 @@ import { useCompanyStore } from "@/stores/company";
 import { useWalletStore } from "@/stores/walletStore";
 import type { Company, UserRole } from "@/types";
 
+function isUserRole(value: unknown): value is UserRole {
+  return value === "admin" || value === "operator" || value === "auditor";
+}
+
 /**
  * Lets an admin switch the dashboard's active company context, guarded by
  * `evaluateCompanySwitch` (#223) so a switch into an inactive, misconfigured,
@@ -23,25 +27,51 @@ export default function CompanySwitcher({
   const publicKey = useWalletStore((s) => s.publicKey);
 
   const [role, setRole] = useState<UserRole | null>(null);
+  const [roleStatus, setRoleStatus] = useState<
+    "loading" | "ready" | "unavailable" | "error"
+  >("loading");
+  const [roleCheckAttempt, setRoleCheckAttempt] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setRoleStatus("loading");
+    setRole(null);
+    setBlockedMessage(null);
+
     fetch("/api/auth/session", { method: "GET", cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!cancelled && data?.role) setRole(data.role);
+      .then(async (res) => {
+        if (!res.ok) {
+          if (!cancelled) setRoleStatus("unavailable");
+          return;
+        }
+
+        const data: unknown = await res.json();
+        const sessionRole =
+          typeof data === "object" && data !== null && "role" in data ? data.role : null;
+
+        if (!cancelled) {
+          if (isUserRole(sessionRole)) {
+            setRole(sessionRole);
+            setRoleStatus("ready");
+          } else {
+            setRoleStatus("unavailable");
+          }
+        }
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (!cancelled) setRoleStatus("error");
+      });
+
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [roleCheckAttempt]);
 
   function handleSelect(target: Company) {
     if (!role) {
-      setBlockedMessage("Log in to switch companies.");
+      setBlockedMessage("Verify your employer access before switching companies.");
       return;
     }
     const result = switchCompany(target, role, publicKey);
@@ -81,6 +111,7 @@ export default function CompanySwitcher({
                 type="button"
                 role="option"
                 aria-selected={c.id === currentId}
+                disabled={roleStatus !== "ready"}
                 onClick={() => handleSelect(c)}
                 className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
               >
@@ -95,6 +126,53 @@ export default function CompanySwitcher({
             </li>
           ))}
         </ul>
+      )}
+
+      {roleStatus === "unavailable" && (
+        <div
+          role="alert"
+          className="mt-2 flex w-72 flex-col items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+        >
+          <span>
+            Your session could not be verified. Sign in again to refresh your employer access.
+          </span>
+          <a className="font-medium underline" href="/login?redirect=%2Fcompany%2Fswitch">
+            Sign in again
+          </a>
+        </div>
+      )}
+
+      {roleStatus === "error" && (
+        <div
+          role="alert"
+          className="mt-2 flex w-72 flex-col items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+        >
+          <span>
+            Could not verify your employer access. Retry the check before switching companies.
+          </span>
+          <button
+            type="button"
+            className="font-medium underline"
+            onClick={() => setRoleCheckAttempt((attempt) => attempt + 1)}
+          >
+            Retry access check
+          </button>
+        </div>
+      )}
+
+      {roleStatus === "ready" && role !== "admin" && (
+        <div
+          role="alert"
+          className="mt-2 flex w-72 flex-col items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+        >
+          <span>
+            Your current role cannot switch companies. If your employer recently changed your
+            access, sign in again to refresh permissions.
+          </span>
+          <a className="font-medium underline" href="/login?redirect=%2Fcompany%2Fswitch">
+            Sign in again
+          </a>
+        </div>
       )}
 
       {blockedMessage && (
