@@ -27,6 +27,8 @@ export interface Employee {
   department?: string;
   salary: number;
   salaryCommitment: string;
+  /** Salary commitment format version; omitted values are treated as legacy version 1. */
+  salaryCommitmentVersion?: number;
   isActive: boolean;
   status?: "active" | "inactive" | "pending";
   onboardingStatus: OnboardingStatus;

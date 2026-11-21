@@ -18,6 +18,7 @@ import type { Employee } from "@/types";
 import EmptyState from "@/components/ui/EmptyState";
 import EmployeeAuditSidebar from "./EmployeeAuditSidebar";
 import { CommitmentReplacementDialog } from "./CommitmentReplacementDialog";
+import { SalaryCommitmentVersionWarning } from "./SalaryCommitmentVersionWarning";
 
 interface CommitmentEntry {
   id: string;
@@ -227,6 +228,10 @@ function EmployeeDetailPageContent({ employeeId }: { employeeId: string }) {
             Replace Commitment
           </button>
         </div>
+
+        <SalaryCommitmentVersionWarning
+          version={employee.salaryCommitmentVersion}
+        />
 
         {commitmentHistory.length === 0 ? (
           <div className="px-6 py-8 text-center text-sm text-gray-500">
