@@ -1032,3 +1032,57 @@ When a payroll run references an inactive or archived company, executing payouts
 - **Zero Compensation Leaks:** Warning banners and failure guidance never contain employee salary figures, compensation commitments, individual payout amounts, or cryptographic keys.
 - **Privacy-Safe Identifiers:** Only sanitized company identifiers and registered company display names are presented.
 - **Audit-Safe Serialization:** `sanitizeCompanyWarningForAudit` records only warning codes, company IDs, severity levels, and blocking flags, stripping any ambient payroll draft data.
+
+---
+
+## Payout Batch Retry Guidance
+
+**Goal:** Provide actionable, context-aware operator guidance for payout batch retries, ensuring operational clarity and preventing duplicate payouts while preserving privacy without exposing employee or salary data.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `lib/payroll/payoutBatchRetryGuidance.ts` | Pure evaluation engine classifying batch retry eligibility, attempt limits, pause flags, and actionable guidance. |
+| `src/payroll/payoutBatchRetryGuidance.ts` | Clean domain re-export for imports across src and lib. |
+| `components/features/payroll/PayoutBatchRetryGuidanceCard.tsx` | Accessible UI component (`role="status"`) presenting retry outcome badges, messages, next steps, and remediation links. |
+| `app/payroll/page.tsx` | Dashboard overview integrating retry decision tracking, sequential attempt increments, and actionable guidance in the retry log. |
+| `__tests__/payout-batch-retry-guidance.test.ts` | Unit tests covering success, blocking, boundary (attempt thresholds), and privacy guarantees. |
+| `__tests__/components/PayoutBatchRetryGuidanceCard.test.tsx` | Component unit tests covering allowed, blocked, and deferred guidance rendering. |
+| `__tests__/payroll-batch-retry-dashboard.test.tsx` | Integration tests verifying retry decision recording, settled run blocking, and attempt exhaustion. |
+
+### Evaluation States & Outcomes
+
+1. **`CONTRACT_PAUSED` (Blocked, `outcome: "blocked"`):**
+   - Triggered when smart contracts are paused (`isMutationDisabled: true`).
+   - Actionable message directs the operator to review pause status in Admin Settings (`/admin`).
+   - Prohibits mutation and retry actions while contracts are suspended.
+
+2. **`ALREADY_SETTLED` (Blocked, `outcome: "blocked"`):**
+   - Triggered when a payout batch has a settlement receipt (`receiptId`), verified on-chain execution (`status === "verified"`), or transaction hash.
+   - Prohibits retrying settled transactions to prevent duplicate disbursements.
+   - Provides direct link to Transaction History (`/history`).
+
+3. **`COMPANY_INACTIVE` (Blocked, `outcome: "blocked"`):**
+   - Triggered when a run references an inactive or archived company.
+   - Instructs the operator to reactivate the company in Company Settings or switch company context (`/company/switch`).
+
+4. **`RUN_CANCELLED` (Blocked, `outcome: "blocked"`):**
+   - Triggered when a run has been cancelled.
+   - Directs the operator to create a new draft batch (`/payroll/create`) instead of retrying a cancelled run.
+
+5. **`TREASURY_INSUFFICIENT`, `APPROVAL_REJECTED`, `COMPLIANCE_HOLD`, `EXPIRED_PROOF`, `DUPLICATE_BATCH` (Blocked):**
+   - Maps specific failure / cancellation reasons to targeted next steps and direct remediation links (`/treasury`, `/payroll/approvals`, `/compliance`, `/payroll/execute`, `/history`).
+
+6. **`MAX_ATTEMPTS_EXCEEDED` (Deferred, `outcome: "deferred"`):**
+   - Triggered when retry attempts exceed the maximum configured threshold (default 3).
+   - Defers automated retries to protect payroll integrity; directs the operator to investigate reconciliation logs (`/payroll/reconciliation`) and request approval for a new batch.
+
+7. **`RETRY_WITHIN_POLICY` / `RECONCILIATION_FAILED` / `DISCREPANCIES_FOUND` (Allowed, `outcome: "allowed"`):**
+   - Indicates the retry attempt is within safe operational limits.
+   - Displays remaining attempts count and recommended next steps for re-queuing the batch safely.
+
+### Privacy Guarantees
+
+- **Zero Compensation Leaks:** All guidance strings, titles, and recommended steps contain zero salary values, compensation commitments, dollar amounts, recipient identities, or wallet addresses.
+- **Privacy-Safe Serialization:** Logs and reports serialize only opaque run identifiers, attempt counters, outcome codes, and remediation links.
