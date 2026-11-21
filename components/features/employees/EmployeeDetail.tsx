@@ -29,6 +29,7 @@ import OnboardingBadge from "./OnboardingBadge";
 import EmptyState from "@/components/ui/EmptyState";
 import WalletChangeReviewCard from "@/components/review/WalletChangeReviewCard";
 import RecipientLockBadge from "./RecipientLockBadge";
+import { SalaryCommitmentVersionWarning } from "./SalaryCommitmentVersionWarning";
 
 export interface EmployeeDetailDrawerProps {
   employee: Employee | null;
@@ -155,6 +156,9 @@ export function EmployeeDetailDrawer({ employee, isOpen, onClose }: EmployeeDeta
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <CustomCheckCircleIcon className="w-3.5 h-3.5 text-indigo-500" /> Salary Commitment
                   </div>
+                  <SalaryCommitmentVersionWarning
+                    version={employee.salaryCommitmentVersion}
+                  />
                   <p className="text-xs font-mono break-all text-gray-500">
                     {employee.salaryCommitment}
                   </p>
