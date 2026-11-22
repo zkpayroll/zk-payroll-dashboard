@@ -1164,3 +1164,32 @@ When a payroll run references an inactive or archived company, executing payouts
 ### Privacy Guarantees
 
 - **Zero Compensation or Identity Exposure:** Rejection reasons, safeguard banners, and toast notifications never include employee names, salary figures, disbursement totals, wallet addresses, or raw input strings.
+
+---
+
+## #886 — Payroll Period Boundary Guidance
+
+The **Draft a settlement window** form in `PayrollScheduleEditor`
+(`/payroll/schedule`) explains how its start and end dates define a payroll
+period.
+
+### Boundary and validation behavior
+
+- Both date fields are inclusive calendar days. A start and end on the same
+  date is a valid one-day window.
+- A following window should start on the day after the previous window ends.
+  Windows that share even one date overlap and cannot be saved.
+- Invalid start or end dates are rejected with a field-specific corrective
+  message. An end date before the start is rejected with guidance to place the
+  end on or after the start.
+- Overlap errors identify the number of conflicting draft windows; cross-
+  template conflicts also identify the conflicting schedule name.
+- The boundary explanation is associated with both date inputs for assistive
+  technology and remains associated when a validation error is displayed.
+- Saving creates a draft only. The success notice reminds operators to submit
+  the policy to apply the window.
+
+### Privacy
+
+Boundary guidance and validation feedback use date and schedule metadata only;
+they do not expose employee records or salary values.
