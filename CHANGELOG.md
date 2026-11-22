@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Rejected Correction Events in Payroll History (#844)**: The History page now lists runs that were rejected after being sent back for corrections.
+  - Pure derivation `lib/payroll/rejectedCorrections.ts` (`getRejectedCorrectionEvents`) over each approval draft's `approvalHistory`. It orders entries by timestamp, skips unparseable timestamps, ignores rejections with no prior correction request, and reports correction rounds and whether the drafter resubmitted. Rejections recorded before this change appear too, with no backfill.
+  - Privacy: it never reads amounts, headcount, employee ids, or draft notes. A reviewer's reason is shown only if it passes the run-note sensitive-content scan. Otherwise the whole reason is withheld and static, actionable copy is shown instead.
+  - Panel `components/features/payroll/RejectedCorrectionHistory.tsx`, mounted on `app/history`
+  - Operator notes in `docs/OPERATOR_HANDBOOK.md` (Rejected Corrections)
+  - Focused test suite `__tests__/rejected-correction-history.test.tsx` covering success, gate-refused rejection, boundary (multiple rounds, out-of-order and invalid timestamps, blank reasons), privacy, and an end-to-end flow through the approval queue store
+
 - **Dashboard Import Duplicate Salary Commitments (#749)**: Highlights duplicate salary commitments while an employee CSV import is being previewed, and blocks the import until every duplicate is resolved.
   - Pure domain module `src/payroll/importSalaryCommitmentDuplicates.ts` (re-exported from `lib/payroll/importSalaryCommitmentDuplicates.ts`) detecting rows that bind the same salary amount to the same wallet (`duplicate_salary_commitment`) and rows carrying the same commitment value (`identical_commitment_value`); both kinds are blocking, while the same salary on different wallets and the same wallet with different salaries stay out of scope
   - Privacy-safe findings: raw salary amounts and full wallet addresses never reach a message, a group identifier, or a rendered field — groups only carry masked addresses (`GDQP2K…4W37`), truncated commitment values, and source row numbers
