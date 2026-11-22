@@ -104,6 +104,10 @@ function DraftWindowForm({ templates }: { templates: PayrollTemplate[] }) {
       aria-label="Add settlement window"
     >
       <h3 className="text-sm font-semibold text-gray-900">Draft a settlement window</h3>
+      <p id="payroll-window-guidance" className="text-xs leading-5 text-gray-600">
+        Start and end dates are inclusive calendar days. The next window should begin the day
+        after this one ends; windows that share a date overlap.
+      </p>
 
       <div>
         <label htmlFor="schedule-template" className="block text-xs font-medium text-gray-700 mb-1">
@@ -137,7 +141,7 @@ function DraftWindowForm({ templates }: { templates: PayrollTemplate[] }) {
               setError(null);
             }}
             aria-invalid={Boolean(error) || undefined}
-            aria-describedby={error ? "payroll-window-error" : undefined}
+            aria-describedby={`payroll-window-guidance${error ? " payroll-window-error" : ""}`}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             required
           />
@@ -155,7 +159,7 @@ function DraftWindowForm({ templates }: { templates: PayrollTemplate[] }) {
               setError(null);
             }}
             aria-invalid={Boolean(error) || undefined}
-            aria-describedby={error ? "payroll-window-error" : undefined}
+            aria-describedby={`payroll-window-guidance${error ? " payroll-window-error" : ""}`}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             required
           />
