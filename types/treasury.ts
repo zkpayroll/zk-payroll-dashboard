@@ -10,6 +10,10 @@
  */
 
 import type { ShortfallAction } from "@/types/policy";
+import type {
+  FundingReservation as TreasuryFundingReservation,
+  ReservationStatus as TreasuryReservationStatus,
+} from "@/stores/reservations";
 
 /**
  * Reserve health for a single payroll asset.
@@ -211,3 +215,80 @@ export interface TreasuryReplenishmentEvaluatedResult
 export type TreasuryReplenishmentReadinessResult =
   | TreasuryReplenishmentInvalidResult
   | TreasuryReplenishmentEvaluatedResult;
+
+/**
+ * Types for Dashboard Treasury Reservation Guidance (#887).
+ */
+export type ReservationGuidanceTone = "ready" | "info" | "warning" | "blocked";
+
+export type ReservationGuidanceReasonCode =
+  | "ASSETS_UNCONFIGURED"
+  | "INVALID_TREASURY_DATA"
+  | "INSUFFICIENT_TREASURY_BALANCE"
+  | "OVER_RESERVATION_BLOCKED"
+  | "RESERVATION_EXPIRED_LOCKED"
+  | "RESERVATION_EXPIRED_BLOCKED"
+  | "RESERVATION_EXPIRING_SOON"
+  | "RESERVATION_LIQUIDITY_TIGHT"
+  | "NO_ACTIVE_RESERVATIONS"
+  | "RESERVATIONS_HEALTHY";
+
+export interface TreasuryReservationActionGuide {
+  action: "reserve" | "refresh" | "revalidate" | "cancel";
+  label: string;
+  whenToUse: string;
+  effect: string;
+}
+
+export interface TreasuryReservationGuidanceInput {
+  reservations?: TreasuryFundingReservation[] | null;
+  availableBalance?: number | string | null;
+  projectedPayroll?: number | string | null;
+  safetyBuffer?: number | string | null;
+  assetCode?: string | null;
+  hasConfiguredAssets?: boolean;
+  newReservationAmount?: number | string | null;
+  now?: number;
+  warningWindowMs?: number;
+}
+
+export interface ReservationGuidanceCounts {
+  total: number;
+  healthy: number;
+  warning: number;
+  expired: number;
+  lockedExpired: number;
+  invalid: number;
+}
+
+export interface SingleReservationGuidance {
+  status: TreasuryReservationStatus;
+  headline: string;
+  nextStep: string;
+  isRecoverable: boolean;
+  hasCorruptData: boolean;
+}
+
+export interface TreasuryReservationGuidance {
+  tone: ReservationGuidanceTone;
+  reasonCode: ReservationGuidanceReasonCode;
+  badgeLabel: string;
+  title: string;
+  summary: string;
+  guidance: string;
+  nextSteps: string[];
+  actionGuides: TreasuryReservationActionGuide[];
+  canExecutePayroll: boolean;
+  canCreateReservation: boolean;
+  assetCode: string;
+  formattedAvailableBalance: string;
+  formattedActiveReserved: string;
+  formattedUnreservedBalance: string;
+  counts: ReservationGuidanceCounts;
+  remediationHref?: string;
+  remediationLabel?: string;
+}
+
+export type ParsedReservationAmountResult =
+  | { ok: true; units: bigint }
+  | { ok: false; reason: "missing" | "invalid" | "negative" };
