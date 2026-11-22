@@ -339,11 +339,15 @@ describe("Treasury Reservations Component Suite (#890)", () => {
       expect(screen.getByText("No funding reservations found")).toBeInTheDocument();
 
       const reserveBtn = screen.getByTestId("reserve-funds-button");
+      fireEvent.change(screen.getByTestId("reservation-amount-input"), {
+        target: { value: "1234.56" },
+      });
       fireEvent.click(reserveBtn);
 
       // Now registered in store and reflected in UI
       const reservations = useReservationsStore.getState().reservations;
       expect(reservations.length).toBeGreaterThan(0);
+      expect(reservations[0].amount).toBe("1234.56");
       expect(screen.queryByText("No funding reservations found")).not.toBeInTheDocument();
       expect(screen.getByText(/Batch BATCH-/i)).toBeInTheDocument();
 
@@ -358,6 +362,37 @@ describe("Treasury Reservations Component Suite (#890)", () => {
       // Appended to timeline in real time
       const createdTimelineItems = screen.getAllByText(/Created/i);
       expect(createdTimelineItems.length).toBeGreaterThan(0);
+    });
+
+    it("rejects invalid and unaffordable reservation amounts without exposing payroll details", () => {
+      render(<TreasuryView configuredAssets={[{ code: "USDC" }]} />);
+      const amountInput = screen.getByTestId("reservation-amount-input");
+      const reserveButton = screen.getByTestId("reserve-funds-button");
+
+      fireEvent.change(amountInput, { target: { value: "0" } });
+      fireEvent.click(reserveButton);
+      expect(screen.getByTestId("reservation-error-alert")).toHaveTextContent(
+        "Enter a valid reservation amount greater than zero.",
+      );
+      expect(useReservationsStore.getState().reservations).toHaveLength(0);
+
+      fireEvent.change(amountInput, { target: { value: "25500.01" } });
+      fireEvent.click(reserveButton);
+      const alert = screen.getByTestId("reservation-error-alert");
+      expect(alert).toHaveTextContent(/exceeds funds available after projected payroll/i);
+      expect(alert.textContent).not.toMatch(/emp_[a-zA-Z0-9_-]+|salary/i);
+      expect(useReservationsStore.getState().reservations).toHaveLength(0);
+    });
+
+    it("accepts a reservation exactly equal to the funds available after projected obligations", () => {
+      render(<TreasuryView configuredAssets={[{ code: "USDC" }]} />);
+      fireEvent.change(screen.getByTestId("reservation-amount-input"), {
+        target: { value: "25500" },
+      });
+      fireEvent.click(screen.getByTestId("reserve-funds-button"));
+
+      expect(useReservationsStore.getState().reservations[0]?.amount).toBe("25500.00");
+      expect(screen.queryByTestId("reservation-error-alert")).not.toBeInTheDocument();
     });
   });
 

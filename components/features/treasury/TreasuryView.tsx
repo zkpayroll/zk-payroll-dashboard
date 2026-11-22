@@ -39,6 +39,7 @@ function TreasuryView({
 }: TreasuryViewProps = {}) {
   const [toastVisible, setToastVisible] = useState(false);
   const [reservationError, setReservationError] = useState<string | null>(null);
+  const [reservationAmount, setReservationAmount] = useState("15000.00");
 
   // Demo wiring: if no assets passed, treat treasury address presence as "configured"
   // When MOCK_COMPANIES has treasury but assets list is empty, show empty state for QA.
@@ -58,13 +59,30 @@ function TreasuryView({
       );
       return;
     }
+    const amount = Number(reservationAmount);
+    if (
+      !Number.isFinite(amount) ||
+      amount <= 0 ||
+      Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-7
+    ) {
+      setReservationError(
+        "Enter a valid reservation amount greater than zero, with no more than two decimal places.",
+      );
+      return;
+    }
+    if (amount > remaining) {
+      setReservationError(
+        "Reservation exceeds funds available after projected payroll obligations. Reduce the amount or fund the treasury before reserving.",
+      );
+      return;
+    }
     setReservationError(null);
     const event = createFundingReservation();
     useReservationsStore.getState().addReservation({
       id: event.reservationId,
       batchId: event.payrollRunId || `BATCH-${event.reservationId.slice(-4).toUpperCase()}`,
       asset: "USDC",
-      amount: "15,000.00",
+      amount: amount.toFixed(2),
       reservedAt: event.createdAt,
       expiresAt: new Date(Date.now() + RESERVATION_TTL_MS).toISOString(),
       canRefresh: true,
@@ -230,6 +248,21 @@ function TreasuryView({
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <h3 className="text-base font-medium text-gray-900">Funding history</h3>
           <div className="relative flex items-center gap-2">
+            <label htmlFor="treasury-reservation-amount" className="sr-only">
+              Reservation amount
+            </label>
+            <input
+              id="treasury-reservation-amount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              inputMode="decimal"
+              value={reservationAmount}
+              onChange={(event) => setReservationAmount(event.target.value)}
+              aria-describedby="treasury-reservation-amount-help"
+              className="w-32 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+              data-testid="reservation-amount-input"
+            />
             <button
               type="button"
               onClick={handleReserveFunds}
@@ -258,6 +291,9 @@ function TreasuryView({
             )}
           </div>
         </div>
+        <p id="treasury-reservation-amount-help" className="px-6 pb-3 text-xs text-gray-500">
+          Enter a positive amount that fits available funds after projected payroll obligations.
+        </p>
 
         {fundingHistory.length === 0 ? (
           <div className="px-6 py-8 text-center text-sm text-gray-500">
