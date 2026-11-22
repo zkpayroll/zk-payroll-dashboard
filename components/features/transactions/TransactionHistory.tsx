@@ -54,6 +54,7 @@ import {
   resolveReconciliationStatus,
 } from "@/lib/reconciliation/status";
 import { SubmissionProgressCell } from "@/components/stepper/SubmissionProgressCell";
+import { sortTransactionsForHistory } from "@/src/payroll/transactionHistoryOrdering";
 
 type StatusFilter = "all" | "verified" | "pending" | "failed" | "cancelled";
 type ReconciliationFilter = "all" | ReconciliationOutcome;
@@ -343,7 +344,7 @@ function TransactionHistoryInner({
       );
     }
 
-    return results;
+    return sortTransactionsForHistory(results);
   }, [filters, mode]);
 
   // #284: quick filters apply on top of the search/panel result so their
