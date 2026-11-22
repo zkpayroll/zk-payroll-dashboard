@@ -396,7 +396,17 @@ export function compilePayrollPolicy(policy: PayrollPolicy): CompiledPolicyResul
   }
 
   // --- 5. Audit & Retention Checks ---
-  if (auditRetention.retentionPeriodDays < 30) {
+  if (!Number.isInteger(auditRetention.retentionPeriodDays)) {
+    issues.push({
+      id: "audit-retention-not-whole",
+      section: "auditRetention",
+      field: "retentionPeriodDays",
+      severity: "error",
+      title: "Audit retention must be whole days",
+      message: "Retention period must be a whole number of days.",
+      remediation: "Enter a whole number of days between 30 and 3,650.",
+    });
+  } else if (auditRetention.retentionPeriodDays < 30) {
     issues.push({
       id: "audit-retention-min",
       section: "auditRetention",

@@ -996,9 +996,11 @@ npm test
 ## Proof Input Validation UI Behavior
 
 - `ProofReferenceInput` trims and lowercases pasted values before validating against `zkp_ref_YYYYMMDD_NNN`.
-- Errors surface only after the field is touched and non-empty, keeping empty states quiet.
-- Invalid input shows the expected format plus recovery guidance: re-copy the full reference from the proof receipt, or clear the field to start over.
+- Guidance is always visible under the field: the expected format `zkp_ref_YYYYMMDD_NNN`, the rule that only the reference is entered (no amounts or employee details), and the recovery step (re-copy the full reference from the proof receipt, or clear the field). It is exported as `PROOF_REFERENCE_GUIDANCE` from `lib/validation/proofReference.ts`.
+- Errors surface only after the field is touched and non-empty, keeping empty states quiet. Error messages never echo the entered value.
+- `validateProofReference` returns a `reason` of `empty` or `malformed` (or `null` when valid) so callers can branch without parsing messages.
 - Valid input shows inline confirmation and reports validity to the parent via `onValidityChange`.
+- `PayrollVerificationForm` blocks an invalid submit, shows the validation message in a `role="alert"` region, and clears it once the reference is edited. Valid submits show the verified toast.
 
 ## #762 — Inactive Company Payroll Run Warning
 
