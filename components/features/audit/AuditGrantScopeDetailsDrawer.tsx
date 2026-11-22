@@ -23,6 +23,7 @@ import {
   formatRevocationTimestamp,
   isAuditGrantRevoked,
 } from "./AuditGrantRevocationStatus";
+import { evaluateAuditorAccessExpiry } from "@/lib/date/auditorAccessExpiry";
 
 export interface AuditGrantScopeItem {
   id: string;
@@ -143,6 +144,7 @@ export function AuditGrantScopeDetailsDrawer({
   if (!isOpen) return null;
 
   const isRevoked = isAuditGrantRevoked(grant);
+  const isExpired = !isRevoked && evaluateAuditorAccessExpiry(grant).state === "expired";
 
   const getStatusBadge = (status: string) => {
     if (isRevoked) {
@@ -385,13 +387,13 @@ export function AuditGrantScopeDetailsDrawer({
               <button
                 type="button"
                 onClick={() => {
-                  if (!isRevoked) {
+                if (!isRevoked) {
                     onExtendGrant(grant.id);
                   }
                 }}
                 disabled={isRevoked}
                 aria-disabled={isRevoked}
-                title={isRevoked ? "Revoked grants cannot be extended" : "Extend Grant"}
+                title={isRevoked ? "Revoked grants cannot be extended" : isExpired ? "Renew expired grant" : "Extend Grant"}
                 data-testid="extend-grant-btn"
                 className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-colors ${
                   isRevoked
@@ -399,7 +401,7 @@ export function AuditGrantScopeDetailsDrawer({
                     : "bg-indigo-600 hover:bg-indigo-700 text-white"
                 }`}
               >
-                <RefreshCw className="w-3.5 h-3.5" /> Extend Grant
+                <RefreshCw className="w-3.5 h-3.5" /> {isExpired ? "Renew Grant" : "Extend Grant"}
               </button>
             )}
 
