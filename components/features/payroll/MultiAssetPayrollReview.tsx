@@ -16,6 +16,10 @@ import {
 } from "lucide-react";
 import type { AssetGroup, MultiAssetPayrollRun } from "@/types/models";
 import { assetLabel, formatAssetAmount, groupRiskLabel } from "@/lib/payroll/multiAsset";
+import {
+  validatePayoutToken,
+  type PayoutTokenValidationFailure,
+} from "@/lib/assets/payoutTokenValidation";
 import { ProofStatusCard } from "@/components/features/proofs/ProofStatusCard";
 import { RoundingInfoTooltip } from "@/components/features/payroll/RoundingInfoTooltip";
 import type { ProofLifecycleState } from "@/stores/proofStatus";
@@ -171,7 +175,13 @@ export default function MultiAssetPayrollReview({
   const statusCfg = STATUS_CONFIG[run.status];
   const hasFundingIssue = run.assetGroups.some((g) => g.status === "underfunded");
   const hasFailedGroup = run.assetGroups.some((g) => g.status === "failed");
-  const canSubmit = run.status === "ready" && run.proofStatus === "ready";
+  // Settlement must not proceed for groups whose payout token is not supported.
+  const unsupportedPayoutTokens = run.assetGroups
+    .map((g) => validatePayoutToken(g.asset.code))
+    .filter((r): r is PayoutTokenValidationFailure => !r.valid);
+  const hasUnsupportedPayoutToken = unsupportedPayoutTokens.length > 0;
+  const canSubmit =
+    run.status === "ready" && run.proofStatus === "ready" && !hasUnsupportedPayoutToken;
 
   const totalByAsset = run.assetGroups.map((g) => ({
     assetCode: g.asset.code,
@@ -206,6 +216,23 @@ export default function MultiAssetPayrollReview({
           {statusCfg.label}
         </span>
       </div>
+
+      {/* Unsupported payout token errors */}
+      {unsupportedPayoutTokens.map((r, i) => (
+        <div
+          key={`${r.errorCode}-${i}`}
+          role="alert"
+          data-error-code={r.errorCode}
+          className="flex items-start gap-3 rounded-lg bg-red-50 border border-red-200 p-4 text-sm text-red-800"
+        >
+          <XCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">Unsupported payout token</p>
+            <p className="text-red-700 mt-0.5">{r.message}</p>
+            <p className="text-xs text-red-600 mt-1">Error code: {r.errorCode}</p>
+          </div>
+        </div>
+      ))}
 
       {/* Global warnings */}
       {hasFundingIssue && (
