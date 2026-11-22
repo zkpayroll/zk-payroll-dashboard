@@ -20,11 +20,17 @@ export function PayrollVerificationForm() {
   const [expectedHash, setExpectedHash] = useState("");
   const [noteResult, setNoteResult] = useState<"match" | "mismatch" | "invalid-hash" | null>(null);
   const [isVerifyingNote, setIsVerifyingNote] = useState(false);
+  const [referenceSubmitError, setReferenceSubmitError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const result = validateProofReference(reference);
-    if (!result.isValid) return;
+    if (!result.isValid) {
+      setReferenceSubmitError(result.message);
+      return;
+    }
+
+    setReferenceSubmitError(null);
 
     setLastVerified(result.normalized);
     toast.success("Proof reference verified", {
@@ -64,9 +70,18 @@ export function PayrollVerificationForm() {
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm p-6 space-y-4">
         <ProofReferenceInput
           value={reference}
-          onChange={setReference}
+          onChange={(next) => {
+            setReference(next);
+            setReferenceSubmitError(null);
+          }}
           onValidityChange={setIsValid}
         />
+
+        {referenceSubmitError && (
+          <p role="alert" className="flex items-center gap-1 text-xs text-red-600">
+            {referenceSubmitError}
+          </p>
+        )}
 
         <button
           type="submit"
