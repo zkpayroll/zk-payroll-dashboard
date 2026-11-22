@@ -43,7 +43,9 @@ export default function CompanySwitcher({
     fetch("/api/auth/session", { method: "GET", cache: "no-store" })
       .then(async (res) => {
         if (!res.ok) {
-          if (!cancelled) setRoleStatus("unavailable");
+          // A 5xx means the session service failed, not that the session is
+          // gone, so offer a retry instead of telling the user to sign in again.
+          if (!cancelled) setRoleStatus(res.status >= 500 ? "error" : "unavailable");
           return;
         }
 

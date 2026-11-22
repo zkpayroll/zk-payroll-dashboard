@@ -145,6 +145,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Company switcher access check on session-service errors (#895)**: `CompanySwitcher` now offers "Retry access check" when `/api/auth/session` answers 5xx, instead of telling the employer to sign in again; 401 and other 4xx responses still route to sign-in.
+
 - **Pause status refresh on long-lived audit pages (#842)**: `PauseStatusBanner` (mounted in the root layout, so on every audit page) no longer goes stale when a page stays open for hours.
   - Re-syncs immediately when the tab becomes visible or the window regains focus, and when another tab changes the persisted company pause state
   - A dismissal now applies only to the pause it was made for, so a later pause is shown again without a reload
@@ -244,6 +246,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Testing
 
+- `__tests__/company-switcher-role-changes.test.tsx`: Component tests for employer role changes in the company switcher (#895): admin switch success and same-company no-op, demotion/promotion picked up by the access-check retry, auditor/operator blocking, revoked (401) vs failed (5xx) sessions, malformed and unrecognised session roles, pending and unmount boundaries, wallet/admin-address guard messages, and privacy assertions that no employee, salary, or wallet data from the session response is rendered
 - `__tests__/instruction-version-rule.test.ts`: Unit tests for version sanitization (fractional, zero, negative, NaN), draft snapshotting, current/stale/unconfigured derivation (including draft-newer-than-saved), the wizard store delegation, and a privacy assertion that no amount, address, or employee id survives into a label or detail
 - `__tests__/instruction-version-badge.test.tsx`: Component tests for the current and stale pill states (including the "drafted" marker and aria-label), hidden unconfigured state, snapshot/clear store behaviour, and agreement between the shared derivation and the badge
 - `__tests__/inactive-employees-rule.test.ts`: 16 unit tests for eligibility reasons (active, pending, inactive, suspended, offboarded), draft-order flagging, stale-id detection, de-duplication, severity escalation, and a privacy assertion that no salary, commitment, or wallet value survives into a warning
