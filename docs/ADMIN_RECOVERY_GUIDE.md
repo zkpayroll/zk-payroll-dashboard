@@ -193,6 +193,24 @@ Recovery steps:
 | History | Transaction status and timestamps | Use confirmed history entries as the source of truth. |
 | Compliance | View key status and expiry | Renew or revoke keys before audit access is interrupted. |
 
+### Auditor grant expiry
+
+The Audit Access page marks grants as **Expiring soon** during the seven-day
+warning window and **Expired** once the expiry timestamp is reached. Expired
+grants are read-only: exports and proof access remain blocked, while the
+operator can open **Inspect Scope** and choose **Renew Grant**. Renewal issues
+a fresh 30-day window; revoked grants cannot be renewed and must be re-issued.
+The grant form validates that the expiry date is in the future.
+
+### Payout batch retries
+
+Retry guidance is evaluated before a retry request is sent. A settled batch,
+paused contract or token, cancelled run, inactive company, compliance hold, or
+exhausted attempt budget is blocked or deferred with a reason and next steps.
+Operators should follow the remediation link, confirm reconciliation and
+on-chain status, and retry only when the card reports **Retry permitted**.
+The UI never displays employee salaries or recipient secrets in this flow.
+
 ## Escalation packet
 
 When handing off to engineering or operations, include:
