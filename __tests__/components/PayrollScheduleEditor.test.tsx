@@ -103,6 +103,23 @@ describe("PayrollScheduleEditor", () => {
     expect(screen.getByText("2025-02-01 → 2025-02-10")).toBeInTheDocument();
   });
 
+  it("accepts a one-day payroll period at the boundary", () => {
+    render(
+      <PayrollScheduleEditor
+        templates={[ACTIVE_TEMPLATE]}
+        locks={[]}
+        runs={[]}
+        initialViewDate={new Date(Date.UTC(2025, 0, 1))}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/window start/i), { target: { value: "2025-02-10" } });
+    fireEvent.change(screen.getByLabelText(/window end/i), { target: { value: "2025-02-10" } });
+    fireEvent.click(screen.getByRole("button", { name: /save draft window/i }));
+
+    expect(screen.getByText("2025-02-10 → 2025-02-10")).toBeInTheDocument();
+  });
+
   it("rejects a draft window where start is after end", () => {
     render(
       <PayrollScheduleEditor
@@ -117,7 +134,7 @@ describe("PayrollScheduleEditor", () => {
     fireEvent.change(screen.getByLabelText(/window end/i), { target: { value: "2025-02-01" } });
     fireEvent.click(screen.getByRole("button", { name: /save draft window/i }));
 
-    expect(screen.getByRole("alert")).toHaveTextContent(/window start must be on or before window end/i);
+    expect(screen.getByRole("alert")).toHaveTextContent(/period end must be on or after the start date/i);
   });
 
   it("rejects a draft window that overlaps an existing draft", () => {

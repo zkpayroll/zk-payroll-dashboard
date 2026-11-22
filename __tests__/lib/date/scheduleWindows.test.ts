@@ -6,6 +6,7 @@ import {
   findMissedOccurrences,
   rangesOverlap,
   findOverlappingWindows,
+  validatePayrollPeriodBoundaries,
 } from "@/lib/date/scheduleWindows";
 import type { PayrollTemplate, PayrollRun } from "@/types/models";
 
@@ -167,6 +168,34 @@ describe("rangesOverlap", () => {
 
   it("treats touching boundaries as overlapping (inclusive)", () => {
     expect(rangesOverlap({ start: "2025-01-01", end: "2025-01-10" }, { start: "2025-01-10", end: "2025-01-20" })).toBe(true);
+  });
+});
+
+describe("validatePayrollPeriodBoundaries", () => {
+  it("accepts valid chronological boundaries, including a one-day period", () => {
+    expect(validatePayrollPeriodBoundaries("2024-02-29", "2024-02-29")).toEqual({
+      valid: true,
+      error: null,
+    });
+    expect(validatePayrollPeriodBoundaries("2025-02-01", "2025-02-28").valid).toBe(true);
+  });
+
+  it("rejects malformed or impossible calendar dates", () => {
+    expect(validatePayrollPeriodBoundaries("2025-02-29", "2025-03-01")).toEqual({
+      valid: false,
+      error: "Enter a valid payroll period start date.",
+    });
+    expect(validatePayrollPeriodBoundaries("2025-02-01", "not-a-date")).toEqual({
+      valid: false,
+      error: "Enter a valid payroll period end date.",
+    });
+  });
+
+  it("rejects a period whose end falls before its start", () => {
+    expect(validatePayrollPeriodBoundaries("2025-03-01", "2025-02-28")).toEqual({
+      valid: false,
+      error: "The payroll period end must be on or after the start date.",
+    });
   });
 });
 

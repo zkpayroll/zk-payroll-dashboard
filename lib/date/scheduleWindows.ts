@@ -168,6 +168,50 @@ export interface DateRange {
   end: string;
 }
 
+export interface PayrollPeriodBoundaryValidation {
+  valid: boolean;
+  error: string | null;
+}
+
+function isValidDateKey(dateKey: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return false;
+
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const parsed = new Date(0);
+  parsed.setUTCFullYear(year, month - 1, day);
+  parsed.setUTCHours(0, 0, 0, 0);
+  return parsed.toISOString().slice(0, 10) === dateKey;
+}
+
+/** Validates inclusive payroll period boundaries entered as calendar dates. */
+export function validatePayrollPeriodBoundaries(
+  start: string,
+  end: string,
+): PayrollPeriodBoundaryValidation {
+  if (!isValidDateKey(start)) {
+    return {
+      valid: false,
+      error: "Enter a valid payroll period start date.",
+    };
+  }
+
+  if (!isValidDateKey(end)) {
+    return {
+      valid: false,
+      error: "Enter a valid payroll period end date.",
+    };
+  }
+
+  if (start > end) {
+    return {
+      valid: false,
+      error: "The payroll period end must be on or after the start date.",
+    };
+  }
+
+  return { valid: true, error: null };
+}
+
 /** Whether two inclusive date ranges (yyyy-mm-dd) overlap at all. */
 export function rangesOverlap(a: DateRange, b: DateRange): boolean {
   return a.start <= b.end && b.start <= a.end;

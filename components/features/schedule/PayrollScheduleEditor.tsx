@@ -10,6 +10,7 @@ import {
   findMissedOccurrences,
   rangesOverlap,
   toDateKey,
+  validatePayrollPeriodBoundaries,
 } from "@/lib/date/scheduleWindows";
 import { useDraftScheduleWindowStore } from "@/stores/draftScheduleWindows";
 import EmptyState from "@/components/ui/EmptyState";
@@ -37,8 +38,9 @@ function DraftWindowForm({ templates }: { templates: PayrollTemplate[] }) {
     e.preventDefault();
     if (!isSubmittable) return;
 
-    if (windowStart > windowEnd) {
-      setError("Window start must be on or before window end.");
+    const boundaryValidation = validatePayrollPeriodBoundaries(windowStart, windowEnd);
+    if (!boundaryValidation.valid) {
+      setError(boundaryValidation.error);
       return;
     }
 
@@ -130,7 +132,12 @@ function DraftWindowForm({ templates }: { templates: PayrollTemplate[] }) {
             id="window-start"
             type="date"
             value={windowStart}
-            onChange={(e) => setWindowStart(e.target.value)}
+            onChange={(e) => {
+              setWindowStart(e.target.value);
+              setError(null);
+            }}
+            aria-invalid={Boolean(error) || undefined}
+            aria-describedby={error ? "payroll-window-error" : undefined}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             required
           />
@@ -143,7 +150,12 @@ function DraftWindowForm({ templates }: { templates: PayrollTemplate[] }) {
             id="window-end"
             type="date"
             value={windowEnd}
-            onChange={(e) => setWindowEnd(e.target.value)}
+            onChange={(e) => {
+              setWindowEnd(e.target.value);
+              setError(null);
+            }}
+            aria-invalid={Boolean(error) || undefined}
+            aria-describedby={error ? "payroll-window-error" : undefined}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             required
           />
@@ -151,7 +163,7 @@ function DraftWindowForm({ templates }: { templates: PayrollTemplate[] }) {
       </div>
 
       {error && (
-        <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+        <div id="payroll-window-error" role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
           <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
           {error}
         </div>
