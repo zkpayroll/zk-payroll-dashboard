@@ -13,17 +13,32 @@ import ReservationExpiryWarning from "./ReservationExpiryWarning";
 import ReservationToastListener from "./ReservationToastListener";
 import AssetReadinessTable from "./AssetReadinessTable";
 import TreasuryReplenishmentReadinessCard from "./TreasuryReplenishmentReadinessCard";
-import { createFundingReservation } from "@/lib/events/reservationEvents";
+import { createFundingReservation, type FundingReservationEvent } from "@/lib/events/reservationEvents";
 import PartialReleaseFailureAlert from "./PartialReleaseFailureAlert";
 import type { PartialReleaseFailure } from "@/lib/treasury/partialRelease";
 import SupportedAssetsEmptyState from "@/components/features/assets/SupportedAssetsEmptyState";
 import { hasSupportedPayrollAssets } from "@/lib/assets/supportedAssets";
+import {
+  useReservationsStore,
+  RESERVATION_TTL_MS,
+  type FundingReservation,
+} from "@/stores/reservations";
+
+export interface TreasuryViewProps {
+  configuredAssets?: Array<{ code: string; issuer?: string }>;
+  releaseFailures?: PartialReleaseFailure[];
+  initialReservations?: FundingReservation[];
+  initialTimelineEvents?: FundingReservationEvent[];
+}
 
 function TreasuryView({
   configuredAssets,
   releaseFailures = [],
-}: { configuredAssets?: Array<{ code: string; issuer?: string }>; releaseFailures?: PartialReleaseFailure[] } = {}) {
+  initialReservations,
+  initialTimelineEvents,
+}: TreasuryViewProps = {}) {
   const [toastVisible, setToastVisible] = useState(false);
+  const [reservationError, setReservationError] = useState<string | null>(null);
 
   // Demo wiring: if no assets passed, treat treasury address presence as "configured"
   // When MOCK_COMPANIES has treasury but assets list is empty, show empty state for QA.
@@ -31,14 +46,32 @@ function TreasuryView({
   const effectiveAssets = configuredAssets ?? (MOCK_COMPANIES[0]?.treasury ? [{ code: "USDC" }, { code: "XLM" }] : []);
   const assetsMissing = !hasSupportedPayrollAssets(effectiveAssets);
 
-  const handleReserveFunds = () => {
-    createFundingReservation();
-  };
-
   const { balance, projectedPayroll, lastFunded } = MOCK_TREASURY_BALANCE;
   const company = MOCK_COMPANIES[0];
   const isLowBalance = projectedPayroll > balance;
   const remaining = balance - projectedPayroll;
+
+  const handleReserveFunds = () => {
+    if (isLowBalance) {
+      setReservationError(
+        "Cannot create treasury reservation: available balance is insufficient to cover projected payroll obligations. Fund the treasury before reserving."
+      );
+      return;
+    }
+    setReservationError(null);
+    const event = createFundingReservation();
+    useReservationsStore.getState().addReservation({
+      id: event.reservationId,
+      batchId: event.payrollRunId || `BATCH-${event.reservationId.slice(-4).toUpperCase()}`,
+      asset: "USDC",
+      amount: "15,000.00",
+      reservedAt: event.createdAt,
+      expiresAt: new Date(Date.now() + RESERVATION_TTL_MS).toISOString(),
+      canRefresh: true,
+      canCancel: true,
+      canRevalidate: true,
+    });
+  };
 
   const fundingHistory = MOCK_TRANSACTIONS.filter((t) => t.status === "verified");
 
@@ -57,6 +90,30 @@ function TreasuryView({
       {releaseFailures.map((failure) => (
         <PartialReleaseFailureAlert key={failure.releaseId} failure={failure} />
       ))}
+
+      {reservationError && (
+        <div
+          role="alert"
+          data-testid="reservation-error-alert"
+          className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start justify-between gap-3"
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" aria-hidden="true" />
+            <div>
+              <p className="text-sm font-medium text-red-800">Reservation Failed</p>
+              <p className="text-sm text-red-700 mt-0.5">{reservationError}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setReservationError(null)}
+            className="text-xs text-red-700 hover:text-red-900 font-medium shrink-0"
+            aria-label="Dismiss reservation error"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {assetsMissing && (
         <SupportedAssetsEmptyState configuredAssets={effectiveAssets} variant="treasury" compact={false} />
@@ -156,11 +213,11 @@ function TreasuryView({
 
       <TreasuryReadinessChecklist />
 
-      <ReservationExpiryWarning />
+      <ReservationExpiryWarning reservations={initialReservations} />
 
       <FundingForecast />
 
-      <ReservationTimeline />
+      <ReservationTimeline initialEvents={initialTimelineEvents} />
 
       {company && (
         <div className="bg-white rounded-lg shadow-sm p-6">
@@ -176,6 +233,7 @@ function TreasuryView({
             <button
               type="button"
               onClick={handleReserveFunds}
+              data-testid="reserve-funds-button"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
             >
               <Lock className="w-3.5 h-3.5" aria-hidden="true" />
