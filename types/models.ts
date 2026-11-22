@@ -199,6 +199,8 @@ export interface PayrollTransaction {
   receiptId?: string | null;
   /** Account sequence reported by the network for this execution, when available. */
   confirmationNonce?: string | null;
+  /** Whether this run's payout asset is currently paused by its issuer or configuration. */
+  payoutTokenPaused?: boolean;
   isArchived?: boolean;
   /**
    * Cancellation reason for run-derived history rows (#284). Mirrors

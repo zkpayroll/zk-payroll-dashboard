@@ -114,6 +114,36 @@ describe("evaluatePayoutBatchRetryGuidance", () => {
       expect(guidance.remediationLabel).toBe("View Settlement History");
     });
 
+    it("blocks retry while the payout token is paused with privacy-safe recovery steps", () => {
+      const guidance = evaluatePayoutBatchRetryGuidance({
+        payrollId: "run_batch_token_paused",
+        isPayoutTokenPaused: true,
+      });
+
+      expect(guidance.outcome).toBe("blocked");
+      expect(guidance.reason).toBe("PAYOUT_TOKEN_PAUSED");
+      expect(guidance.canRetry).toBe(false);
+      expect(guidance.guidance).toMatch(/Wait for the payout asset to be resumed/i);
+      expect(guidance.nextSteps).toContain(
+        "After resumption, confirm this batch has not settled and review reconciliation before retrying",
+      );
+      expect(guidance.remediationHref).toBe("/settings/assets");
+      expect(guidance.guidance).not.toMatch(/\$\d+|\bemp_[a-zA-Z0-9_-]+\b|G[A-Z2-7]{55}/i);
+    });
+
+    it("prioritizes settlement safety over a paused-token retry condition", () => {
+      const guidance = evaluatePayoutBatchRetryGuidance({
+        payrollId: "run_batch_settled_token_paused",
+        isPayoutTokenPaused: true,
+        receiptId: "receipt_test",
+      });
+
+      expect(guidance.outcome).toBe("blocked");
+      expect(guidance.reason).toBe("ALREADY_SETTLED");
+      expect(guidance.canRetry).toBe(false);
+      expect(guidance.remediationHref).toBe("/history");
+    });
+
     it("blocks retry when transaction hash or verified status is present", () => {
       const guidance = evaluatePayoutBatchRetryGuidance({
         payrollId: "run_batch_settled_tx",
