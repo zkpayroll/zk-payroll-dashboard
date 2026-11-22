@@ -48,6 +48,7 @@ function evaluateRetryDecision(
     payrollId,
     attempt,
     isMutationDisabled,
+    isPayoutTokenPaused: options.isPayoutTokenPaused,
     pauseReason: options.pauseReason,
     hasInactiveCompany: options.hasInactiveCompany,
     isSettled: options.isSettled,
@@ -122,6 +123,7 @@ export default function PayrollDashboardPage() {
         isMutationDisabled,
         {
           pauseReason,
+          isPayoutTokenPaused: run?.payoutTokenPaused,
           hasInactiveCompany,
           isSettled,
           receiptId: run?.receiptId,

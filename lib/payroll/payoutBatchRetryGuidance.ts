@@ -17,6 +17,7 @@ export type RetryDecisionOutcome = "allowed" | "blocked" | "deferred";
 
 export type PayoutBatchRetryReasonCode =
   | "CONTRACT_PAUSED"
+  | "PAYOUT_TOKEN_PAUSED"
   | "ALREADY_SETTLED"
   | "COMPANY_INACTIVE"
   | "RUN_CANCELLED"
@@ -51,6 +52,7 @@ export interface PayoutBatchRetryEvaluationInput {
   attempt?: number;
   maxAttempts?: number;
   isMutationDisabled?: boolean;
+  isPayoutTokenPaused?: boolean;
   pauseReason?: string | null;
   hasInactiveCompany?: boolean;
   isSettled?: boolean;
@@ -143,6 +145,30 @@ export function evaluatePayoutBatchRetryGuidance(
       ],
       remediationHref: "/history",
       remediationLabel: "View Settlement History",
+      canRetry: false,
+    };
+  }
+
+  if (input.isPayoutTokenPaused) {
+    return {
+      payrollId,
+      outcome: "blocked",
+      reason: "PAYOUT_TOKEN_PAUSED",
+      attempt: rawAttempt,
+      maxAttempts,
+      remainingAttempts: Math.max(0, maxAttempts - rawAttempt),
+      title: "Payout Token Paused — Retry Blocked",
+      message:
+        "The payout asset is currently paused. Retrying this batch before the asset is resumed is not safe.",
+      guidance:
+        "Do not retry or switch the asset as a workaround. Wait for the payout asset to be resumed, then verify settlement status and reconciliation before retrying.",
+      nextSteps: [
+        "Review payout asset availability in Payroll Assets",
+        "Wait for the responsible administrator or issuer to resume the asset",
+        "After resumption, confirm this batch has not settled and review reconciliation before retrying",
+      ],
+      remediationHref: "/settings/assets",
+      remediationLabel: "Review Payroll Assets",
       canRetry: false,
     };
   }
