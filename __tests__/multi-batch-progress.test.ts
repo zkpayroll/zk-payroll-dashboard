@@ -24,6 +24,16 @@ describe("summarizeMultiBatchProgress", () => {
     ]).status).toBe("failed");
   });
 
+  it("keeps a completed batch pending until every recipient settles", () => {
+    expect(summarizeMultiBatchProgress([
+      { batchId: "batch-1", status: "completed", completedItems: 9, totalItems: 10 },
+    ]).status).toBe("pending");
+
+    expect(summarizeMultiBatchProgress([
+      { batchId: "batch-1", status: "completed", completedItems: 10, totalItems: 10 },
+    ]).status).toBe("completed");
+  });
+
   it("handles an empty batch list without division by zero", () => {
     expect(summarizeMultiBatchProgress([])).toMatchObject({
       totalBatches: 0,
