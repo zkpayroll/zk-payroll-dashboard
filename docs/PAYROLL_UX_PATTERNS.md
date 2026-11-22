@@ -1088,3 +1088,42 @@ When a payroll run references an inactive or archived company, executing payouts
 
 - **Zero Compensation Leaks:** All guidance strings, titles, and recommended steps contain zero salary values, compensation commitments, dollar amounts, recipient identities, or wallet addresses.
 - **Privacy-Safe Serialization:** Logs and reports serialize only opaque run identifiers, attempt counters, outcome codes, and remediation links.
+
+---
+
+## Salary Commitment Version Recovery Flow (#899, #900, #962)
+
+**Goal:** Enable operators to inspect historical salary commitment versions for an employee and safely recover/restore a previous version (e.g. after a bad import, circuit mismatch, or rollbacked compensation adjustment), ensuring payroll correctness, operational clarity, and strict privacy preservation without exposing employee salary figures or private cryptographic inputs.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `lib/employees/salaryCommitmentVersionRecovery.ts` | Pure decision logic, version history reconstruction, validation rules, error codes, and privacy sanitization. |
+| `stores/employees.ts` | Zustand store actions (`recoverCommitmentVersion`, `confirmCommitmentReplacement`) and version-aware audit log entries. |
+| `components/features/employees/CommitmentVersionRecoveryDialog.tsx` | Confirmation dialog showing target/recovered version metadata, commitment hash previews, guidance, and privacy shield. |
+| `components/features/employees/EmployeeDetailPageContent.tsx` | Employee detail view surfacing version-aware Salary Commitment History table with status badges (`Active`, `Superseded`, `Restored`) and per-version recovery action buttons. |
+| `components/features/employees/EmployeeDetail.tsx` | Slide-over drawer surfacing version-aware history and status badges. |
+| `types/models.ts` | Public type definitions including `salaryCommitmentVersion` on `Employee`. |
+| `__tests__/salary-commitment-version-recovery.test.ts` | Domain unit tests for version derivation, recovery validation, boundary cases, and zero-leakage guarantees. |
+| `__tests__/components/CommitmentVersionRecoveryDialog.test.tsx` | Component tests for recovery review modal, validation errors, confirm actions, and privacy guarantees. |
+| `__tests__/employee-commitment-version-recovery-flow.test.tsx` | Integration tests for the full version recovery flow on the employee detail page. |
+
+### Expected Behavior & Version Lifecycle
+
+1. **Version History Reconstruction:**
+   - Every employee begins at **Version 1 (Active)** representing the baseline commitment hash established at onboarding.
+   - When a replacement is confirmed via `CommitmentReplacementDialog`, the existing version transitions to **Superseded** and a new monotonic version (e.g., **Version 2**) becomes **Active**.
+   - When a superseded version is recovered, the recovery evaluator validates the target version and generates a new active version (e.g., **Version 3 (Restored from v1)**), maintaining an immutable, append-only historical audit trail.
+
+2. **Recovery Validation Rules (`reviewCommitmentVersionRecovery`):**
+   - **`VERSION_ALREADY_ACTIVE`:** Blocks no-op recovery when the selected target version is currently active (`target.status === "active"` or commitment matches active hash).
+   - **`VERSION_NOT_FOUND`:** Rejects requests where the specified target version does not exist in the employee's history.
+   - **`COMMITMENT_EMPTY` / `COMMITMENT_MALFORMED`:** Rejects target versions containing empty or structurally invalid commitment hashes (less than minimum 8 characters).
+   - **`EMPLOYEE_NOT_FOUND`:** Rejects operations when the employee record is missing or unresolved.
+   - **Wallet Synchronization:** When a historical version had a distinct wallet address attached, the recovery review evaluates whether the wallet address also requires restoration and provides dual previews.
+
+3. **Privacy Guarantees:**
+   - **Zero Salary Leaks:** Raw salary figures and private blinding secrets are never passed to, handled by, or rendered in review objects or error states.
+   - **Truncated Previews:** All commitment hashes and Stellar addresses are displayed as truncated previews (e.g., `0x11111111…`).
+   - **Audit Provenance:** Recovery actions record the operator attribution, timestamp, target version reference, and privacy-safe explanation in `commitmentReplacementLog`.

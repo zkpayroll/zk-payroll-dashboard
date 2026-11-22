@@ -43,6 +43,8 @@ export interface Employee {
   offboardedAt?: string | null;
   /** Privacy-safe reason for the most recent lifecycle transition. */
   lifecycleNote?: string | null;
+  /** Currently active salary commitment version (starts at 1). */
+  salaryCommitmentVersion?: number;
 }
 
 export interface Company {
