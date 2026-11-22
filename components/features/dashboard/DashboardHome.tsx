@@ -25,6 +25,7 @@ import DashboardEmployeeEligibilityStatusCheck from "@/components/features/dashb
 import DashboardPayoutVarianceAnomalyDetection from "@/components/features/dashboard/DashboardPayoutVarianceAnomalyDetection";
 import DashboardOrganizationConfigChangeLedger from "@/components/features/dashboard/DashboardOrganizationConfigChangeLedger";
 import DashboardPayrollOperationsHealthCard from "@/components/features/dashboard/DashboardPayrollOperationsHealthCard";
+import TreasurySettlementSummaryCard from "@/components/features/dashboard/TreasurySettlementSummaryCard";
 import { MOCK_COMPANIES, MOCK_EMPLOYEES } from "@/lib/api/mockData";
 
 function DashboardHome() {
@@ -160,6 +161,9 @@ function DashboardHome() {
       </ErrorBoundary>
       <ErrorBoundary>
         <TreasuryLiquidityReserveCard />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <TreasurySettlementSummaryCard />
       </ErrorBoundary>
       <ErrorBoundary>
         <DashboardAssetAvailabilityCheck
