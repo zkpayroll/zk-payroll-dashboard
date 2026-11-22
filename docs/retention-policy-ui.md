@@ -47,7 +47,14 @@ The alert offers two buttons:
 
 - Changing the period does not delete existing audit records.
 - Immutable records and legal holds stay protected.
+- Records tied to pending or unverified payroll settlements stay protected from retention purge until on-chain settlement is finalized.
 - Reducing the period can make older records eligible for pruning later. Review compliance obligations before saving.
+
+## Settlement-pending purge safeguard
+
+- Dashboard retention purge controls in the archive center (`/archive`, `/archive/payroll-runs`, `/history/archived`) and `RetentionSafeguardPanel` check settlement finality before allowing any record deletion.
+- While any payroll run has a pending settlement (`pending`, `in_progress`, `awaiting_confirmation`, `unconfirmed`, `paused`, or `settlementPending: true`) or an unverified settlement state (`unknown`, `failed`, or missing), retention purge is disabled across the batch.
+- Safeguard banners and rejection messages report only aggregate counts, policy windows, and remediation links (`/payroll/reconciliation`, `/settings/payroll-policy`), never exposing employee identities, wallet addresses, or salary amounts.
 
 ## Related code
 
@@ -55,3 +62,6 @@ The alert offers two buttons:
 - `lib/payroll/retentionPeriodValidation.ts`: the shared range and message rules.
 - `lib/sdk/payrollPolicyCompiler.ts`: the compiler checks that block saving.
 - `stores/payrollPolicy.ts`: `updateAuditRetention` and `savePolicy`.
+- `src/audit/recordRetention.ts`: `evaluateAuditRetention` and `evaluateRetentionPurgeGuard` settlement-aware retention checks.
+- `stores/archive.ts`: `evaluateArchiveRetentionPurge` and `purgeExpiredRuns` store guard.
+- `components/features/archive/PayrollArchiveCenter.tsx`: archive retention purge safeguard UI.

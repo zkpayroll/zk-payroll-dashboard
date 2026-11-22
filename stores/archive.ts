@@ -1,5 +1,15 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { AuditRetentionPolicy } from "@/types/policy";
+import { usePayrollPolicyStore } from "@/stores/payrollPolicy";
+import {
+  classifyRecordSettlementState,
+  evaluateRetentionPurgeGuard,
+  type AuditRecordMeta,
+  type AuditSettlementState,
+  type RetentionPurgeBlockerCode,
+  type RetentionPurgeGuardResult,
+} from "@/src/audit/recordRetention";
 
 export type ArchivedRunStatus =
   | "archived"
@@ -9,6 +19,8 @@ export type ArchivedRunStatus =
   | "completed";
 
 export type AuditAvailability = "available" | "pending" | "unavailable";
+
+export type ArchiveSettlementStatus = AuditSettlementState;
 
 export interface ArchivedPayrollRun {
   id: string;
@@ -31,6 +43,49 @@ export interface ArchivedPayrollRun {
   archivedAt?: string;
   archivedBy?: string;
   notes?: string;
+  /** Settlement finality status checked before retention purge (#859). */
+  settlementStatus?: ArchiveSettlementStatus | (string & {}) | null;
+  /** Explicit hold when settlement confirmation is still in flight (#859). */
+  settlementPending?: boolean;
+}
+
+export interface ArchiveRetentionPurgeOptions {
+  policy?: AuditRetentionPolicy;
+  now?: number;
+}
+
+export interface ArchiveRetentionPurgeResult {
+  allowed: boolean;
+  blockerCode: RetentionPurgeBlockerCode | null;
+  purgedCount: number;
+  purgedRunIds: string[];
+  /** Actionable, privacy-safe operator message (never salary or employee data). */
+  reason: string;
+}
+
+export function toArchiveAuditRecordMeta(
+  run: ArchivedPayrollRun,
+): AuditRecordMeta {
+  return {
+    id: run.id,
+    createdAt: run.executedAt,
+    category: "archived_payroll_run",
+    // Non-archived or disputed runs must never be removed by archive retention purge.
+    immutable: !run.isArchived || run.isDisputed || run.status === "disputed",
+    settlementPending: run.settlementPending,
+    settlementStatus: run.settlementStatus ?? "unknown",
+  };
+}
+
+export function evaluateArchiveRetentionPurge(
+  runs: ArchivedPayrollRun[],
+  policy: AuditRetentionPolicy,
+  now: number = Date.now(),
+): RetentionPurgeGuardResult {
+  const records = runs.map(toArchiveAuditRecordMeta);
+  return evaluateRetentionPurgeGuard(records, policy, now, {
+    requireExplicitSettlementState: true,
+  });
 }
 
 export type ArchiveFilterStatus = "all" | ArchivedRunStatus;
@@ -58,6 +113,14 @@ export interface ArchiveStoreState {
   setSelectedRunId: (id: string | null) => void;
   archiveRun: (id: string) => boolean;
   unarchiveRun: (id: string) => void;
+  setRunSettlementStatus: (
+    id: string,
+    settlementStatus: ArchiveSettlementStatus | (string & {}) | null,
+    settlementPending?: boolean,
+  ) => void;
+  purgeExpiredRuns: (
+    options?: ArchiveRetentionPurgeOptions,
+  ) => ArchiveRetentionPurgeResult;
   getFilteredRuns: () => ArchivedPayrollRun[];
   resetFilters: () => void;
   setRuns: (runs: ArchivedPayrollRun[]) => void;
@@ -85,6 +148,8 @@ export const MOCK_ARCHIVED_RUNS: ArchivedPayrollRun[] = [
     archivedAt: "2025-02-01T10:00:00Z",
     archivedBy: "GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W37",
     notes: "January 2025 standard monthly payroll run.",
+    settlementStatus: "settled",
+    settlementPending: false,
   },
   {
     id: "arc_002",
@@ -106,6 +171,8 @@ export const MOCK_ARCHIVED_RUNS: ArchivedPayrollRun[] = [
     archivedAt: "2025-03-01T11:30:00Z",
     archivedBy: "GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W37",
     notes: "February 2025 verified settlement.",
+    settlementStatus: "settled",
+    settlementPending: false,
   },
   {
     id: "arc_003",
@@ -127,6 +194,8 @@ export const MOCK_ARCHIVED_RUNS: ArchivedPayrollRun[] = [
     archivedAt: "2026-07-03T08:15:00Z",
     archivedBy: "GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W37",
     notes: "Q3 2026 Multi-Asset Payroll Run finalized & archived.",
+    settlementStatus: "pending",
+    settlementPending: true,
   },
   {
     id: "arc_004",
@@ -145,6 +214,8 @@ export const MOCK_ARCHIVED_RUNS: ArchivedPayrollRun[] = [
     disputeReason: "Salary commitment mismatch under investigation by compliance team.",
     isArchived: false,
     notes: "Disputed run — flagged as unsafe to archive until resolution.",
+    settlementStatus: "settled",
+    settlementPending: false,
   },
   {
     id: "arc_005",
@@ -163,6 +234,8 @@ export const MOCK_ARCHIVED_RUNS: ArchivedPayrollRun[] = [
     isArchived: true,
     archivedAt: "2024-12-31T18:00:00Z",
     notes: "Legacy payroll record archived without ZK audit bundle.",
+    settlementStatus: "settled",
+    settlementPending: false,
   },
 ];
 
@@ -224,6 +297,63 @@ export const useArchiveStore = create<ArchiveStoreState>()(
               : r
           ),
         }));
+      },
+
+      setRunSettlementStatus: (id, settlementStatus, settlementPending) => {
+        const derivedPending =
+          settlementPending ??
+          classifyRecordSettlementState({ settlementStatus }, true) === "pending";
+        set((state) => ({
+          runs: state.runs.map((r) =>
+            r.id === id || r.payrollRunId === id
+              ? {
+                  ...r,
+                  settlementStatus,
+                  settlementPending: derivedPending,
+                }
+              : r
+          ),
+        }));
+      },
+
+      purgeExpiredRuns: (options) => {
+        const policy =
+          options?.policy ??
+          usePayrollPolicyStore.getState().policy.auditRetention;
+        const now = options?.now ?? Date.now();
+        const currentRuns = get().runs;
+        const guard = evaluateArchiveRetentionPurge(currentRuns, policy, now);
+
+        if (!guard.purgeAllowed) {
+          return {
+            allowed: false,
+            blockerCode: guard.blockerCode,
+            purgedCount: 0,
+            purgedRunIds: [],
+            reason: guard.primaryReason,
+          };
+        }
+
+        const purgeSet = new Set(guard.purgableRecordIds);
+        const remainingRuns = currentRuns.filter((run) => !purgeSet.has(run.id));
+        const currentSelected = get().selectedRunId;
+
+        set({
+          runs: remainingRuns,
+          selectedRunId:
+            currentSelected && purgeSet.has(currentSelected)
+              ? null
+              : currentSelected,
+        });
+
+        const purgedCount = guard.purgableRecordIds.length;
+        return {
+          allowed: true,
+          blockerCode: null,
+          purgedCount,
+          purgedRunIds: guard.purgableRecordIds,
+          reason: `Purged ${purgedCount} retention-expired payroll run${purgedCount === 1 ? "" : "s"} with finalized settlement.`,
+        };
       },
 
       getFilteredRuns: () => {
@@ -301,7 +431,11 @@ export const useArchiveStore = create<ArchiveStoreState>()(
 
       setRuns: (runs) => set({ runs }),
 
-      reset: () => set(initialState),
+      reset: () =>
+        set({
+          ...initialState,
+          runs: MOCK_ARCHIVED_RUNS.map((r) => ({ ...r })),
+        }),
     }),
     {
       name: "zk-payroll-archive-store",

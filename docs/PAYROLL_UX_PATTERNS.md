@@ -1127,3 +1127,40 @@ When a payroll run references an inactive or archived company, executing payouts
    - **Zero Salary Leaks:** Raw salary figures and private blinding secrets are never passed to, handled by, or rendered in review objects or error states.
    - **Truncated Previews:** All commitment hashes and Stellar addresses are displayed as truncated previews (e.g., `0x11111111…`).
    - **Audit Provenance:** Recovery actions record the operator attribution, timestamp, target version reference, and privacy-safe explanation in `commitmentReplacementLog`.
+
+---
+
+## Pending-Settlement Retention Purge Safeguard (#859)
+
+**Goal:** Disable retention purge in the dashboard layer whenever payroll settlement is pending or unverified so operators cannot prematurely prune commitments, receipts, or reconciliation context needed for active disbursements, while keeping all feedback strictly free of private employee or salary data.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `src/audit/recordRetention.ts` | Settlement finality classification (`classifyRecordSettlementState`), per-record hold in `evaluateAuditRetention`, and batch-level `evaluateRetentionPurgeGuard`. |
+| `components/audit/RetentionSafeguardPanel.tsx` | Audit safeguard panel displaying pending-settlement hold banners and disabling purge triggers until settlements finalize. |
+| `stores/archive.ts` | Settlement-aware `ArchivedPayrollRun` metadata, `evaluateArchiveRetentionPurge`, and fail-closed `purgeExpiredRuns` action. |
+| `components/features/archive/PayrollArchiveCenter.tsx` | Archive center Retention Purge Safeguard region, disabled purge button with actionable remediation links, and per-run settlement finality badges. |
+| `app/archive/page.tsx` | Canonical `/archive` dashboard route rendering `PayrollArchiveCenter`. |
+| `__tests__/retention-purge-pending-settlement.test.tsx` | Focused tests covering settled purge success, pending/unverified settlement rejection, exact cutoff boundaries, and privacy invariants. |
+
+### Safeguard Outcomes
+
+1. **`SETTLEMENT_PENDING` (Blocked):**
+   - Triggered when one or more runs carry `settlementPending: true` or an in-flight status (`pending`, `in_progress`, `submitting`, `executing`, `awaiting_confirmation`, `unconfirmed`, `paused`).
+   - Disables the purge button and directs operators to `/payroll/reconciliation` to verify on-chain settlement finality.
+
+2. **`SETTLEMENT_UNVERIFIED` (Blocked, Fail-Closed):**
+   - Triggered when a record's settlement state is missing, empty, `unknown`, `failed`, or unrecognized.
+   - Fails closed without echoing raw unrecognized strings into the UI.
+
+3. **`IMMUTABLE_AUDIT_LOG` / `INVALID_POLICY` / `NO_EXPIRED_RECORDS` (Blocked):**
+   - Preserves existing append-only log, 30–3650 day policy validation, dispute holds, and retention window protections.
+
+4. **Eligible Purge (`purgeAllowed: true`):**
+   - Enabled only when policy validation passes, `immutableAuditLog` is `false`, zero runs have pending or unverified settlements, and at least one archived non-disputed run has aged past `retentionPeriodDays`.
+
+### Privacy Guarantees
+
+- **Zero Compensation or Identity Exposure:** Rejection reasons, safeguard banners, and toast notifications never include employee names, salary figures, disbursement totals, wallet addresses, or raw input strings.
