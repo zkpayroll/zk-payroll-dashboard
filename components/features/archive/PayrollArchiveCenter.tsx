@@ -358,6 +358,16 @@ export default function PayrollArchiveCenter({
       </div>
 
       {/* Retention Purge Safeguard (#859) */}
+      <div
+        role="note"
+        data-testid="archive-retention-migration-guidance"
+        className="rounded-lg border border-indigo-100 bg-indigo-50/70 px-4 py-3 text-xs leading-relaxed text-indigo-950"
+      >
+        <p className="font-semibold">How retention policy changes affect archived runs</p>
+        <p className="mt-1">
+          The current policy retains records for {effectivePolicy.retentionPeriodDays} days. If the retention period changes, expiration is recalculated from each run’s execution date; shortening it can make older archived runs eligible for purge, while extending it can keep them longer. A policy change does not delete records by itself. Purging remains a separate action and is blocked when settlement is pending or unverified, or when policy safeguards prevent removal.
+        </p>
+      </div>
       <section
         aria-labelledby="archive-retention-purge-heading"
         data-testid="archive-retention-purge-bar"
