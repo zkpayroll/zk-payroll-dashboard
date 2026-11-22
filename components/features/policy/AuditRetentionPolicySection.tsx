@@ -3,6 +3,10 @@
 import React, { useState } from "react";
 import { Archive, AlertCircle, AlertTriangle, Info } from "lucide-react";
 import type { AuditRetentionPolicy, PolicyValidationIssue } from "@/types/policy";
+import {
+  RETENTION_PERIOD_RECOMMENDED_DAYS,
+  validateRetentionPeriodDays,
+} from "@/lib/payroll/retentionPeriodValidation";
 
 interface AuditRetentionPolicySectionProps {
   auditRetention: AuditRetentionPolicy;
@@ -20,14 +24,13 @@ export function AuditRetentionPolicySection({
 
   const presets = [90, 180, 365, 730, 2555];
   const [lastValidDays, setLastValidDays] = useState(
-    Number.isInteger(auditRetention.retentionPeriodDays) &&
-    auditRetention.retentionPeriodDays >= 30 && auditRetention.retentionPeriodDays <= 3650
-      ? auditRetention.retentionPeriodDays : 365,
+    validateRetentionPeriodDays(auditRetention.retentionPeriodDays).valid
+      ? auditRetention.retentionPeriodDays : RETENTION_PERIOD_RECOMMENDED_DAYS,
   );
-  const validDays = Number.isInteger(auditRetention.retentionPeriodDays) &&
-    auditRetention.retentionPeriodDays >= 30 && auditRetention.retentionPeriodDays <= 3650;
+  const retentionCheck = validateRetentionPeriodDays(auditRetention.retentionPeriodDays);
+  const validDays = retentionCheck.valid;
   const updateDays = (days: number) => {
-    if (Number.isInteger(days) && days >= 30 && days <= 3650) setLastValidDays(days);
+    if (validateRetentionPeriodDays(days).valid) setLastValidDays(days);
     onChange({ retentionPeriodDays: days });
   };
 
@@ -116,11 +119,12 @@ export function AuditRetentionPolicySection({
           {!validDays && (
             <div role="alert" className="mt-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
               <p>Enter a whole number between 30 and 3650 days before saving. No policy change has been confirmed.</p>
+              {!retentionCheck.valid && <p className="mt-1">{retentionCheck.reason}</p>}
               <button type="button" onClick={() => updateDays(lastValidDays)} className="mt-2 rounded border border-red-300 bg-white px-3 py-1 font-semibold">
                 Restore last valid value ({lastValidDays} days)
               </button>
-              <button type="button" onClick={() => updateDays(365)} className="ml-2 rounded border border-red-300 bg-white px-3 py-1 font-semibold">
-                Use recommended 365 days
+              <button type="button" onClick={() => updateDays(RETENTION_PERIOD_RECOMMENDED_DAYS)} className="ml-2 rounded border border-red-300 bg-white px-3 py-1 font-semibold">
+                Use recommended {RETENTION_PERIOD_RECOMMENDED_DAYS} days
               </button>
             </div>
           )}
