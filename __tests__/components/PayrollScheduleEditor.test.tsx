@@ -120,6 +120,37 @@ describe("PayrollScheduleEditor", () => {
     expect(screen.getByText("2025-02-10 → 2025-02-10")).toBeInTheDocument();
   });
 
+  it("explains inclusive boundaries and rejects windows sharing an end date", () => {
+    render(
+      <PayrollScheduleEditor
+        templates={[ACTIVE_TEMPLATE]}
+        locks={[]}
+        runs={[]}
+        initialViewDate={new Date(Date.UTC(2025, 0, 1))}
+      />,
+    );
+
+    expect(screen.getByText(/start and end dates are inclusive calendar days/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/window start/i)).toHaveAttribute(
+      "aria-describedby",
+      "payroll-window-guidance",
+    );
+
+    fireEvent.change(screen.getByLabelText(/window start/i), { target: { value: "2025-02-01" } });
+    fireEvent.change(screen.getByLabelText(/window end/i), { target: { value: "2025-02-10" } });
+    fireEvent.click(screen.getByRole("button", { name: /save draft window/i }));
+
+    fireEvent.change(screen.getByLabelText(/window start/i), { target: { value: "2025-02-10" } });
+    fireEvent.change(screen.getByLabelText(/window end/i), { target: { value: "2025-02-15" } });
+    fireEvent.click(screen.getByRole("button", { name: /save draft window/i }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/overlaps with/i);
+    expect(screen.getByLabelText(/window start/i)).toHaveAttribute(
+      "aria-describedby",
+      "payroll-window-guidance payroll-window-error",
+    );
+  });
+
   it("rejects a draft window where start is after end", () => {
     render(
       <PayrollScheduleEditor
