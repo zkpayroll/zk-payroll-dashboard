@@ -533,9 +533,148 @@ describe("Treasury Reservations Component Suite (#890)", () => {
       expect(screen.getAllByText(/Available [Bb]alance/).length).toBeGreaterThan(0);
 
       // Reservation subcomponents mounted
+      expect(screen.getByTestId("treasury-reservation-guidance-card")).toBeInTheDocument();
       expect(screen.getByText("No funding reservations found")).toBeInTheDocument();
       expect(screen.getByText("Funding Reservation Timeline")).toBeInTheDocument();
       expect(screen.getByTestId("reserve-funds-button")).toBeInTheDocument();
+    });
+  });
+
+  describe("11. Structured Reservation Guidance & Security Hardening (#887)", () => {
+    it("transitions guidance card across empty, healthy, warning, and locked-expired states", () => {
+      const { rerender } = render(<TreasuryView configuredAssets={[{ code: "USDC" }]} />);
+      const card = () => screen.getByTestId("treasury-reservation-guidance-card");
+
+      expect(card()).toHaveAttribute("data-reason", "NO_ACTIVE_RESERVATIONS");
+      expect(card()).toHaveAttribute("data-tone", "info");
+      expect(screen.getByTestId("treasury-reservation-action-guides")).toBeInTheDocument();
+
+      // Active healthy reservation
+      act(() => {
+        useReservationsStore.getState().setReservations([
+          makeReservation({
+            id: "res_h",
+            batchId: "BATCH-H1",
+            amount: "15,000.00",
+            expiresAt: new Date(Date.now() + 25 * MINUTE).toISOString(),
+          }),
+        ]);
+      });
+      rerender(<TreasuryView configuredAssets={[{ code: "USDC" }]} />);
+      expect(card()).toHaveAttribute("data-reason", "RESERVATIONS_HEALTHY");
+      expect(card()).toHaveAttribute("data-tone", "ready");
+      expect(screen.getByTestId("reservation-item-guidance-res_h")).toHaveTextContent(
+        /ready for payroll settlement/i,
+      );
+
+      // Entering warning window
+      act(() => {
+        useReservationsStore.getState().setReservations([
+          makeReservation({
+            id: "res_w",
+            batchId: "BATCH-W1",
+            amount: "15,000.00",
+            expiresAt: new Date(Date.now() + 2 * MINUTE).toISOString(),
+          }),
+        ]);
+      });
+      rerender(<TreasuryView configuredAssets={[{ code: "USDC" }]} />);
+      expect(card()).toHaveAttribute("data-reason", "RESERVATION_EXPIRING_SOON");
+      expect(card()).toHaveAttribute("data-tone", "warning");
+      expect(screen.getByTestId("expiring-soon-guidance-banner")).toBeInTheDocument();
+
+      // Expired and locked (canRefresh: false, canRevalidate: false)
+      act(() => {
+        useReservationsStore.getState().setReservations([
+          makeReservation({
+            id: "res_l",
+            batchId: "BATCH-L1",
+            amount: "15,000.00",
+            expiresAt: new Date(Date.now() - MINUTE).toISOString(),
+            canRefresh: false,
+            canRevalidate: false,
+            canCancel: true,
+          }),
+        ]);
+      });
+      rerender(<TreasuryView configuredAssets={[{ code: "USDC" }]} />);
+      expect(card()).toHaveAttribute("data-reason", "RESERVATION_EXPIRED_LOCKED");
+      expect(card()).toHaveAttribute("data-tone", "blocked");
+      expect(screen.getByTestId("locked-expired-guidance")).toBeInTheDocument();
+      expect(screen.getByTestId("reservation-item-guidance-res_l")).toHaveTextContent(
+        /Cancel to free the slot/i,
+      );
+    });
+
+    it("blocks cumulative over-reservation when repeated clicks exhaust unreserved liquidity", () => {
+      render(<TreasuryView configuredAssets={[{ code: "USDC" }]} />);
+      const amountInput = screen.getByTestId("reservation-amount-input");
+      const reserveBtn = screen.getByTestId("reserve-funds-button");
+
+      // Default balance is 45,000 USDC, remaining after projected is 25,500 USDC
+      fireEvent.change(amountInput, { target: { value: "20000" } });
+      fireEvent.click(reserveBtn);
+      fireEvent.click(reserveBtn);
+      expect(useReservationsStore.getState().reservations).toHaveLength(2);
+      expect(screen.queryByTestId("reservation-error-alert")).not.toBeInTheDocument();
+
+      // 3rd lock of 20,000 exceeds remaining 5,000 USDC unreserved liquidity
+      fireEvent.click(reserveBtn);
+      expect(useReservationsStore.getState().reservations).toHaveLength(2);
+      const alert = screen.getByTestId("reservation-error-alert");
+      expect(alert).toHaveTextContent(
+        /existing active reservations leave insufficient unreserved liquidity for an additional 20,000 USDC lock/i,
+      );
+    });
+
+    it("surfaces asset configuration guidance when reserving without configured assets", () => {
+      render(<TreasuryView configuredAssets={[]} />);
+      fireEvent.click(screen.getByTestId("reserve-funds-button"));
+      expect(screen.getByTestId("reservation-error-alert")).toHaveTextContent(
+        /configure at least one supported Stellar payroll asset/i,
+      );
+      expect(useReservationsStore.getState().reservations).toHaveLength(0);
+    });
+
+    it("fails closed on malformed timestamps, corrupt amounts, and null prop entries while sanitizing DOM/title attributes", () => {
+      const syntheticPub = "G" + "A".repeat(55);
+      const { container } = render(
+        <TreasuryView
+          configuredAssets={[{ code: "USDC" }]}
+          initialReservations={[
+            null as unknown as FundingReservation,
+            makeReservation({
+              id: "res_bad_1",
+              batchId: `BATCH_${syntheticPub}_emp_77`,
+              amount: "-500",
+              expiresAt: "invalid-iso-date",
+            }),
+          ]}
+          initialTimelineEvents={mockTimelineEvents}
+        />,
+      );
+
+      expect(screen.getByTestId("corrupt-reservations-alert")).toBeInTheDocument();
+      expect(screen.getByTestId("countdown-res_bad_1")).toHaveTextContent("Expired");
+      expect(screen.getByTestId("countdown-res_bad_1")).not.toHaveTextContent(/NaN/i);
+      expect(screen.getByText("Invalid amount")).toBeInTheDocument();
+      expect(screen.getByTestId("treasury-reservation-guidance-card")).toHaveAttribute(
+        "data-reason",
+        "INVALID_TREASURY_DATA",
+      );
+
+      // Deep privacy check across rendered HTML, attributes, and localStorage
+      expect(container.innerHTML).not.toContain(syntheticPub);
+      expect(container.innerHTML).not.toContain("emp_77");
+      const titleEls = container.querySelectorAll("[title]");
+      titleEls.forEach((el) => {
+        const titleVal = el.getAttribute("title") || "";
+        expect(titleVal).not.toContain(syntheticPub);
+        expect(titleVal).not.toContain("emp_77");
+      });
+      const serializedStorage = JSON.stringify(window.localStorage);
+      expect(serializedStorage).not.toContain(syntheticPub);
+      expect(serializedStorage).not.toContain("emp_77");
     });
   });
 });

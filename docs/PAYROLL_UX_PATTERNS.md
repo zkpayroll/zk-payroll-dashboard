@@ -1164,3 +1164,24 @@ When a payroll run references an inactive or archived company, executing payouts
 ### Privacy Guarantees
 
 - **Zero Compensation or Identity Exposure:** Rejection reasons, safeguard banners, and toast notifications never include employee names, salary figures, disbursement totals, wallet addresses, or raw input strings.
+
+---
+
+## Treasury Reservation Guidance (#887)
+
+**Goal:** Provide operators with deterministic, privacy-safe guidance across every treasury reservation lifecycle state (unconfigured assets, malformed data, insufficient balance, cumulative over-reservation, locked/recoverable expired holds, 5-minute expiry warning window, tight capacity, setup guidance, and active coverage) without exposing employee or salary data.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `types/treasury.ts` | Public reservation guidance domain types re-exported through `types/index.ts`. |
+| `lib/treasury/reservationGuidance.ts` | Pure 7-decimal `BigInt` evaluator (`evaluateTreasuryReservationGuidance`), per-lock helper (`describeSingleReservationGuidance`), and bounded $O(n)$ PII sanitizer (`sanitizeReservationIdentifier`). |
+| `src/treasury/reservationGuidance.ts` | Domain module re-export matching repository conventions. |
+| `components/features/treasury/TreasuryReservationGuidanceCard.tsx` | Accessible guidance card surfacing status badges, aggregate lock metrics, ordered next steps, controls reference, and remediation links. |
+| `components/features/treasury/ReservationExpiryWarning.tsx` | Hardened expiry list with warning banner, locked-expired fallback copy, per-item guidance, corrupt-entry fail-closed alerts, and sanitized `title`/text fields. |
+| `components/features/treasury/TreasuryView.tsx` | Integrates `TreasuryReservationGuidanceCard` and cumulative `BigInt` over-reservation protection alongside reservation amount validation. |
+| `docs/TREASURY_RESERVATIONS.md` | Detailed architecture table, reason code matrix, and security invariants. |
+| `__tests__/treasury-reservation-guidance.test.ts` | Unit tests covering all 10 reason codes, `BigInt` precision, fail-closed timestamps, and ReDoS/PII sanitization. |
+| `__tests__/components/TreasuryReservationGuidanceCard.test.tsx` | Isolated component unit tests covering tone roles, store isolation, override props, and remediation links. |
+| `__tests__/treasury-reservations.test.tsx` | End-to-end `TreasuryView` and `TreasuryPage` integration and privacy tests. |

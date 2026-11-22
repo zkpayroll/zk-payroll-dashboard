@@ -10,10 +10,16 @@ import TreasuryReadinessChecklist from "./TreasuryReadinessChecklist";
 import TreasuryDrainWarning from "./TreasuryDrainWarning";
 import FundingImbalanceDashboard from "./FundingImbalanceDashboard";
 import ReservationExpiryWarning from "./ReservationExpiryWarning";
+import TreasuryReservationGuidanceCard from "./TreasuryReservationGuidanceCard";
 import ReservationToastListener from "./ReservationToastListener";
 import AssetReadinessTable from "./AssetReadinessTable";
 import TreasuryReplenishmentReadinessCard from "./TreasuryReplenishmentReadinessCard";
 import { createFundingReservation, type FundingReservationEvent } from "@/lib/events/reservationEvents";
+import {
+  evaluateTreasuryReservationGuidance,
+  formatReservationUnits,
+  parseReservationAmountUnits,
+} from "@/lib/treasury/reservationGuidance";
 import PartialReleaseFailureAlert from "./PartialReleaseFailureAlert";
 import type { PartialReleaseFailure } from "@/lib/treasury/partialRelease";
 import SupportedAssetsEmptyState from "@/components/features/assets/SupportedAssetsEmptyState";
@@ -40,6 +46,8 @@ function TreasuryView({
   const [toastVisible, setToastVisible] = useState(false);
   const [reservationError, setReservationError] = useState<string | null>(null);
   const [reservationAmount, setReservationAmount] = useState("15000.00");
+  const storeReservations = useReservationsStore((s) => s.reservations);
+  const activeReservations = initialReservations ?? storeReservations;
 
   // Demo wiring: if no assets passed, treat treasury address presence as "configured"
   // When MOCK_COMPANIES has treasury but assets list is empty, show empty state for QA.
@@ -66,7 +74,7 @@ function TreasuryView({
       Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-7
     ) {
       setReservationError(
-        "Enter a valid reservation amount greater than zero, with no more than two decimal places.",
+        "Enter a valid reservation amount greater than zero. Use no more than two decimal places.",
       );
       return;
     }
@@ -74,6 +82,48 @@ function TreasuryView({
       setReservationError(
         "Reservation exceeds funds available after projected payroll obligations. Reduce the amount or fund the treasury before reserving.",
       );
+      return;
+    }
+    const requestedAmountText = amount.toFixed(2);
+    const currentReservations =
+      initialReservations ?? useReservationsStore.getState().reservations;
+    const precheckGuidance = evaluateTreasuryReservationGuidance({
+      reservations: currentReservations,
+      availableBalance: balance,
+      projectedPayroll,
+      assetCode: "USDC",
+      hasConfiguredAssets: !assetsMissing,
+      newReservationAmount: requestedAmountText,
+    });
+    if (!precheckGuidance.canCreateReservation) {
+      const parsedRequest = parseReservationAmountUnits(requestedAmountText);
+      const formattedRequest = parsedRequest.ok
+        ? formatReservationUnits(parsedRequest.units)
+        : requestedAmountText;
+      if (precheckGuidance.reasonCode === "ASSETS_UNCONFIGURED") {
+        setReservationError(
+          "Cannot create treasury reservation: configure at least one supported Stellar payroll asset in Asset Settings before reserving.",
+        );
+      } else if (precheckGuidance.reasonCode === "INVALID_TREASURY_DATA") {
+        setReservationError(
+          "Cannot create treasury reservation: treasury balance or existing reservation data is invalid and fails closed. Refresh balances or clear malformed locks first.",
+        );
+      } else if (precheckGuidance.reasonCode === "OVER_RESERVATION_BLOCKED") {
+        setReservationError(
+          "Cannot create treasury reservation: existing active reservations already exceed available treasury liquidity. Cancel stale reservations or add funds before reserving.",
+        );
+      } else if (
+        precheckGuidance.counts.healthy + precheckGuidance.counts.warning >
+        0
+      ) {
+        setReservationError(
+          `Cannot create treasury reservation: existing active reservations leave insufficient unreserved liquidity for an additional ${formattedRequest} USDC lock. Release or cancel stale reservations, or add funds before reserving.`,
+        );
+      } else {
+        setReservationError(
+          `Cannot create treasury reservation: available unreserved balance cannot cover a ${formattedRequest} USDC lock. Reduce the amount or add funds before reserving.`,
+        );
+      }
       return;
     }
     setReservationError(null);
@@ -230,6 +280,15 @@ function TreasuryView({
       <FundingImbalanceDashboard />
 
       <TreasuryReadinessChecklist />
+
+      <TreasuryReservationGuidanceCard
+        reservations={activeReservations}
+        availableBalance={balance}
+        projectedPayroll={projectedPayroll}
+        newReservationAmount={reservationAmount}
+        assetCode="USDC"
+        hasConfiguredAssets={!assetsMissing}
+      />
 
       <ReservationExpiryWarning reservations={initialReservations} />
 
