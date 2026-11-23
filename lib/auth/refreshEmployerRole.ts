@@ -88,13 +88,21 @@ export type SubmissionRoleCheck =
 /**
  * Turns a refresh result into a go/no-go for submission. A role that cannot be
  * confirmed never counts as allowed: failing closed is the point of the check.
+ *
+ * When the role has changed since the page loaded, the message tells the user
+ * to reload so the UI reflects their current permissions. No role names from
+ * the server are echoed beyond the typed UserRole value.
  */
 export function checkRoleForSubmission(
   refresh: EmployerRoleRefresh,
   previousRole?: UserRole | null,
 ): SubmissionRoleCheck {
   if (refresh.status === "fresh") {
-    return { ok: true, role: refresh.role, changed: previousRole != null && previousRole !== refresh.role };
+    return {
+      ok: true,
+      role: refresh.role,
+      changed: previousRole != null && previousRole !== refresh.role,
+    };
   }
 
   if (refresh.status === "session_invalid") {

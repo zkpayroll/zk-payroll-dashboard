@@ -19,3 +19,23 @@ is read from the response; nothing else in the body is stored or shown.
 The decision is recorded in the retry decision log with the reason code
 `role_refresh_failed` (or `permission_denied` when the fresh role lacks
 `create:payroll`).
+
+## Guidance shown to the employer
+
+When the role changes or the submission is blocked, the form shows one of the
+following messages. Messages name the action to take and never include salary,
+employee, or other payroll data.
+
+- **Role changed:** "Your role was updated to <role> since this page loaded.
+  Review the form and submit again." Shown only when the fresh role differs
+  from the displayed role.
+- **Permission denied:** "Your current role (<role>) cannot create payroll.
+  Ask an administrator to grant create access, then try again."
+- **Session invalid:** "Your session is no longer valid. Sign in again to
+  continue. Nothing was submitted."
+- **Unavailable:** "We could not confirm your role right now. Nothing was
+  submitted. Try again in a moment."
+
+For `unavailable`, the retry button stays enabled. For `session_invalid`, it is
+replaced by a sign-in link. Error text does not echo the response body, the
+request payload, or any employee or amount values.
