@@ -21,6 +21,12 @@ export interface ProofReferenceInputProps {
  * so copy/paste from explorers or logs doesn't trip false negatives.
  * Guidance on what a valid reference looks like and how to recover from an
  * error is always visible; error messages never echo the entered value.
+ *
+ * When the entered value is not a supported proof format, the error message
+ * explains which formats are accepted and how to correct the reference. The
+ * message is generic and never includes the raw input, so private payroll
+ * identifiers are not surfaced in the UI or in announcements to assistive
+ * technology.
  */
 export function ProofReferenceInput({
   value,
@@ -40,6 +46,10 @@ export function ProofReferenceInput({
     onChange(next);
     onValidityChange?.(validateProofReference(next).isValid);
   };
+
+  const errorText = showError
+    ? `${validation.message} Supported format: ${PROOF_REFERENCE_GUIDANCE}`
+    : null;
 
   return (
     <div className="space-y-1.5">
@@ -81,10 +91,10 @@ export function ProofReferenceInput({
         {PROOF_REFERENCE_GUIDANCE}
       </p>
 
-      {showError && (
+      {showError && errorText && (
         <p id={errorId} role="alert" className="flex items-center gap-1 text-xs text-red-600">
           <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-          {validation.message}
+          {errorText}
         </p>
       )}
     </div>
