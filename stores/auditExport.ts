@@ -108,6 +108,7 @@ interface AuditExportStore {
   includeMetadata: boolean;
   dateRangeStart: string;
   dateRangeEnd: string;
+  searchQuery: string;
 
   /**
    * Search/filter state.
