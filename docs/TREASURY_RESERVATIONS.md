@@ -76,7 +76,7 @@ with `npm test -- treasury-reservations`.
 
 This document describes the treasury reservation component architecture, guidance evaluation model, user flows, lifecycle events, operational recovery mechanisms, and zero-knowledge privacy protections.
 
-Issues: #887, #890
+Issues: #887, #889, #890
 
 ## Architecture Overview
 
@@ -94,6 +94,8 @@ Treasury reservations guarantee that funds earmarked for approved payroll runs a
 | Reservation Timeline | `components/features/treasury/ReservationTimeline.tsx` |
 | Toast Announcements | `components/features/treasury/ReservationToastListener.tsx` |
 | Reservations Store | `stores/reservations.ts` |
+| Recovery Planner & Runner | `lib/treasury/reservationRecovery.ts` |
+| Recovery Flow Tests | `__tests__/treasury-reservation-recovery.test.tsx` |
 | Event Emitters & Log | `lib/events/reservationEvents.ts` |
 | Guidance Unit Tests | `__tests__/treasury-reservation-guidance.test.ts` |
 | Guidance Card Tests | `__tests__/components/TreasuryReservationGuidanceCard.test.tsx` |
@@ -155,6 +157,82 @@ Reservations transition across well-defined states based on time-to-live (`RESER
 5. **Cancel**
    - Removes the reservation from active tracking (`cancelReservation(id)`).
    - If no reservations remain, returns to the empty state guidance banner.
+
+## Recovery Flow (`#889`)
+
+`lib/treasury/reservationRecovery.ts` decides what an operator should do to
+unblock each reservation and reports the outcome of every recovery attempt.
+
+### Recovery plan
+
+`getReservationRecoveryPlan(reservation, now)` returns the reservation status,
+whether it blocks execution, each action's availability (with an actionable
+`disabledReason`), and one recommendation:
+
+| Situation | Recommendation |
+| --- | --- |
+| Healthy lock | `none` |
+| Expiring or expired, Refresh allowed | `refresh` |
+| Expiring or expired, only Revalidate allowed | `revalidate` |
+| Expiring soon, no renewal allowed | `execute` (run payroll before expiry) |
+| Expired, no renewal allowed, Cancel allowed | `cancel` |
+| Expired, every action disabled | `escalate` (treasury administrator) |
+
+Fail-closed rules:
+
+- Malformed amount, asset, or timestamp counts as expired and blocks execution.
+- Refresh and Revalidate are **never** offered for a corrupt amount or asset.
+  Renewing would revive an unusable lock, so the operator is steered to Cancel.
+- A timestamp-only defect can still be repaired with Refresh or Revalidate.
+- Permission flags must be exactly `true`; any other value counts as disabled.
+
+`summarizeReservationRecovery(reservations, now)` returns how many locks block
+execution, how many can be recovered from this screen, and how many need an
+administrator. The expired banner shows this as recovery progress.
+
+### Action results
+
+Store actions (`refreshReservation`, `revalidateReservation`,
+`cancelReservation`) return a `ReservationActionResult` instead of silently
+doing nothing:
+
+```ts
+type ReservationActionResult =
+  | { ok: true; action; reservationId }
+  | { ok: false; action; reason: "invalid_id" | "not_found" | "not_permitted" | "invalid_data" };
+```
+
+`runReservationRecoveryAction(action, id)` is the UI entry point. It adds the
+`invalid_data` guard and records successful actions on the reservation
+timeline. Timeline entries contain no amounts.
+
+### Operator messages
+
+`describeReservationActionResult(result)` produces the message shown in the
+`reservation-recovery-outcome` live region (`role="status"` on success,
+`role="alert"` on failure):
+
+| Outcome | Message |
+| --- | --- |
+| Refresh succeeded | Reservation refreshed. A new 15-minute execution window is active. |
+| Revalidate succeeded | Reservation revalidated. Its reservation window was re-anchored to now for 15 minutes. |
+| Cancel succeeded | Reservation cancelled and its hold released. Create a new reservation before executing payroll. |
+| `invalid_id` | … has no valid identifier. Reload treasury state, then retry. |
+| `not_found` | … is no longer tracked in this session … Reload treasury state, then retry. |
+| `not_permitted` | … is not permitted for this reservation. Use another available recovery action or contact a treasury administrator. |
+| `invalid_data` | … has an invalid amount or asset and cannot be renewed. Cancel it and create a new reservation. |
+
+Messages name the action and the next step only. They never include amounts,
+batch identifiers, employee data, or wallet addresses.
+
+### UI behavior (`ReservationExpiryWarning`)
+
+- The recommended action is highlighted (`data-recommended="true"`), and each
+  action group exposes `data-recommendation`.
+- Disabled actions are explained under the buttons and linked through
+  `aria-describedby`.
+- Each attempt is reported in the live outcome region and through the optional
+  `onRecoveryAction(result)` callback.
 
 ## Zero-Knowledge & Privacy Preservation
 

@@ -17,6 +17,16 @@ import {
   type ReservationStatus,
 } from "@/stores/reservations";
 import {
+  RESERVATION_RECOVERY_ACTIONS,
+  RESERVATION_RECOVERY_ACTION_LABELS,
+  describeReservationActionResult,
+  getReservationRecoveryPlan,
+  runReservationRecoveryAction,
+  type ReservationActionMessage,
+  type ReservationActionResult,
+  type ReservationRecoveryAction,
+} from "@/lib/treasury/reservationRecovery";
+import {
   deduplicateInputReservations,
   describeSingleReservationGuidance,
   parseReservationAmountUnits,
@@ -29,7 +39,15 @@ interface ReservationExpiryWarningProps {
   /** Optional clock override for deterministic rendering and single-clock coordination. */
   now?: number;
   className?: string;
+  /** Called after every Refresh / Revalidate / Cancel attempt with its outcome. */
+  onRecoveryAction?: (result: ReservationActionResult) => void;
 }
+
+const ACTION_ICONS: Record<ReservationRecoveryAction, typeof RefreshCw> = {
+  refresh: RefreshCw,
+  revalidate: RotateCcw,
+  cancel: XCircle,
+};
 
 const STATUS_STYLES: Record<
   ReservationStatus,
@@ -84,13 +102,35 @@ export function ReservationExpiryWarning({
   reservations,
   now: nowOverride,
   className = "",
+  onRecoveryAction,
 }: ReservationExpiryWarningProps) {
   const storeReservations = useReservationsStore((s) => s.reservations);
-  const refreshReservation = useReservationsStore((s) => s.refreshReservation);
-  const revalidateReservation = useReservationsStore(
-    (s) => s.revalidateReservation,
-  );
-  const cancelReservation = useReservationsStore((s) => s.cancelReservation);
+  const [outcome, setOutcome] = useState<ReservationActionMessage | null>(null);
+
+  const handleRecoveryAction = (
+    action: ReservationRecoveryAction,
+    reservationId: string,
+  ) => {
+    const result = runReservationRecoveryAction(action, reservationId);
+    setOutcome(describeReservationActionResult(result));
+    onRecoveryAction?.(result);
+  };
+
+  const outcomeRegion = outcome ? (
+    <p
+      role={outcome.tone === "error" ? "alert" : "status"}
+      aria-live="polite"
+      data-testid="reservation-recovery-outcome"
+      data-tone={outcome.tone}
+      className={`rounded-md border px-3 py-2 text-sm ${
+        outcome.tone === "error"
+          ? "border-red-200 bg-red-50 text-red-800"
+          : "border-emerald-200 bg-emerald-50 text-emerald-800"
+      }`}
+    >
+      {outcome.message}
+    </p>
+  ) : null;
 
   const rawItems = reservations ?? storeReservations;
   const { items, corruptEntries } = deduplicateInputReservations(rawItems);
@@ -111,8 +151,10 @@ export function ReservationExpiryWarning({
 
   if (items.length === 0 && corruptEntries === 0) {
     return (
+      <div className={`space-y-3 ${className}`}>
+      {outcomeRegion}
       <div
-        className={`rounded-lg border border-emerald-200 bg-emerald-50 p-4 ${className}`}
+        className="rounded-lg border border-emerald-200 bg-emerald-50 p-4"
         role="status"
       >
         <div className="flex items-center gap-3">
@@ -131,6 +173,7 @@ export function ReservationExpiryWarning({
           </div>
         </div>
       </div>
+      </div>
     );
   }
 
@@ -145,8 +188,14 @@ export function ReservationExpiryWarning({
     const remaining = itemGuidance.hasCorruptData
       ? 0
       : getTimeRemaining(reservation, effectiveNow);
-    return { reservation, itemGuidance, status, remaining };
+    const plan = getReservationRecoveryPlan(reservation, effectiveNow);
+    return { reservation, itemGuidance, status, remaining, plan };
   });
+
+  const blockingCount = evaluatedItems.filter((e) => e.plan.blocksExecution).length;
+  const adminCount = evaluatedItems.filter(
+    (e) => e.plan.blocksExecution && e.plan.requiresAdministrator,
+  ).length;
 
   const hasExpired = evaluatedItems.some((entry) => entry.status === "expired");
   const hasLockedExpired = evaluatedItems.some(
@@ -161,6 +210,7 @@ export function ReservationExpiryWarning({
 
   return (
     <div className={`space-y-4 ${className}`}>
+      {outcomeRegion}
       {corruptEntries > 0 && (
         <div
           role="alert"
@@ -217,6 +267,19 @@ export function ReservationExpiryWarning({
                   administrator.
                 </p>
               )}
+              {blockingCount > 0 && (
+                <p
+                  data-testid="reservation-recovery-progress"
+                  className="text-xs mt-1.5 text-red-800"
+                >
+                  {blockingCount} {blockingCount === 1 ? "reservation blocks" : "reservations block"}{" "}
+                  execution: {blockingCount - adminCount} can be recovered here
+                  {adminCount > 0
+                    ? `, ${adminCount} ${adminCount === 1 ? "needs" : "need"} a treasury administrator`
+                    : ""}
+                  .
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -250,7 +313,7 @@ export function ReservationExpiryWarning({
       {evaluatedItems.length > 0 && (
         <ul className="space-y-3">
           {evaluatedItems.map(
-            ({ reservation, itemGuidance, status, remaining }) => {
+            ({ reservation, itemGuidance, status, remaining, plan }) => {
               const style = STATUS_STYLES[status];
               const StatusIcon = style.icon;
               const safeBatchId = sanitizeReservationIdentifier(
@@ -339,44 +402,67 @@ export function ReservationExpiryWarning({
                         {itemGuidance.nextStep}
                       </p>
 
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => refreshReservation(reservation.id)}
-                          disabled={!reservation.canRefresh}
-                          className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <RefreshCw
-                            className="w-3.5 h-3.5"
-                            aria-hidden="true"
-                          />
-                          Refresh
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => revalidateReservation(reservation.id)}
-                          disabled={!reservation.canRevalidate}
-                          className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <RotateCcw
-                            className="w-3.5 h-3.5"
-                            aria-hidden="true"
-                          />
-                          Revalidate
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => cancelReservation(reservation.id)}
-                          disabled={!reservation.canCancel}
-                          className="inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <XCircle
-                            className="w-3.5 h-3.5"
-                            aria-hidden="true"
-                          />
-                          Cancel
-                        </button>
+                      <div
+                        className="mt-3 flex flex-wrap gap-2"
+                        data-testid={`reservation-recovery-actions-${reservation.id}`}
+                        data-recommendation={plan.recommendation}
+                      >
+                        {RESERVATION_RECOVERY_ACTIONS.map((action) => {
+                          const availability = plan.actions[action];
+                          const ActionIcon = ACTION_ICONS[action];
+                          const isRecommended = plan.recommendation === action;
+                          const reasonId = `reservation-${reservation.id}-${action}-disabled-reason`;
+                          const tone =
+                            action === "cancel"
+                              ? "border-red-200 text-red-700 hover:bg-red-50"
+                              : "border-gray-200 text-gray-700 hover:bg-gray-50";
+                          return (
+                            <button
+                              key={action}
+                              type="button"
+                              data-testid={`reservation-${action}-${reservation.id}`}
+                              data-recommended={isRecommended ? "true" : undefined}
+                              onClick={() =>
+                                handleRecoveryAction(action, reservation.id)
+                              }
+                              disabled={!availability.enabled}
+                              aria-describedby={
+                                availability.enabled ? undefined : reasonId
+                              }
+                              className={`inline-flex items-center gap-1 rounded border bg-white px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${tone} ${
+                                isRecommended ? "ring-2 ring-indigo-400" : ""
+                              }`}
+                            >
+                              <ActionIcon
+                                className="w-3.5 h-3.5"
+                                aria-hidden="true"
+                              />
+                              {RESERVATION_RECOVERY_ACTION_LABELS[action]}
+                            </button>
+                          );
+                        })}
                       </div>
+
+                      {status !== "healthy" &&
+                        RESERVATION_RECOVERY_ACTIONS.some(
+                          (action) => !plan.actions[action].enabled,
+                        ) && (
+                          <ul
+                            data-testid={`reservation-recovery-disabled-${reservation.id}`}
+                            className="mt-2 space-y-0.5 text-xs text-gray-600"
+                          >
+                            {RESERVATION_RECOVERY_ACTIONS.filter(
+                              (action) => !plan.actions[action].enabled,
+                            ).map((action) => (
+                              <li
+                                key={action}
+                                id={`reservation-${reservation.id}-${action}-disabled-reason`}
+                              >
+                                {plan.actions[action].disabledReason}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                     </div>
                   </div>
                 </li>

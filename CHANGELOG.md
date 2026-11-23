@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Treasury Reservation Recovery Flow (#889)**: Expired or expiring funding reservations now get a clear recovery path.
+  - `lib/treasury/reservationRecovery.ts` picks the recommended action (Refresh → Revalidate → Cancel → escalate to an administrator) and explains why any action is disabled. It never offers renewal for a lock with a corrupt amount or asset.
+  - Store actions `refreshReservation`, `revalidateReservation`, and `cancelReservation` now return a `ReservationActionResult` (`invalid_id`, `not_found`, `not_permitted`, `invalid_data`) instead of silently doing nothing.
+  - `ReservationExpiryWarning` highlights the recommended action, shows recovery progress, explains disabled actions, and announces each outcome with an actionable, privacy-safe message. Successful actions are recorded on the reservation timeline.
 - **Rejected Correction Events in Payroll History (#844)**: The History page now lists runs that were rejected after being sent back for corrections.
   - Pure derivation `lib/payroll/rejectedCorrections.ts` (`getRejectedCorrectionEvents`) over each approval draft's `approvalHistory`. It orders entries by timestamp, skips unparseable timestamps, ignores rejections with no prior correction request, and reports correction rounds and whether the drafter resubmitted. Rejections recorded before this change appear too, with no backfill.
   - Privacy: it never reads amounts, headcount, employee ids, or draft notes. A reviewer's reason is shown only if it passes the run-note sensitive-content scan. Otherwise the whole reason is withheld and static, actionable copy is shown instead.
