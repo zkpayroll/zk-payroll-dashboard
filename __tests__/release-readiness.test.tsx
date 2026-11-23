@@ -44,7 +44,6 @@ describe('ReleaseReadinessChecklist', () => {
     });
     render(<ReleaseReadinessChecklist />);
     expect(screen.getByText(/Blockers/)).toBeInTheDocument();
-    expect(screen.getAllByText('CI passing').length).toBeGreaterThan(0);
     expect(screen.getAllByText('CI passing')[0]).toBeInTheDocument();
   });
 
