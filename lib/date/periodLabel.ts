@@ -270,7 +270,7 @@ export function parsePeriod(input: unknown): ParsedPeriod {
   // `new Date()` silently rolls impossible calendar days forward
   // ("2025-02-30" -> March 2), which would mislabel a run into the next
   // period. Reject those explicitly so period boundaries stay honest.
-  const isoDateMatch = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T\s])/.exec(str);
+  const isoDateMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|[T\s])/);
   if (isoDateMatch) {
     const year = Number.parseInt(isoDateMatch[1], 10);
     const month = Number.parseInt(isoDateMatch[2], 10);
