@@ -35,6 +35,8 @@ describe("ExportPermissionsMatrix", () => {
   it("shows the restriction reason text for a restricted cell", () => {
     render(<ExportPermissionsMatrix />);
     expect(
+      screen.getAllByText("Treasury operations are admin-only. Please contact an administrator.").length,
+    ).toBeGreaterThan(0);
       screen.getAllByText("Treasury operations are admin-only. Please contact an administrator.")[0],
     ).toBeInTheDocument();
   });
