@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import PayrollWizard from "@/components/features/payroll/PayrollWizard";
 import { usePayrollWizardStore } from "@/stores/payrollWizard";
+import { usePayrollUploadCheckpointStore } from "@/stores/payrollUploadCheckpoint";
 
 // Mock sonner toast
 vi.mock("sonner", () => ({
@@ -53,6 +54,7 @@ describe("PayrollWizard UI & Receipt Flow", () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
     usePayrollWizardStore.getState().reset();
+    usePayrollUploadCheckpointStore.getState().clearCheckpoint();
     // Default to an authorized operator so existing flows are unaffected.
     validateOperatorMock.mockReturnValue({
       ok: true,
@@ -77,6 +79,26 @@ describe("PayrollWizard UI & Receipt Flow", () => {
     expect(
       screen.getByRole("button", { name: /start payroll run/i }),
     ).toBeInDocument();
+  });
+
+  it("shows a persisted upload checkpoint but not one created by the active run", () => {
+    const checkpointStore = usePayrollUploadCheckpointStore.getState();
+    checkpointStore.saveCheckpoint("run_recovered", "proof_generated", 2, true);
+
+    const { unmount } = render(<PayrollWizard />);
+    expect(
+      screen.getByLabelText(/interrupted payroll upload detected/i),
+    ).toBeInTheDocument();
+
+    unmount();
+    checkpointStore.clearCheckpoint();
+    render(<PayrollWizard />);
+    fireEvent.click(screen.getByRole("button", { name: /start payroll run/i }));
+
+    expect(usePayrollUploadCheckpointStore.getState().checkpoint).not.toBeNull();
+    expect(
+      screen.queryByLabelText(/interrupted payroll upload detected/i),
+    ).not.toBeInTheDocument();
   });
 
   it("configures and starts a payroll run, displaying selected employees and total amount", () => {
@@ -120,7 +142,7 @@ describe("PayrollWizard UI & Receipt Flow", () => {
     ).toBeInDocument();
 
     // Fast-forward 2000ms for generation timer
-    await vi.advanceTimerByTimeAsync(2000);
+    await vi.advanceTimersByTimeAsync(2000);
 
     // Success toast and next step should have loaded
     expect(toast.success).toHaveBeenCalledWith("Proof generated successfully");
@@ -147,7 +169,7 @@ describe("PayrollWizard UI & Receipt Flow", () => {
     fireEvent.click(generateBtn);
 
     // Fast-forward 2000ms
-    await vi.advanceTimerByTimeAsync(2000);
+    await vi.advanceTimersByTimeAsync(2000);
 
     // Expect error message and retry button
     expect(toast.error).toHaveBeenCalledWith(
@@ -196,7 +218,7 @@ describe("PayrollWizard UI & Receipt Flow", () => {
     ).toBeInDocument();
 
     // Fast-forward 1500ms
-    await vi.advanceTimerByTimeAsync(1500);
+    await vi.advanceTimersByTimeAsync(1500);
 
     // Verify submission success receipt is visible
     expect(toast.success).toHaveBeenCalledWith(
@@ -240,7 +262,7 @@ describe("PayrollWizard UI & Receipt Flow", () => {
     fireEvent.click(submitBtn);
 
     // Fast-forward 1500ms
-    await vi.advanceTimerByTimeAsync(1500);
+    await vi.advanceTimersByTimeAsync(1500);
 
     // Verify error messages and buttons are shown
     expect(toast.error).toHaveBeenCalledWith(

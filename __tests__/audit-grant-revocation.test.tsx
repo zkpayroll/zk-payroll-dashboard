@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import {
   AuditGrantScopeDetailsDrawer,
   type AuditGrantDetail,
+  formatGrantLedgerExpiry,
 } from "@/components/features/audit/AuditGrantScopeDetailsDrawer";
 import {
   AuditGrantRevocationStatus,
@@ -21,6 +22,7 @@ const createActiveGrant = (): AuditGrantDetail => ({
   grantedBy: "Operator Admin",
   createdAt: "2026-09-01T10:00:00Z",
   expiresAt: "2026-12-01T10:00:00Z",
+  expiresAtLedger: 5_200_000,
   status: "active",
   maskingTier: "FULL_ZERO_KNOWLEDGE",
   accessibleScopes: [
@@ -98,6 +100,9 @@ describe("Audit Grant Revocation Status & Timestamp (#515)", () => {
       expect(screen.getByText(/ACTIVE GRANT/i)).toBeInTheDocument();
       expect(screen.queryByTestId("grant-revoked-banner")).not.toBeInTheDocument();
       expect(screen.queryByTestId("grant-meta-revoked-at")).not.toBeInTheDocument();
+      expect(screen.getByTestId("grant-ledger-expiry")).toHaveTextContent(
+        "Expires at ledger #5200000",
+      );
 
       // Verify revoke action is enabled and triggers callback
       const revokeBtn = screen.getByTestId("revoke-grant-btn");
@@ -202,6 +207,9 @@ describe("Audit Grant Revocation Status & Timestamp (#515)", () => {
       expect(screen.getByTestId("grant-expiry-guidance")).toHaveTextContent(
         /Inspect Scope/i,
       );
+      expect(
+        screen.getByTestId("grant-list-ledger-expiry-grant_audit_991823"),
+      ).toHaveTextContent("Expires at ledger #5200000");
 
       // Verify table rendered with seeded grants
       expect(screen.getByTestId("audit-grants-table")).toBeInTheDocument();
@@ -224,6 +232,31 @@ describe("Audit Grant Revocation Status & Timestamp (#515)", () => {
   });
 
   describe("3. Boundary Cases & Privacy Guarantees", () => {
+    it("accepts the first ledger sequence as an exact expiry boundary", () => {
+      expect(formatGrantLedgerExpiry(1)).toBe("Expires at ledger #1");
+    });
+
+    it("rejects invalid ledger sequences without rendering a false boundary", () => {
+      expect(formatGrantLedgerExpiry(0)).toBe(
+        "Ledger expiry unavailable. Verify grant metadata.",
+      );
+      expect(formatGrantLedgerExpiry(Number.NaN)).toBe(
+        "Ledger expiry unavailable. Verify grant metadata.",
+      );
+      expect(formatGrantLedgerExpiry(undefined)).toBeNull();
+
+      render(
+        <AuditGrantScopeDetailsDrawer
+          isOpen={true}
+          grant={{ ...createActiveGrant(), expiresAtLedger: 0 }}
+          onClose={vi.fn()}
+        />,
+      );
+      expect(screen.getByTestId("grant-ledger-expiry")).toHaveTextContent(
+        "Ledger expiry unavailable. Verify grant metadata.",
+      );
+    });
+
     it("handles revoked grant with missing or null revokedAt timestamp gracefully", () => {
       const grant: AuditGrantDetail = {
         ...createRevokedGrant(),

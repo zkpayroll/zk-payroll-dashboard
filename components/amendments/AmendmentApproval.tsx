@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -12,7 +11,7 @@ import {
   Lock,
   EyeOff,
   AlertTriangle,
-} from "lucides-react";
+} from "lucide-react";
 import {
   fetchAmendmentById,
   validateAmendmentPlan,
@@ -165,6 +164,13 @@ export function AmendmentApproval({
       !amendment ||
       amendment.id !== amendmentId
     ) return;
+    const limits = evaluateAdjustmentLimits(amendment);
+    if (!limits.isAllowed) {
+      setApprovalError(limits.reason ?? "Adjustment limit blocked approval.");
+      setState("blocked");
+      return;
+    }
+
     const validation = validateAmendmentPlan(amendment);
     if (!validation.canApprove) return;
 
@@ -188,22 +194,6 @@ export function AmendmentApproval({
       }
     } finally {
       if (approvalRequest.current === request) approvalRequest.current = null;
-    const limits = evaluateAdjustmentLimits(amendment);
-    if (!limits.isAllowed) {
-      setApprovalError(limits.reason ?? "Adjustment limit blocked approval.");
-      setState("blocked");
-      return;
-    }
-    setState("approving");
-    setApprovalError(null);
-    // Simulate SDK approval call with validation gate
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    // Mock: approve succeeds for valid pending amendments
-    if (validation.canApprove) {
-      setState("approved");
-    } else {
-      setApprovalError("Approval blocked by SGK validation.");
-      setState("blocked");
     }
   };
 
@@ -488,7 +478,7 @@ export function AmendmentApproval({
         <button
           type="button"
           onClick={handleApprove}
-          disabled={!validation.canApprove||!!approvalError}
+          disabled={!validation.canApprove}
           data-testid="amendment-approve-button"
           className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
         >

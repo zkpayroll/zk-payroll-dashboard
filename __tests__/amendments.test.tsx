@@ -16,6 +16,11 @@ import AmendmentList from "@/src/components/amendments/AmendmentList";
 import AmendmentDiff from "@/src/components/amendments/AmendmentDiff";
 import AmendmentDetail from "@/src/components/amendments/AmendmentDetail";
 import AmendmentApproval from "@/src/components/amendments/AmendmentApproval";
+import {
+  evaluateAdjustmentLimits,
+  MAX_ADJUSTMENT_WINDOW_HOURS,
+  MAX_APPROVAL_ATTEMPTS,
+} from "@/components/amendments/AmendmentApproval";
 
 // Helper to find fixtures
 const validAmendment = MOCK_AMENDMENTS.find((a) => a.id === "amd_valid_001")!;
@@ -267,6 +272,40 @@ describe("AmendmentDetail component", () => {
 });
 
 describe("AmendmentApproval component — blocks stale/policy-invalid", () => {
+  it("allows approval at the adjustment-window boundary and blocks after it", () => {
+    const now = new Date("2026-11-23T12:00:00Z");
+    const atBoundary = {
+      ...validAmendment,
+      submittedAt: new Date(
+        now.getTime() - MAX_ADJUSTMENT_WINDOW_HOURS * 60 * 60 * 1000,
+      ).toISOString(),
+    };
+
+    expect(evaluateAdjustmentLimits(atBoundary, now).isAllowed).toBe(true);
+    expect(
+      evaluateAdjustmentLimits(
+        {
+          ...atBoundary,
+          submittedAt: new Date(
+            now.getTime() -
+              (MAX_ADJUSTMENT_WINDOW_HOURS * 60 * 60 * 1000 + 1),
+          ).toISOString(),
+        },
+        now,
+      ).isAllowed,
+    ).toBe(false);
+  });
+
+  it("blocks approval after the configured attempt limit", () => {
+    const result = evaluateAdjustmentLimits(
+      { ...validAmendment, adjustmentAttempts: MAX_APPROVAL_ATTEMPTS },
+      new Date("2026-11-23T12:00:00Z"),
+    );
+
+    expect(result.isAllowed).toBe(false);
+    expect(result.remainingAttempts).toBe(0);
+  });
+
   it("shows loading state", () => {
     render(<AmendmentApproval amendmentId="amd_valid_001" initialState="loading" />);
     expect(screen.getByTestId("amendment-approval-loading")).toBeInTheDocument();
