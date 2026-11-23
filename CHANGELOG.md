@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+- **Payroll Period Boundary Recovery Flow (#884)**: Improved recovery flow for invalid, inverted, or conflicting payroll period boundaries (settlement windows).
+  - Pure decision logic `lib/payroll/periodBoundaryRecovery.ts` evaluating boundary recovery proposals, calculating the next non-overlapping window, and applying recovery mutations with zero exposure of employee or salary figures.
+  - Domain types `types/periodBoundary.ts` defining recovery plans, statuses, and action models re-exported via `types/index.ts`.
+  - Store extension in `stores/draftScheduleWindows.ts` with `getRecoveryPlan`, `applyRecovery`, and `recoverAndUpsertDraft`.
+  - Interactive boundary recovery controls in `PayrollScheduleEditor` (`components/features/schedule/PayrollScheduleEditor.tsx`) offering one-click date swapping and window shifting with polite live region announcements.
+  - Collision detector and auto-recovery panel `components/features/payroll/PayrollScheduleCollisionDetector.tsx` mounted on `/payroll/schedule`.
+  - Focused test coverage in `__tests__/lib/payroll/period-boundary-recovery.test.ts`, `__tests__/components/PeriodBoundaryRecovery.test.tsx`, and `__tests__/payroll-schedule-collision-recovery.test.tsx`.
 - **Treasury Reservation Recovery Flow (#889)**: Expired or expiring funding reservations now get a clear recovery path.
   - `lib/treasury/reservationRecovery.ts` picks the recommended action (Refresh → Revalidate → Cancel → escalate to an administrator) and explains why any action is disabled. It never offers renewal for a lock with a corrupt amount or asset.
   - Store actions `refreshReservation`, `revalidateReservation`, and `cancelReservation` now return a `ReservationActionResult` (`invalid_id`, `not_found`, `not_permitted`, `invalid_data`) instead of silently doing nothing.

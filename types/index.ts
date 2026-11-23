@@ -8,3 +8,4 @@ export * from "./compensation";
 
 export * from "./treasury";
 export * from "./beneficiary";
+export * from "./periodBoundary";
