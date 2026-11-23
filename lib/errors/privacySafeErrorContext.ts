@@ -207,7 +207,7 @@ export function assertPrivacySafeErrorContext(
   const result = filterErrorContext(context, options);
   if (!result.isPrivacySafe) {
     throw new PrivacySafeErrorContextError(
-      `Error context contains ${result.redactedFields.length} field(s) not safe for ${options.audience} audience.`,
+      `Error context contains ${result.redactedFields.length} field(s) not safe for ${options.audience} audience. Only field paths are reported; values are never included. Adjust the audience or review the redacted fields before displaying this context.`,
       result,
     );
   }
