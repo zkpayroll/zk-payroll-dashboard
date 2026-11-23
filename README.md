@@ -155,7 +155,6 @@ Run automated coverage: `npm test -- __tests__/snapshots.test.tsx`
 - [Dashboard setup guide (wallet, Friendbot, checklist)](docs/SETUP_GUIDE.md)
 - [Admin recovery guide](docs/ADMIN_RECOVERY_GUIDE.md)
 - [Wallet signing failure recovery guide](docs/WALLET_SIGNING_RECOVERY_GUIDE.md) 🆕
-- [Treasury reservation UI behavior](docs/TREASURY_RESERVATIONS.md) 🆕
 - [Content style guide](docs/CONTENT_STYLE_GUIDE.md)
 - [Payroll guardrails — behaviour & QA (#541–#544)](docs/PAYROLL_GUARDRAILS_QA.md) 🆕
 

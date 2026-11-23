@@ -8,7 +8,6 @@ import ReservationTimeline from "./ReservationTimeline";
 import StatusBadge from "@/components/ui/StatusBadge";
 import TreasuryReadinessChecklist from "./TreasuryReadinessChecklist";
 import TreasuryDrainWarning from "./TreasuryDrainWarning";
-import TreasuryReservation from "./TreasuryReservation";
 import FundingImbalanceDashboard from "./FundingImbalanceDashboard";
 import ReservationExpiryWarning from "./ReservationExpiryWarning";
 import TreasuryReservationGuidanceCard from "./TreasuryReservationGuidanceCard";
@@ -282,7 +281,6 @@ function TreasuryView({
 
       <TreasuryReadinessChecklist />
 
-      <TreasuryReservation balance={balance} projectedPayroll={projectedPayroll} />
       <TreasuryReservationGuidanceCard
         reservations={activeReservations}
         availableBalance={balance}
