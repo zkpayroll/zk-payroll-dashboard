@@ -50,11 +50,13 @@ const CSV_TEMPLATE_HEADER = "name,email,department,address,salary,start_date";
 const CSV_TEMPLATE_ROW =
   "Jane Doe,jane@company.io,Engineering,GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W37,5000,2025-06-01";
 
-function parseCsv(text: string): CsvRow[] {
-  const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "");
-  if (lines.length < 2) return [];
+function parseCsv(text: string): { columns: string[]; rows: CsvRow[] } | null {
+  const records = parseCsvRecords(text);
+  if (!records) return null;
 
-  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+  const headers = records[0]?.map((h) => h.trim().toLowerCase()) ?? [];
+  if (records.length < 2) return { columns: headers, rows: [] };
+
   const rows: CsvRow[] = [];
 
   const nameIdx = headers.indexOf("name");
@@ -64,13 +66,18 @@ function parseCsv(text: string): CsvRow[] {
   const salaryIdx = headers.indexOf("salary");
   const startIdx = headers.indexOf("start_date");
 
-  if (nameIdx === -1 || addrIdx === -1 || salaryIdx === -1) {
-    return [];
+  if (
+    nameIdx === -1 ||
+    addrIdx === -1 ||
+    salaryIdx === -1 ||
+    startIdx === -1
+  ) {
+    return { columns: headers, rows: [] };
   }
 
-  for (let i = 1; i < lines.length; i++) {
-    const values = parseCsvLine(lines[i]);
-    if (values.length === 0) continue;
+  for (let i = 1; i < records.length; i++) {
+    const values = records[i];
+    if (values.length !== headers.length) return null;
 
     rows.push({
       rowIndex: i,
@@ -83,27 +90,67 @@ function parseCsv(text: string): CsvRow[] {
     });
   }
 
-  return rows;
+  return { columns: headers, rows };
 }
 
-function parseCsvLine(line: string): string[] {
-  const result: string[] = [];
+function parseCsvRecords(text: string): string[][] | null {
+  const records: string[][] = [];
+  let record: string[] = [];
   let current = "";
   let inQuotes = false;
+  let afterQuote = false;
 
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') {
-      inQuotes = !inQuotes;
-    } else if (ch === "," && !inQuotes) {
-      result.push(current);
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"' && text[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else if (ch === '"') {
+        inQuotes = false;
+        afterQuote = true;
+      } else {
+        current += ch;
+      }
+    } else if (afterQuote) {
+      if (ch === ",") {
+        record.push(current);
+        current = "";
+        afterQuote = false;
+      } else if (ch === "\r" || ch === "\n") {
+        record.push(current);
+        records.push(record);
+        record = [];
+        current = "";
+        afterQuote = false;
+        if (ch === "\r" && text[i + 1] === "\n") i++;
+      } else if (ch !== " " && ch !== "\t") {
+        return null;
+      }
+    } else if (ch === '"') {
+      if (current.length > 0) return null;
+      inQuotes = true;
+    } else if (ch === ",") {
+      record.push(current);
       current = "";
+    } else if (ch === "\r" || ch === "\n") {
+      record.push(current);
+      if (record.some((value) => value.trim() !== "")) records.push(record);
+      record = [];
+      current = "";
+      if (ch === "\r" && text[i + 1] === "\n") i++;
     } else {
       current += ch;
     }
   }
-  result.push(current);
-  return result;
+
+  if (inQuotes) return null;
+  if (current.length > 0 || record.length > 0 || afterQuote) {
+    record.push(current);
+    if (record.some((value) => value.trim() !== "")) records.push(record);
+  }
+
+  return records;
 }
 
 function validateRow(row: CsvRow): RowValidationError[] {
@@ -280,14 +327,47 @@ export default function CsvImport() {
 
       setFileName(file.name);
       const reader = new FileReader();
+      const rejectUpload = (description: string) => {
+        setParsedRows([]);
+        setValidationErrors([]);
+        setSourceColumns([]);
+        setFileName("");
+        setImportedIds(new Set());
+        setDuplicateResolutions({});
+        toast.error("Unable to read CSV", { description });
+      };
+
       reader.onload = () => {
-        const text = reader.result as string;
-        const columns = (text.split(/\r?\n/, 1)[0] ?? "")
-          .split(",")
-          .map((column) => column.trim().toLowerCase())
-          .filter(Boolean);
-        setSourceColumns(columns);
-        const rows = parseCsv(text);
+        if (
+          !(reader.result instanceof ArrayBuffer) ||
+          reader.result.byteLength !== file.size
+        ) {
+          rejectUpload(
+            "The file appears incomplete. Re-export the full CSV and upload it again.",
+          );
+          return;
+        }
+
+        let text: string;
+        try {
+          text = new TextDecoder("utf-8", { fatal: true }).decode(reader.result);
+        } catch {
+          rejectUpload(
+            "The file is not a complete UTF-8 CSV. Re-export the full CSV and upload it again.",
+          );
+          return;
+        }
+
+        const parsedCsv = parseCsv(text);
+        if (parsedCsv === null) {
+          rejectUpload(
+            "The CSV appears incomplete or malformed. Check that every row has all columns and quoted fields are closed, then upload the full file again.",
+          );
+          return;
+        }
+
+        setSourceColumns(parsedCsv.columns);
+        const { rows } = parsedCsv;
 
         if (rows.length === 0) {
           toast.error("Invalid CSV", {
@@ -333,7 +413,17 @@ export default function CsvImport() {
           );
         }
       };
-      reader.readAsText(file);
+      reader.onerror = () => {
+        rejectUpload(
+          "The file could not be read completely. Re-export the full CSV and upload it again.",
+        );
+      };
+      reader.onabort = () => {
+        rejectUpload(
+          "The file read was interrupted. Re-export the full CSV and upload it again.",
+        );
+      };
+      reader.readAsArrayBuffer(file);
     },
     [],
   );
