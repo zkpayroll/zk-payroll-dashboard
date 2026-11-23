@@ -128,9 +128,12 @@ function SelectStep() {
           searchFiltered.map((entry) => (
             <label
               key={entry.id}
+              htmlFor={`audit-entry-${entry.id}`}
+              aria-label={`Select ${entry.title}`}
               className={`flex items-start gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-colors ${entry.selected ? "bg-blue-50/50" : ""}`}
             >
               <input
+                id={`audit-entry-${entry.id}`}
                 type="checkbox"
                 checked={entry.selected}
                 onChange={() => toggleEntry(entry.id)}
@@ -199,7 +202,7 @@ function ConfigureStep() {
       <h3 className="text-lg font-semibold">Configure Export</h3>
 
       <div>
-        <label className="text-sm font-medium mb-3 block">Export Format</label>
+        <p className="text-sm font-medium mb-3 block">Export Format</p>
         <div className="grid grid-cols-3 gap-3">
           {FORMAT_OPTIONS.map((opt) => (
             <button
@@ -220,10 +223,11 @@ function ConfigureStep() {
       </div>
 
       <div>
-        <label className="text-sm font-medium mb-3 block">Date Range</label>
+        <p className="text-sm font-medium mb-3 block">Date Range</p>
         <div className="flex gap-3">
           <input
             type="date"
+            aria-label="Start date"
             value={dateRangeStart}
             onChange={(e) => setDateRange(e.target.value, dateRangeEnd)}
             className="flex-1 px-3 py-2 border rounded-lg text-sm"
@@ -231,6 +235,7 @@ function ConfigureStep() {
           <span className="flex items-center text-muted-foreground">to</span>
           <input
             type="date"
+            aria-label="End date"
             value={dateRangeEnd}
             onChange={(e) => setDateRange(dateRangeStart, e.target.value)}
             className="flex-1 px-3 py-2 border rounded-lg text-sm"

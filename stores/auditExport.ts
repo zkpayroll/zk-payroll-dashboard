@@ -37,6 +37,7 @@ interface AuditExportStore {
   includeMetadata: boolean;
   dateRangeStart: string;
   dateRangeEnd: string;
+  searchQuery: string;
   activeExportJob: ExportJob | null;
   exportHistory: ExportJob[];
 

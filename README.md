@@ -129,6 +129,7 @@ For detailed usage instructions, see [Transaction Detail Usage Guide](docs/TRANS
 - [Dashboard setup guide](docs/SETUP_GUIDE.md)
 - [Admin recovery guide](docs/ADMIN_RECOVERY_GUIDE.md)
 - [Wallet signing failure recovery guide](docs/WALLET_SIGNING_RECOVERY_GUIDE.md) 🆕
+- [Treasury reservation UI behavior](docs/TREASURY_RESERVATIONS.md) 🆕
 - [Content style guide](docs/CONTENT_STYLE_GUIDE.md)
 
 ## 🤝 Contributing

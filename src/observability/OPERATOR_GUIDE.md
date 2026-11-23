@@ -11,6 +11,7 @@ The payroll observability system is designed from the ground up to prevent sensi
 > [!IMPORTANT]
 > **Strict Support Workflow Directive ("Don't Ask the User For X")**:
 > When diagnosing payroll issues, support operators **MUST NEVER** request, record, or share:
+>
 > 1. ❌ **Salary amounts or payment figures** (e.g. "How much was the payroll for employee X?")
 > 2. ❌ **Employee personal identifiers** (e.g. employee SSNs, full legal names, home addresses, or personal emails)
 > 3. ❌ **Wallet private keys, secret keys, or seed phrases** (e.g. Freighter secret keys, Stellar secret seed phrases `S...`)
@@ -51,5 +52,6 @@ All events emitted by the payroll observability layer pass through a central red
 The redaction engine employs a **fail-safe default**: any payload field that is not explicitly present in the non-sensitive allowlist is automatically replaced with `[REDACTED_UNCLASSIFIED]`.
 
 If you see `[REDACTED_UNCLASSIFIED]` in an incident payload:
+
 - It is safe to copy and view (the value has already been safely stripped).
 - If the field is a new non-sensitive metadata metric (e.g., a new timing metric), notify engineering to submit a PR adding it to `ALLOWED_METADATA_KEYS` in `src/observability/redaction.ts`.

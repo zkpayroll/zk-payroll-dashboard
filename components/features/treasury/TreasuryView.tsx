@@ -7,6 +7,7 @@ import FundingForecast from "./FundingForecast";
 import StatusBadge from "@/components/ui/StatusBadge";
 import TreasuryReadinessChecklist from "./TreasuryReadinessChecklist";
 import TreasuryDrainWarning from "./TreasuryDrainWarning";
+import TreasuryReservation from "./TreasuryReservation";
 
 function TreasuryView() {
   const [toastVisible, setToastVisible] = useState(false);
@@ -92,6 +93,8 @@ function TreasuryView() {
       />
 
       <TreasuryReadinessChecklist />
+
+      <TreasuryReservation balance={balance} projectedPayroll={projectedPayroll} />
 
       <FundingForecast />
 

@@ -13,13 +13,13 @@ import {
 } from "lucide-react";
 import type {
   AuditTimelineEvent,
-  AuditReadyTimeline,
+  AuditReadyTimeline as AuditReadyTimelineData,
   AuditTimelineEventType,
 } from "@/types/models";
 
 interface AuditReadyTimelineProps {
   payrollId?: string;
-  timeline?: AuditReadyTimeline;
+  timeline?: AuditReadyTimelineData;
   className?: string;
 }
 
@@ -47,7 +47,7 @@ const EVENT_ICONS: Record<AuditTimelineEventType, typeof CheckCircle2> = {
   run_failed: Clock,
 };
 
-function generateMockTimeline(payrollId: string): AuditReadyTimeline {
+function generateMockTimeline(payrollId: string): AuditReadyTimelineData {
   const now = new Date();
   const events: AuditTimelineEvent[] = [
     {
