@@ -77,24 +77,44 @@ describe("Payroll Schedule", () => {
   it("allows switching months via prev and next buttons", () => {
     render(<PayrollCalendar runs={MOCK_PAYROLL_RUNS} />);
 
-    // Get the next upcoming run to determine the initial month
-    // From mock data, next upcoming is around Mar 31, 2025
-    const initialMonthHeader = screen.getByRole("heading", { level: 3, name: /March/i });
-    const initialText = initialMonthHeader.textContent;
-    expect(initialText).toMatch(/March/i);
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+    const initialMonthHeader = screen
+      .getAllByRole("heading", { level: 3 })
+      .find((heading) => /^[A-Z][a-z]+ \d{4}$/.test(heading.textContent ?? ""))!;
+    const initialMonthIndex = monthNames.findIndex((month) =>
+      (initialMonthHeader.textContent ?? "").startsWith(month),
+    );
+    expect(initialMonthIndex).toBeGreaterThanOrEqual(0);
 
     const prevButton = screen.getByRole("button", { name: /previous month/i });
     const nextButton = screen.getByRole("button", { name: /next month/i });
 
-    // Switch to previous month (February)
     fireEvent.click(prevButton);
-    expect(initialMonthHeader.textContent).toMatch(/February/i);
+    expect(initialMonthHeader.textContent).toContain(
+      monthNames[(initialMonthIndex + 11) % 12],
+    );
 
-    // Switch to next month twice (March then April)
     fireEvent.click(nextButton);
-    expect(initialMonthHeader.textContent).toMatch(/March/i);
+    expect(initialMonthHeader.textContent).toContain(
+      monthNames[initialMonthIndex],
+    );
     fireEvent.click(nextButton);
-    expect(initialMonthHeader.textContent).toMatch(/April/i);
+    expect(initialMonthHeader.textContent).toContain(
+      monthNames[(initialMonthIndex + 1) % 12],
+    );
   });
 });
 
