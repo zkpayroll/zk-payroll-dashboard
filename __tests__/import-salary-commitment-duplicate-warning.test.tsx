@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { toast } from "sonner";
 import CsvImport from "@/components/features/employees/CsvImport";
 import {
   ImportSalaryCommitmentDuplicateWarning,
@@ -143,6 +144,52 @@ describe("CsvImport duplicate salary commitment highlighting", () => {
     expect(
       screen.getByRole("button", { name: /import all valid \(2\)/i }),
     ).toBeEnabled();
+  });
+
+  it("rejects an incomplete quoted record without exposing its contents", async () => {
+    const { container } = render(<CsvImport />);
+
+    await uploadCsv(
+      container,
+      [
+        "name,address,salary,start_date",
+        `"Jane Doe,${ADDRESS_A},5000,2025-06-01`,
+      ].join("\n"),
+    );
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "Unable to read CSV",
+        expect.objectContaining({
+          description: expect.stringMatching(/incomplete or malformed/i),
+        }),
+      ),
+    );
+    expect(screen.queryByText("Parsed Records")).not.toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        description: expect.stringContaining("Jane Doe"),
+      }),
+    );
+  });
+
+  it("accepts a complete row with exactly the required columns (boundary case)", async () => {
+    const { container } = render(<CsvImport />);
+
+    await uploadCsv(
+      container,
+      [
+        "name,address,salary,start_date",
+        `Jane Doe,${ADDRESS_A},5000,2025-06-01`,
+      ].join("\n"),
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /import all valid \(1\)/i }),
+      ).toBeEnabled(),
+    );
   });
 
   it("highlights duplicate rows and blocks the import until they are resolved (rejected case)", async () => {
