@@ -8,6 +8,8 @@ import {
   UserPlus, Key, Upload, ClipboardList, FileSearch, Download
 } from "lucide-react";
 import { toast } from "sonner";
+import { useKeyboardShortcutsStore } from "@/stores/keyboardShortcuts";
+import { useSession } from "@/hooks/useSession";
 
 interface CommandItem {
   id: string;
@@ -23,7 +25,8 @@ interface CommandItem {
 export default function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [role, setRole] = useState<"Admin" | "Employee">("Admin");
+  const { sessionInfo } = useSession();
+  const role = sessionInfo?.role;
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -104,6 +107,16 @@ export default function CommandPalette({ isOpen, onClose }: { isOpen: boolean; o
       route: "/incidents/runbook",
     },
     {
+      id: "nav-payroll-policy",
+      title: "Go to Payroll Policy Editor",
+      description: "Configure settlement windows, reserve rules, approval requirements, and capacity limits.",
+      category: "Navigation",
+      icon: Settings,
+      route: "/settings/payroll-policy",
+      adminOnly: true,
+    },
+
+    {
       id: "create-payroll",
       title: "Create New Payroll Run",
       description: "Generate proofs, approve, and execute on-chain batch payments.",
@@ -165,6 +178,17 @@ export default function CommandPalette({ isOpen, onClose }: { isOpen: boolean; o
       },
     },
     {
+      id: "action-shortcuts",
+      title: "View Keyboard Shortcuts",
+      description: "Quick reference guide for all payroll navigation and action hotkeys (press ?).",
+      category: "Actions",
+      icon: Keyboard,
+      action: () => {
+        onClose();
+        useKeyboardShortcutsStore.getState().openModal();
+      },
+    },
+    {
       id: "nav-setup",
       title: "Go to Company Setup",
       description: "Configure your company profile, admin wallet, and treasury address.",
@@ -195,7 +219,7 @@ export default function CommandPalette({ isOpen, onClose }: { isOpen: boolean; o
   }, [search, commands]);
 
   const handleItemSelect = (item: CommandItem) => {
-    if (item.adminOnly && role !== "Admin") {
+    if (item.adminOnly && role !== "admin") {
       toast.error("Access Denied", {
         description: "This administrative action requires the Admin role.",
       });
@@ -253,14 +277,7 @@ export default function CommandPalette({ isOpen, onClose }: { isOpen: boolean; o
           <span className="font-medium">Role-Based Access Control:</span>
           <div className="flex items-center gap-1.5">
             <span className="text-gray-500">Current Role:</span>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as any)}
-              className="bg-white border border-indigo-200 text-indigo-900 rounded px-2 py-0.5 font-semibold text-xs outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="Admin">Admin (Full Access)</option>
-              <option value="Employee">Employee (Restricted)</option>
-            </select>
+            <span className="font-semibold px-2 py-0.5 capitalize">{role || "Loading..."}</span>
           </div>
         </div>
 
@@ -275,7 +292,7 @@ export default function CommandPalette({ isOpen, onClose }: { isOpen: boolean; o
               <div className="divide-y divide-gray-50">
                 {filtered.map((item) => {
                   const Icon = item.icon;
-                  const isLocked = item.adminOnly && role !== "Admin";
+                  const isLocked = item.adminOnly && role !== "admin";
 
                   return (
                     <button

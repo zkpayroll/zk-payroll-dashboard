@@ -15,6 +15,7 @@ Visual regression tests capture representative states for:
 - Payroll wizard and execution flows
 - Payroll run detail views
 - Payroll comparison views
+- Payroll status badge colours, labels, and contrast
 - Compliance screens
 
 ## Test Organization
@@ -23,10 +24,45 @@ Tests are organized by feature area:
 
 ```text
 __tests__/visual-regression/
-├── dashboard-states.test.tsx      # Dashboard and admin panel states
-├── payroll-flow-states.test.tsx   # Payroll execution and history views
-└── README.md                      # This file
+├── dashboard-states.test.tsx           # Dashboard and admin panel states
+├── payroll-flow-states.test.tsx        # Payroll execution and history views
+├── payroll-status-badges.test.tsx      # Status badge colours, labels, contrast
+└── README.md                           # This file
 ```
+
+## Payroll Status Badges
+
+Status badges are the fastest signal an operator gets from a payroll screen, which makes them easy to break with an unrelated change. A renamed Tailwind token or a palette tidy-up can quietly render a failed run in green.
+
+`src/payroll/statusBadges.ts` is the single source of truth for:
+
+- **Labels** — the wording for each run lifecycle and reconciliation status.
+- **Variants** — which `badgeVariants` entry each status uses.
+- **Contrast** — the one approved colour pair per variant, plus the WCAG ratio it measures.
+
+`components/ui/StatusBadge.tsx` and `components/features/payroll/ReconciliationBadge.tsx` both read their labels and variants from that contract, so a change has to be made once and is then covered by the suite.
+
+### What the suite asserts
+
+| Check | Guards against |
+| --- | --- |
+| One snapshot per status | Any unintended change to badge markup, classes, or wording |
+| Exact approved background/text classes | A `badge.tsx` variant drifting from the contract |
+| WCAG AA ratio per payroll variant | Contrast dropping below 4.5:1 for 12px text |
+| No colour collisions within a surface | Two statuses becoming indistinguishable by colour |
+| Static, value-free labels | A label leaking an amount, count, or contact detail |
+| Rendered text free of digits and currency | A failure badge exposing payroll values |
+| Contract covers every declared status | A new status shipping without a badge spec |
+
+### Adding or changing a status
+
+1. Add the label, variant, and approved pair to `src/payroll/statusBadges.ts`.
+2. Run the suite and review the new snapshot rather than blind-updating it.
+3. Confirm the new colour clears WCAG AA; if it does not, darken the text or lighten the background instead of widening the threshold.
+
+### Known contrast deviation
+
+`destructive` (`bg-red-500` / `text-gray-50`) measures 3.60:1, under the 4.5:1 AA floor. It is recorded in `KNOWN_STATUS_BADGE_CONTRAST_DEVIATIONS` rather than silently tolerated, and the suite fails if a deviation is listed for a colour the payroll badges actually use. It is not part of the payroll badge palette — it is used by the retry toast and the transaction detail drawer — so fixing it is a separate change.
 
 ## Running Visual Regression Tests
 
@@ -157,7 +193,8 @@ Snapshot files are committed to version control. This allows:
 ```text
 __tests__/visual-regression/__snapshots__/
 ├── dashboard-states.test.tsx.snap
-└── payroll-flow-states.test.tsx.snap
+├── payroll-flow-states.test.tsx.snap
+└── payroll-status-badges.test.tsx.snap
 ```
 
 ## Troubleshooting

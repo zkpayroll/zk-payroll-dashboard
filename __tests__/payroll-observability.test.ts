@@ -8,6 +8,7 @@ import {
 } from "@/src/observability";
 import {
   emitDraftCreated,
+  emitDraftUpdated,
   emitValidationStarted,
   emitValidationSucceeded,
   emitProofSetupStarted,
@@ -93,5 +94,24 @@ describe("End-to-End Payroll Observability & Incident Replay Lifecycle", () => {
     const retryEntry = timeline.entries.find((e) => e.stage === "retry");
     expect(retryEntry).toBeDefined();
     expect(retryEntry?.redactedContext.retryCount).toBe(1);
+  });
+
+  it("adds a privacy-safe draft update item to the timeline", async () => {
+    const runId = generateCorrelationId();
+
+    await withCorrelationId(runId, async () => {
+      emitDraftUpdated({
+        payload: { employeeCount: 3, totalAmount: 15000 },
+      });
+    });
+
+    const event = getEventsByCorrelationId(runId)[0];
+    expect(event.stage).toBe("draft_updated");
+    expect(event.payload.employeeCount).toBe(3);
+    expect(event.payload.totalAmount).toBe("[REDACTED]");
+
+    const timeline = generateIncidentTimeline(runId);
+    expect(timeline.entries[0].formattedSummary).toContain("Payroll Draft Updated");
+    expect(timeline.entries[0].formattedSummary).not.toContain("15000");
   });
 });

@@ -1,6 +1,36 @@
 import '@testing-library/jest-dom';
 import { TextEncoder, TextDecoder } from 'util';
-import { vi } from 'vitest';
+import { webcrypto } from 'node:crypto';
+import { vi, expect } from 'vitest';
+
+if (typeof globalThis.crypto === 'undefined') {
+  // @ts-expect-error - jsdom polyfill
+  globalThis.crypto = webcrypto;
+} else if (!(globalThis.crypto as Crypto).subtle) {
+  (globalThis.crypto as Crypto).subtle = (webcrypto as Crypto).subtle;
+}
+
+// `toBeInDocument` alias for jest-dom's `toBeInTheDocument` so tests written
+// against the shorter name keep working with the same semantics.
+expect.extend({
+  toBeInDocument(element: HTMLElement | null) {
+    const pass = element != null && element.isConnected;
+    return {
+      pass,
+      message: () =>
+        `expected element ${pass ? "not " : ""}to be present in the document`,
+    };
+  },
+});
+
+declare module "vitest" {
+  interface Assertion<T = any> {
+    toBeInDocument(): T;
+  }
+  interface AsymmetricMatchersContaining {
+    toBeInDocument(): any;
+  }
+}
 
 if (typeof globalThis.TextEncoder === 'undefined') {
   globalThis.TextEncoder = TextEncoder;
@@ -84,3 +114,6 @@ Date.prototype.toLocaleString = function (
 ) {
   return originalToLocaleString.call(this, locales === undefined ? 'en-US' : locales, options);
 };
+
+
+

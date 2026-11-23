@@ -3,11 +3,13 @@
 import { CheckCircle2, Hash, Users, Banknote, Calendar, ArrowRight, Printer, History } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { validateSettlementReceiptId } from "@/lib/validation/settlementReceipt";
 
 interface PayrollReceiptProps {
   totalAmount: number;
   employeeCount: number;
   transactionHash: string | null;
+  receiptId?: string | null;
   onReset: () => void;
 }
 
@@ -15,9 +17,11 @@ export default function PayrollReceipt({
   totalAmount,
   employeeCount,
   transactionHash,
+  receiptId,
   onReset,
 }: PayrollReceiptProps) {
   const timestamp = new Date().toLocaleString();
+  const receiptValidation = validateSettlementReceiptId(receiptId);
 
   const handlePrint = () => {
     window.print();
@@ -37,6 +41,13 @@ export default function PayrollReceipt({
         <p className="text-gray-500 mt-1">Transaction confirmed on network</p>
       </div>
 
+      {!receiptValidation.isValid && (
+        <div role="alert" className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-semibold">Settlement receipt unavailable</p>
+          <p className="mt-1">{receiptValidation.message} Contact an administrator before treating this receipt as settled.</p>
+        </div>
+      )}
+
       {/* Receipt Style Container */}
       <div className="bg-white border-2 border-dashed border-gray-200 rounded-lg p-6 space-y-6 relative overflow-hidden">
         {/* Top/Bottom "Teeth" Effect (CSS-only approximation) */}
@@ -51,6 +62,12 @@ export default function PayrollReceipt({
         </div>
 
         <div className="space-y-4 pt-4">
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-gray-600">Settlement Receipt ID</span>
+            <span className="font-mono text-gray-900">
+              {receiptValidation.isValid ? receiptValidation.normalized : "Unavailable"}
+            </span>
+          </div>
           <div className="flex justify-between items-center text-sm">
             <div className="flex items-center gap-2 text-gray-600">
               <Users className="w-4 h-4" />

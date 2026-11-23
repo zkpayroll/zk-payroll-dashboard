@@ -18,6 +18,11 @@ import {
   MOCK_TREASURY_BALANCE,
 } from "@/lib/api/mockData";
 import { canExport, getExportRestrictionReason, ROLE_LABELS } from "@/lib/auth/roles";
+import ExportReviewGate from "@/components/features/exports/ExportReviewGate";
+import {
+  summarizeExportRedaction,
+  type ExportScopeSummary,
+} from "@/src/exports/reviewGate";
 import type { UserRole } from "@/types";
 
 interface ExportDefinition {
@@ -31,6 +36,20 @@ interface ExportDefinition {
   actionLabel: string;
   Icon: ComponentType<{ className?: string }>;
   onClick?: () => void;
+  recordCount?: number;
+  redactedFields?: string[];
+}
+
+function buildScopeSummary(exportDef: ExportDefinition): ExportScopeSummary {
+  return {
+    permissionKey: exportDef.permissionKey,
+    title: exportDef.title,
+    scope: exportDef.scope,
+    format: exportDef.format,
+    fields: exportDef.fields,
+    privacyNotice: exportDef.privacy,
+    recordCount: exportDef.recordCount,
+  };
 }
 
 function toCsvRow(values: Array<string | number | null | undefined>) {
@@ -106,6 +125,7 @@ const exportDefinitions: ExportDefinition[] = [
     actionLabel: "Download CSV",
     Icon: Download,
     onClick: exportPayrollHistory,
+    recordCount: MOCK_TRANSACTIONS.length,
   },
   {
     permissionKey: "employee-directory",
@@ -118,6 +138,8 @@ const exportDefinitions: ExportDefinition[] = [
     actionLabel: "Download CSV",
     Icon: Database,
     onClick: exportEmployeeDirectory,
+    recordCount: MOCK_EMPLOYEES.length,
+    redactedFields: ["salary commitment"],
   },
   {
     permissionKey: "audit-requests",
@@ -130,6 +152,7 @@ const exportDefinitions: ExportDefinition[] = [
     actionLabel: "Download CSV",
     Icon: ShieldCheck,
     onClick: exportAuditAccess,
+    recordCount: MOCK_AUDIT_REQUESTS.length,
   },
   {
     permissionKey: "audit-report",
@@ -142,6 +165,7 @@ const exportDefinitions: ExportDefinition[] = [
     actionLabel: "Print report",
     Icon: Printer,
     onClick: () => window.print(),
+    recordCount: MOCK_PAYROLL_RUNS.length,
   },
   {
     permissionKey: "treasury-snapshot",
@@ -159,9 +183,11 @@ const exportDefinitions: ExportDefinition[] = [
 function ExportCard({
   exportDef,
   role,
+  onRequestExport,
 }: {
   exportDef: ExportDefinition;
   role: UserRole | null;
+  onRequestExport: (exportDef: ExportDefinition) => void;
 }) {
   const { title, description, scope, format, fields, privacy, actionLabel, Icon, onClick, permissionKey } = exportDef;
   const hasPermission = role ? canExport(role, permissionKey) : false;
@@ -229,7 +255,8 @@ function ExportCard({
         ) : onClick ? (
           <button
             type="button"
-            onClick={onClick}
+            onClick={() => onRequestExport(exportDef)}
+            data-testid={`export-request-${permissionKey}`}
             className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
           >
             <Download className="h-4 w-4" aria-hidden="true" />
@@ -259,6 +286,7 @@ function ExportCard({
 function ExportCenter() {
   const [role, setRole] = useState<UserRole | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
+  const [pendingExport, setPendingExport] = useState<ExportDefinition | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -340,9 +368,31 @@ function ExportCenter() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         {exportDefinitions.map((def) => (
-          <ExportCard key={def.permissionKey} exportDef={def} role={role} />
+          <ExportCard
+            key={def.permissionKey}
+            exportDef={def}
+            role={role}
+            onRequestExport={setPendingExport}
+          />
         ))}
       </div>
+
+      {pendingExport && (
+        <ExportReviewGate
+          isOpen
+          role={role}
+          scope={buildScopeSummary(pendingExport)}
+          redaction={summarizeExportRedaction(
+            pendingExport.fields,
+            pendingExport.redactedFields ?? [],
+          )}
+          onConfirm={() => {
+            pendingExport.onClick?.();
+            setPendingExport(null);
+          }}
+          onCancel={() => setPendingExport(null)}
+        />
+      )}
     </section>
   );
 }

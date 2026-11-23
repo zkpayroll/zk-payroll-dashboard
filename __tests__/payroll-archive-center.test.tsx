@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import PayrollArchiveCenter from "@/components/features/archive/PayrollArchiveCenter";
 import { useArchiveStore, MOCK_ARCHIVED_RUNS } from "@/stores/archive";
+import { usePayrollPolicyStore } from "@/stores/payrollPolicy";
 
 describe("PayrollArchiveCenter", () => {
   beforeEach(() => {
@@ -25,6 +26,24 @@ describe("PayrollArchiveCenter", () => {
 
     const maskedElements = screen.getAllByText("••••••••");
     expect(maskedElements.length).toBeGreaterThan(0);
+  });
+
+  it("explains how a retention policy change affects archived runs without showing payroll details", () => {
+    const policy = usePayrollPolicyStore.getState().policy.auditRetention;
+    render(
+      <PayrollArchiveCenter
+        retentionPolicy={{ ...policy, retentionPeriodDays: 30 }}
+        now={Date.parse("2026-11-22T00:00:00Z")}
+      />,
+    );
+
+    const guidance = screen.getByTestId("archive-retention-migration-guidance");
+    expect(guidance).toHaveTextContent("current policy retains records for 30 days");
+    expect(guidance).toHaveTextContent("expiration is recalculated from each run’s execution date");
+    expect(guidance).toHaveTextContent("A policy change does not delete records by itself");
+    expect(guidance).toHaveTextContent("settlement is pending or unverified");
+    expect(guidance).not.toHaveTextContent("$9,500");
+    expect(guidance).not.toHaveTextContent("employee");
   });
 
   it("toggles private values visibility when clicking the toggle button", () => {
@@ -165,4 +184,15 @@ describe("PayrollArchiveCenter", () => {
     // After clicking, run state updates
     expect(useArchiveStore.getState().runs.find((r) => r.id === "arc_001")?.isArchived).toBe(false);
   });
+
+    it("shows archive eligibility for ready and disputed runs", () => {
+      render(<PayrollArchiveCenter />);
+
+      const readyRunCard = screen.getByTestId("archive-run-card-arc_001");
+      const disputedRunCard = screen.getByTestId("archive-run-card-arc_004");
+
+      expect(within(readyRunCard).getByText("Archived")).toBeInTheDocument();
+      expect(within(disputedRunCard).getByText("Blocked by dispute")).toBeInTheDocument();
+    });
+
 });

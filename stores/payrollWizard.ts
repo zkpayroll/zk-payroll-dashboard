@@ -1,6 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { PayrollWizardState, PayrollWizardStep } from "@/types";
+import {
+  getInstructionVersionStatus,
+} from "@/src/payroll/instructionVersion";
 
 const STEPS: PayrollWizardStep[] = ["review", "proof", "confirm", "submit"];
 
@@ -18,12 +21,18 @@ interface PayrollWizardStore extends PayrollWizardState {
   ) => void;
   setSubmissionError: (error: string | null) => void;
   setTransactionHash: (hash: string | null) => void;
+  /** Snapshot the saved policy's version for this draft (#534). */
+  setInstructionVersion: (version: number | null) => void;
   setIsProofNearingExpiration: (val: boolean) => void;
   setTreasuryBalanceOverride: (balance: number | null) => void;
   reset: () => void;
   hasDraft: () => boolean;
   restoreDraft: () => void;
   clearDraft: () => void;
+  /** Whether the recovered draft was interrupted mid-submission (#755). */
+  wasInterrupted: () => boolean;
+  /** Clears the interruption marker once the operator has acknowledged it. */
+  acknowledgeInterruption: () => void;
 }
 
 const initialState: PayrollWizardState = {
@@ -38,7 +47,20 @@ const initialState: PayrollWizardState = {
   transactionHash: null,
   isProofNearingExpiration: false,
   treasuryBalanceOverride: null,
+  interruptedAtStep: null,
 };
+
+/**
+ * Compare the snapshotted draft version against the active saved policy
+ * version (#534). A draft never silently adopts a newer policy: the badge
+ * keeps showing the version the run was drafted under.
+ */
+export function getWizardInstructionVersionStatus(
+  draftVersion: number | null | undefined,
+  activeVersion: number | null | undefined,
+) {
+  return getInstructionVersionStatus(activeVersion, draftVersion);
+}
 
 export const usePayrollWizardStore = create<PayrollWizardStore>()(
   persist(
@@ -69,6 +91,7 @@ export const usePayrollWizardStore = create<PayrollWizardStore>()(
       setSubmissionStatus: (submissionStatus) => set({ submissionStatus }),
       setSubmissionError: (submissionError) => set({ submissionError }),
       setTransactionHash: (transactionHash) => set({ transactionHash }),
+      setInstructionVersion: (instructionVersion) => set({ instructionVersion }),
       setIsProofNearingExpiration: (isProofNearingExpiration) => set({ isProofNearingExpiration }),
       setTreasuryBalanceOverride: (treasuryBalanceOverride) => set({ treasuryBalanceOverride }),
       reset: () => set({ ...initialState }),
@@ -82,7 +105,10 @@ export const usePayrollWizardStore = create<PayrollWizardStore>()(
           set({ currentStep: "review" });
         }
       },
-      clearDraft: () => set({ ...initialState }),
+      clearDraft: () =>
+        set({ ...initialState, instructionVersion: null, interruptedAtStep: null }),
+      wasInterrupted: () => get().interruptedAtStep != null,
+      acknowledgeInterruption: () => set({ interruptedAtStep: null }),
     }),
     {
       name: "zk-payroll-wizard-draft",
@@ -98,6 +124,15 @@ export const usePayrollWizardStore = create<PayrollWizardStore>()(
         proof: null,
         isProofNearingExpiration: false,
         treasuryBalanceOverride: null,
+        // A settlement is "interrupted" (as opposed to a plain unsubmitted
+        // draft) when, at the moment of persisting, a proof or submission
+        // was actively in flight. Only the step name is kept — never the
+        // proof artifact or transaction hash — so the next load can warn
+        // the operator before they retry (#755).
+        interruptedAtStep:
+          state.proofStatus === "generating" || state.submissionStatus === "submitting"
+            ? state.currentStep
+            : state.interruptedAtStep ?? null,
       }),
     },
   ),

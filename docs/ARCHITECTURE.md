@@ -7,6 +7,7 @@ graph TD
     A[HistoryPage] --> B[DashboardLayout]
     B --> C[TransactionHistory]
     C --> D[TransactionDetailDrawer]
+    C --> K[ReconciliationStatusBadge]
     D --> E[Sheet]
     D --> F[Badge]
     D --> G[ScrollArea]
@@ -62,6 +63,8 @@ sequenceDiagram
   detailDrawerOpen: boolean                       // NEW
 }
 ```
+
+`Filters` also stores the optional reconciliation outcome. Saved views are normalized when loaded so views created before the reconciliation filter remains valid.
 
 **TransactionDetailDrawer**:
 
@@ -224,12 +227,34 @@ interface PayrollTransaction {
   totalAmount: number;           // Total paid (in base currency)
   employeeCount: number;         // Number of employees
   proof: string;                 // Zero-knowledge proof
-  status: TransactionStatus;     // Current status
+  status: TransactionStatus;     // Current payment status
+  reconciliationStatus?: ReconciliationStatus; // Reconciliation outcome
+  reconciliationDetails?: {
+    processedCount: number;
+    totalCount: number;
+    discrepancies?: string[];
+    lastReconciliedAt?: string;
+  };
   txHash?: string;               // Blockchain transaction hash
 }
 
 type TransactionStatus = "pending" | "verified" | "failed";
+
+type ReconciliationStatus =
+  | "matched"
+  | "pending"
+  | "mismatched"
+  | "failed"
+  | "manually_reviewed"
+  | "complete"   // legacy API value
+  | "partial";   // legacy API value
 ```
+
+### Reconciliation Status Resolution
+
+`ReconciliationStatusBadge` consumes the normalized outcome. `resolveReconciliationStatus` first honors an explicit outcome, then derives a safe result from aggregate reconciliation counts, and finally falls back to `Failed` for a failed transaction or `Pending` when data is unavailable. Legacy `complete` and `partial` values map to `matched` and `mismatched` respectively.
+
+The resolver never renders payroll amounts, employee identities, wallet addresses, proofs, or discrepancy strings. The badge, search index, and CSV export include only the normalized label.
 
 ## Security Considerations
 
@@ -243,18 +268,19 @@ type TransactionStatus = "pending" | "verified" | "failed";
 2. **Data Exposure**:
 
    ```typescript
-   // ✅ Safe to show
-   - Total amount
-   - Employee count
-   - Status
-   - Timestamps
-   - Transaction hash
-   
-   // ❌ Never exposed
-   - Individual salaries
-   - Employee personal info
-   - Private keys
-   - Unencrypted addresses
+    // ✅ Safe to show
+    - Total amount
+    - Employee count
+    - Status
+    - Reconciliation outcome
+    - Timestamps
+    - Transaction hash
+
+    // ❌ Never exposed
+    - Individual salaries
+    - Employee personal info
+    - Private keys
+    - Unencrypted addresses
    ```
 
 3. **External Links**:

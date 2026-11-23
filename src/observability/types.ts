@@ -1,5 +1,6 @@
 export type PayrollStage =
   | "draft"
+  | "draft_updated"
   | "validation"
   | "proof_setup"
   | "wallet_signing"
@@ -7,7 +8,8 @@ export type PayrollStage =
   | "polling"
   | "failure"
   | "retry"
-  | "reconciliation";
+  | "reconciliation"
+  | "employer_onboarding";
 
 export type PayrollEventStatus = "started" | "succeeded" | "failed" | "retried";
 

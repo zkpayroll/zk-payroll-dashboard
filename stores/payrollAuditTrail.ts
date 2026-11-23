@@ -9,7 +9,9 @@ export type PayrollApprovalActionType =
   | "wallet_signing"
   | "cancelled"
   | "submitted"
-  | "submission_failed";
+  | "submission_failed"
+  | "period_locked"
+  | "period_reopened";
 
 const ACTION_LABELS: Record<PayrollApprovalActionType, string> = {
   draft_created: "Draft Created",
@@ -20,6 +22,8 @@ const ACTION_LABELS: Record<PayrollApprovalActionType, string> = {
   cancelled: "Cancelled",
   submitted: "Submitted",
   submission_failed: "Submission Failed",
+  period_locked: "Period Locked",
+  period_reopened: "Period Reopened",
 };
 
 export function getActionLabel(action: PayrollApprovalActionType): string {

@@ -69,24 +69,21 @@ This guide answers common operational questions for administrators managing payr
 
 ---
 
-### Q: What does "Reconciliation Failed" mean?
+### Q: What do the reconciliation badges mean?
 
-**A:** When a payroll run shows "Reconciliation Failed," it means the Dashboard could not verify that all submitted payments were processed correctly on-chain.
+**A:** Payroll history shows a separate reconciliation badge for each run. The badge describes the settlement comparison, not the payment submission status shown in the adjacent `Status` badge.
 
-**Causes:**
+| Badge | Meaning | Operator action |
+| --- | --- | --- |
+| **Matched** | Every expected payment was reconciled. | No action required. |
+| **Pending** | Reconciliation is still in progress. | Wait and refresh before investigating. |
+| **Mismatched** | The comparison found a discrepancy or incomplete progress. | Open the run and review the reconciliation details. |
+| **Failed** | Reconciliation could not complete. | Check the run, retry when the underlying issue is resolved, or contact support. |
+| **Manually reviewed** | A reviewer acknowledged the outcome. | Read the reviewer context before changing the run. |
 
-- On-chain settlement is still in progress (can take 5-30 minutes)
-- Some transactions succeeded but others failed
-- The reconciliation service encountered a temporary error
+Legacy `Complete` and `Partial` API values are normalized to `Matched` and `Mismatched` in the UI.
 
-**What to do:**
-
-1. **Wait and refresh** - Settlement can take time. Refresh the page in 5-10 minutes.
-2. **Check on-chain** - Review the transaction hash in a Stellar block explorer.
-3. **Manual reconciliation** - If the issue persists:
-   - Export the reconciliation report
-   - Compare submitted amounts vs. on-chain transfers
-   - File a support request with the discrepancy details
+**Privacy:** Badges expose only the outcome label. They do not include salaries, wallet addresses, proofs, or discrepancy text. Authorized reconciliation detail views and reports remain separate from the badge.
 
 ---
 
@@ -205,19 +202,16 @@ This guide answers common operational questions for administrators managing payr
 
 ## Reconciliation & Settlement
 
-### Q: What does "Partially Reconciled" mean?
+### Q: What does "Mismatched" mean?
 
-**A:** "Partially Reconciled" means:
-
-- Some employees' payments have been confirmed on-chain
-- Other employees' payments are still pending or failed
-- Settlement is in progress
+**A:** "Mismatched" means that the reconciliation comparison found a discrepancy or that the run is only partially processed. The run may still be settling, or a payment may differ from the expected result.
 
 **What to do:**
 
-1. **Wait** - Settlement typically completes within 30 minutes
-2. **Check the progress bar** - Shows how many payments have been processed
-3. **Review discrepancies** - If any, they're listed under "Discrepancies"
+1. **Check the run** - Open the payroll run and review the progress summary.
+2. **Wait when appropriate** - Settlement can take several minutes.
+3. **Investigate discrepancies** - Use the authorized reconciliation details and transaction hash.
+4. **Escalate persistent issues** - Include the run ID and timestamp, but do not attach private payroll data.
 
 ---
 
@@ -228,7 +222,7 @@ This guide answers common operational questions for administrators managing payr
 1. Open a payroll run from the list
 2. Scroll to **Reconciliation Status**
 3. View:
-   - Current status (Pending, Partial, Complete, Failed)
+   - Current reconciliation outcome (Matched, Pending, Mismatched, Failed, Manually reviewed)
    - Progress bar (X of Y payments processed)
    - Any discrepancies
    - Timestamp of last reconciliation update

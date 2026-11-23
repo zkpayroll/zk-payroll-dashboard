@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useWalletStore } from "@/stores/walletStore";
 import { useCompanyStore } from "@/stores/company";
-import { EXPECTED_NETWORK } from "@/components/providers/StellarProvider";
+import { useEnvironmentStore } from "@/stores/environment";
 import { MOCK_COMPANIES, MOCK_TREASURY_BALANCE } from "@/lib/api/mockData";
 import {
   computeTreasuryReadiness,
@@ -35,6 +35,7 @@ export function useTreasuryReadiness(
   const publicKey = useWalletStore((s) => s.publicKey);
   const network = useWalletStore((s) => s.network);
   const company = useCompanyStore((s) => s.company);
+  const expectedNetwork = useEnvironmentStore((s) => s.getActiveProfileConfig().stellarNetwork);
 
   // The dashboard currently runs against the in-repo mock data set
   // (see `lib/api/mockData.ts` – used throughout the Treasury / Admin /
@@ -54,7 +55,7 @@ export function useTreasuryReadiness(
         balance,
         projectedPayroll,
         treasuryAddress,
-        expectedNetwork: EXPECTED_NETWORK,
+        expectedNetwork,
         currentNetwork: network,
         isWalletConnected: isConnected,
         companyAdmin,
@@ -64,6 +65,7 @@ export function useTreasuryReadiness(
       balance,
       projectedPayroll,
       treasuryAddress,
+      expectedNetwork,
       network,
       isConnected,
       companyAdmin,

@@ -157,6 +157,9 @@ Use this checklist to confirm the dashboard is wired correctly:
 - [ ] `/history` shows transaction history table
 - [ ] Filters panel can be opened/closed
 - [ ] Status, employee, date range, and payroll run filters work
+- [ ] Quick filters toolbar shows Status, Approval, Risk, Treasury, and Reconciliation chip groups
+- [ ] Clicking a quick filter chip narrows the list and shows a match count; clicking it again clears that group
+- [ ] "Clear quick filters" resets the toolbar; combined counts appear in the header filter badge
 - [ ] CSV export downloads a file with filtered results
 - [ ] "No transactions match the current filters" appears when no results
 
@@ -201,6 +204,16 @@ lsof -ti:3000 | xargs kill -9
 # Or use a different port
 npm run dev -- -p 3001
 ```
+
+### Node version / install issues (contributor notes)
+
+- **Node too old** (`EBADENGINE` or syntax errors): install Node 18+ (20 LTS recommended). `nvm install 20 && nvm use 20`, then `rm -rf node_modules && npm install`.
+- **Lockfile mismatch**: repo commits `package-lock.json`. Prefer `npm install`. If you use `pnpm`, delete the other lockfile before committing — do not commit both.
+- **Missing env file**: `Invalid environment variables` at boot means `.env.local` is missing or `SESSION_SECRET` is <32 chars. `cp .env.example .env.local` and set a 32+ char random secret (`openssl rand -base64 32`) and your `G...` admin key.
+- **Peer-deps warnings**: `npm install` may show peer-deps warnings — usually safe to ignore; for a clean reinstall run `rm -rf node_modules package-lock.json && npm install`.
+- **Type / lint failures**: run `npm run typecheck` and `npm run lint` locally; for docs run `npm run lint:md:fix`.
+
+Contributor short reference with full env table and run commands: see [docs/setup.md](./setup.md) and [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## 📚 Additional Resources
 

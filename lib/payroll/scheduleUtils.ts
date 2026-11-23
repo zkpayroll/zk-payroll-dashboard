@@ -89,14 +89,77 @@ export function toDateKey(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+function isValidRunDate(date: Date): boolean {
+  return !Number.isNaN(date.getTime());
+}
+
+export interface CalendarOverlap {
+  /** ISO (YYYY-MM-DD) key for the overlapping day. */
+  dateKey: string;
+  /** All unresolved runs landing on that day, oldest-created first. */
+  runs: PayrollRun[];
+  /** Employee IDs that appear in more than one of the overlapping runs. */
+  sharedEmployeeIds: string[];
+}
+
+/**
+ * Detects calendar days where more than one *unresolved* payroll run
+ * (scheduled or pending approval) is set to land. Two active runs sharing a
+ * date is an operational risk — most often a duplicate submission or a
+ * scheduling mistake — so completed and failed runs (which can no longer be
+ * double-processed) are excluded. Runs with a missing or unparsable date are
+ * skipped rather than treated as colliding on an "Invalid Date" bucket.
+ */
+export function detectCalendarOverlaps(runs: PayrollRun[]): CalendarOverlap[] {
+  const activeKinds: RunScheduleKind[] = ["scheduled", "pending_approval"];
+  const byDate = new Map<string, PayrollRun[]>();
+
+  for (const run of runs) {
+    if (!activeKinds.includes(classifyRun(run))) continue;
+
+    const date = getRunDate(run);
+    if (!isValidRunDate(date)) continue;
+
+    const key = toDateKey(date);
+    const existing = byDate.get(key) ?? [];
+    existing.push(run);
+    byDate.set(key, existing);
+  }
+
+  const overlaps: CalendarOverlap[] = [];
+  Array.from(byDate.entries()).forEach(([dateKey, dateRuns]) => {
+    if (dateRuns.length < 2) return;
+
+    const employeeCounts = new Map<string, number>();
+    dateRuns.forEach((run) => {
+      (run.employeeIds ?? []).forEach((employeeId) => {
+        employeeCounts.set(employeeId, (employeeCounts.get(employeeId) ?? 0) + 1);
+      });
+    });
+    const sharedEmployeeIds = Array.from(employeeCounts.entries())
+      .filter(([, count]) => count > 1)
+      .map(([employeeId]) => employeeId);
+
+    overlaps.push({
+      dateKey,
+      runs: [...dateRuns].sort(
+        (a, b) => getRunDate(a).getTime() - getRunDate(b).getTime(),
+      ),
+      sharedEmployeeIds,
+    });
+  });
+
+  return overlaps.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+}
+
 export function getCalendarMonthDays(year: number, month: number): (Date | null)[] {
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-  const leadingEmpty = firstDay.getDay();
+  const firstDay = new Date(Date.UTC(year, month, 1));
+  const lastDay = new Date(Date.UTC(year, month + 1, 0));
+  const leadingEmpty = firstDay.getUTCDay();
   const days: (Date | null)[] = Array.from({ length: leadingEmpty }, () => null);
 
-  for (let day = 1; day <= lastDay.getDate(); day++) {
-    days.push(new Date(year, month, day));
+  for (let day = 1; day <= lastDay.getUTCDate(); day++) {
+    days.push(new Date(Date.UTC(year, month, day)));
   }
 
   while (days.length % 7 !== 0) {
@@ -105,6 +168,7 @@ export function getCalendarMonthDays(year: number, month: number): (Date | null)
 
   return days;
 }
+
 
 export const RUN_KIND_STYLES: Record<
   RunScheduleKind,

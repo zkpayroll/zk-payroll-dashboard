@@ -7,12 +7,12 @@ import {
   XCircle,
   Edit,
   Send,
-  Paperclip,
   Clock,
   User,
 } from "lucide-react";
 import { MOCK_APPROVAL_COMMENTS, MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import type { ApprovalAction } from "@/types";
+import AttachmentMetadataViewer from "@/components/features/attachments/AttachmentMetadataViewer";
 
 // ─── Action metadata ─────────────────────────────────────────────────────────
 
@@ -100,10 +100,10 @@ function ApprovalCommentHistory() {
       comments = comments.filter((c) => c.action === actionFilter);
     }
     return comments.sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
   }, [selectedPayrollId, actionFilter]);
-
 
   return (
     <section aria-labelledby="approval-comments-heading" className="space-y-4">
@@ -123,9 +123,7 @@ function ApprovalCommentHistory() {
           <select
             id="payroll-select"
             value={selectedPayrollId ?? ""}
-            onChange={(e) =>
-              setSelectedPayrollId(e.target.value || null)
-            }
+            onChange={(e) => setSelectedPayrollId(e.target.value || null)}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
           >
             <option value="">All payroll runs</option>
@@ -138,24 +136,29 @@ function ApprovalCommentHistory() {
         </div>
 
         <div className="flex gap-1 flex-wrap">
-          {(["all", "submitted", "approved", "rejected", "requested_changes", "commented"] as const).map(
-            (action) => (
-              <button
-                key={action}
-                type="button"
-                onClick={() => setActionFilter(action)}
-                className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  actionFilter === action
-                    ? "bg-gray-900 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                {action === "all"
-                  ? "All"
-                  : ACTION_META[action].label}
-              </button>
-            ),
-          )}
+          {(
+            [
+              "all",
+              "submitted",
+              "approved",
+              "rejected",
+              "requested_changes",
+              "commented",
+            ] as const
+          ).map((action) => (
+            <button
+              key={action}
+              type="button"
+              onClick={() => setActionFilter(action)}
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                actionFilter === action
+                  ? "bg-gray-900 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {action === "all" ? "All" : ACTION_META[action].label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -163,9 +166,7 @@ function ApprovalCommentHistory() {
       {filteredComments.length === 0 && (
         <div className="bg-white rounded-lg shadow-sm p-8 text-center">
           <MessageSquare className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-900">
-            No comments found
-          </p>
+          <p className="text-sm font-medium text-gray-900">No comments found</p>
           <p className="text-sm text-gray-500 mt-1">
             {selectedPayrollId
               ? "This payroll run has no matching comments."
@@ -203,9 +204,7 @@ function ApprovalCommentHistory() {
                         className={`w-4 h-4 shrink-0 ${meta.text}`}
                         aria-hidden="true"
                       />
-                      <span
-                        className={`text-sm font-semibold ${meta.text}`}
-                      >
+                      <span className={`text-sm font-semibold ${meta.text}`}>
                         {meta.label}
                       </span>
                     </div>
@@ -227,14 +226,10 @@ function ApprovalCommentHistory() {
                       <Clock className="w-3.5 h-3.5" />
                       {formatDate(comment.createdAt)}
                     </span>
-                    {comment.attachmentUrl && (
-                      <a
-                        href={comment.attachmentUrl}
-                        className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700"
-                      >
-                        <Paperclip className="w-3.5 h-3.5" />
-                        Attachment
-                      </a>
+                    {(comment.attachmentMetadata || comment.attachmentUrl) && (
+                      <AttachmentMetadataViewer
+                        metadata={comment.attachmentMetadata}
+                      />
                     )}
                   </div>
                 </div>

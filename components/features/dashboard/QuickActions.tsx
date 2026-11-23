@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   UserPlus,
@@ -8,6 +9,7 @@ import {
   Upload,
   Plus,
 } from "lucide-react";
+import { usePayrollOperator } from "@/hooks/usePayrollOperator";
 
 interface QuickAction {
   label: string;
@@ -51,17 +53,32 @@ const QUICK_ACTIONS: QuickAction[] = [
 interface QuickActionsProps {
   role?: "admin" | "operator" | "auditor";
   compact?: boolean;
+  operatorAddress?: string;
 }
 
-export default function QuickActions({ role = "admin", compact = false }: QuickActionsProps) {
+export default function QuickActions({
+  role = "admin",
+  compact = false,
+  operatorAddress,
+}: QuickActionsProps) {
   const router = useRouter();
+  const { isOperator, isLoading: isOperatorLoading } =
+    usePayrollOperator(operatorAddress);
   const isAdmin = role === "admin";
+  const canExecutePayroll = isAdmin || isOperator;
 
-  const visibleActions = QUICK_ACTIONS.filter(
-    (a) => !a.adminOnly || isAdmin
+  const visibleActions = useMemo(
+    () =>
+      QUICK_ACTIONS.filter((a) => {
+        if (a.route === "/payroll/execute") {
+          return canExecutePayroll;
+        }
+        return !a.adminOnly || isAdmin;
+      }),
+    [isAdmin, canExecutePayroll]
   );
 
-  if (visibleActions.length === 0) return null;
+  if (isOperatorLoading || visibleActions.length === 0) return null;
 
   return (
     <div className="space-y-3">
@@ -80,11 +97,23 @@ export default function QuickActions({ role = "admin", compact = false }: QuickA
       >
         {visibleActions.map((action) => {
           const Icon = action.icon;
+          const isPayrollExecute = action.route === "/payroll/execute";
+          const disabled = isPayrollExecute && !canExecutePayroll;
           return (
             <button
               key={action.label}
               type="button"
-              onClick={() => router.push(action.route)}
+              disabled={disabled}
+              aria-disabled={disabled}
+              title={
+                disabled
+                  ? "Payroll operator permission required to execute payroll"
+                  : undefined
+              }
+              onClick={() => {
+                if (disabled) return;
+                router.push(action.route);
+              }}
               className={`flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-white hover:border-indigo-300 hover:bg-indigo-50 transition-all group text-left ${
                 compact ? "" : ""
               }`}

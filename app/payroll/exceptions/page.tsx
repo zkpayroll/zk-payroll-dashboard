@@ -1,10 +1,14 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import PayrollExceptionsQueue from "@/components/features/payroll/PayrollExceptionsQueue";
+import PayrollExceptionTriage from "@/components/triage/PayrollExceptionTriage";
+import ExceptionOwnershipTracker from "@/components/triage/ExceptionOwnershipTracker";
+import ReserveThresholdExceptionApprovals from "@/components/triage/ReserveThresholdExceptionApprovals";
 
 function ExceptionsPage() {
   return (
     <DashboardLayout>
-      <PayrollExceptionsQueue />
+      <PayrollExceptionTriage />
+      <ExceptionOwnershipTracker />
+      <ReserveThresholdExceptionApprovals />
     </DashboardLayout>
   );
 }

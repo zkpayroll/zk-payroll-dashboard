@@ -37,7 +37,10 @@ describe("ExportPermissionsMatrix", () => {
     expect(
       screen.getAllByText("Treasury operations are admin-only. Please contact an administrator.").length,
     ).toBeGreaterThan(0);
+      screen.getAllByText("Treasury operations are admin-only. Please contact an administrator.")[0],
+    ).toBeInTheDocument();
   });
+
 
   it("matches canExport for every export type / role combination", () => {
     render(<ExportPermissionsMatrix />);

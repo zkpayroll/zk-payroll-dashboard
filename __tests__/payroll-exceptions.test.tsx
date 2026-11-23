@@ -36,7 +36,7 @@ describe("PayrollExceptionsQueue", () => {
       screen.getByRole("tabpanel", { name: /transaction exceptions/i }),
     ).toBeInTheDocument();
     expect(screen.getAllByRole("status").length).toBeGreaterThan(0);
-    expect(screen.getByText(/payroll run tx_/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/payroll run tx_/i).length).toBeGreaterThan(0);
   });
 
   it("switches to employee exceptions and resolves an item", () => {

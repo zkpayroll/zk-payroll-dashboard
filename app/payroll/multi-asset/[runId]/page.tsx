@@ -5,6 +5,10 @@ import { useParams, notFound } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import MultiAssetPayrollReview from "@/components/features/payroll/MultiAssetPayrollReview";
 import { MOCK_MULTI_ASSET_RUNS } from "@/lib/api/mockData";
+import {
+  beginPartialGroupRetry,
+  completePartialGroupRetry,
+} from "@/lib/payroll/partialBatchRecovery";
 
 export default function MultiAssetPayrollDetailPage() {
   const { runId } = useParams<{ runId: string }>();
@@ -51,15 +55,20 @@ export default function MultiAssetPayrollDetailPage() {
     setRuns((prev) =>
       prev.map((r) =>
         r.id === runId
-          ? {
-              ...r,
-              assetGroups: r.assetGroups.map((g) =>
-                g.asset.code === assetCode ? { ...g, status: "executing" } : g,
-              ),
-            }
+          ? beginPartialGroupRetry(r, assetCode)
           : r,
       ),
     );
+    setTimeout(() => {
+      const executedAt = new Date().toISOString();
+      setRuns((prev) =>
+        prev.map((r) =>
+          r.id === runId
+            ? completePartialGroupRetry(r, assetCode, `retry_${assetCode}_${Date.now()}`, executedAt)
+            : r,
+        ),
+      );
+    }, 2500);
   };
 
   const currentRun = runs.find((r) => r.id === runId)!;

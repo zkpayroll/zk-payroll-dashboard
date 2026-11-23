@@ -1,6 +1,7 @@
 import * as React from "react";
 import { CheckCircle2, Clock, XCircle, HelpCircle, AlertCircle, MessageSquareWarning } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { PAYROLL_RUN_STATUS_BADGE_SPECS } from "@/src/payroll/statusBadges";
 
 export type StatusType =
   | "verified"
@@ -28,28 +29,29 @@ interface StatusConfig {
   icon?: React.ComponentType<any>;
 }
 
+/** Glyphs for the run lifecycle, keyed by the statuses declared in the contract. */
+const PAYROLL_RUN_STATUS_ICONS: Record<string, React.ComponentType<any>> = {
+  verified: CheckCircle2,
+  pending: Clock,
+  failed: XCircle,
+  cancelled: XCircle,
+};
+
 const statusConfigs: Record<string, StatusConfig> = {
-  // Payroll / Transaction statuses
-  verified: {
-    label: "Verified",
-    variant: "success",
-    icon: CheckCircle2,
-  },
-  pending: {
-    label: "Pending",
-    variant: "warning",
-    icon: Clock,
-  },
-  failed: {
-    label: "Failed",
-    variant: "error",
-    icon: XCircle,
-  },
-  cancelled: {
-    label: "Cancelled",
-    variant: "secondary",
-    icon: XCircle,
-  },
+  // Payroll / Transaction statuses.
+  // Labels and variants come from the shared contract in
+  // @/src/payroll/statusBadges so the visual regression suite has one source
+  // of truth for colours, words, and contrast. Icons stay local to the view.
+  ...Object.fromEntries(
+    PAYROLL_RUN_STATUS_BADGE_SPECS.map((spec) => [
+      spec.status,
+      {
+        label: spec.label,
+        variant: spec.variant,
+        icon: spec.hasIcon ? PAYROLL_RUN_STATUS_ICONS[spec.status] : undefined,
+      },
+    ]),
+  ),
 
   // Employee directory statuses
   active: {

@@ -16,6 +16,13 @@ import {
 } from "lucide-react";
 import type { AssetGroup, MultiAssetPayrollRun } from "@/types/models";
 import { assetLabel, formatAssetAmount, groupRiskLabel } from "@/lib/payroll/multiAsset";
+import {
+  validatePayoutToken,
+  type PayoutTokenValidationFailure,
+} from "@/lib/assets/payoutTokenValidation";
+import { ProofStatusCard } from "@/components/features/proofs/ProofStatusCard";
+import { RoundingInfoTooltip } from "@/components/features/payroll/RoundingInfoTooltip";
+import type { ProofLifecycleState } from "@/stores/proofStatus";
 
 // ── Status helpers ────────────────────────────────────────────────────────────
 
@@ -156,22 +163,43 @@ interface MultiAssetPayrollReviewProps {
   run: MultiAssetPayrollRun;
   onSubmit?: () => void;
   onRetryGroup?: (assetCode: string) => void;
+  onRegenerateProof?: () => void;
 }
 
 export default function MultiAssetPayrollReview({
   run,
   onSubmit,
   onRetryGroup,
+  onRegenerateProof,
 }: MultiAssetPayrollReviewProps) {
   const statusCfg = STATUS_CONFIG[run.status];
   const hasFundingIssue = run.assetGroups.some((g) => g.status === "underfunded");
   const hasFailedGroup = run.assetGroups.some((g) => g.status === "failed");
-  const canSubmit = run.status === "ready" && run.proofStatus === "ready";
+  // Settlement must not proceed for groups whose payout token is not supported.
+  const unsupportedPayoutTokens = run.assetGroups
+    .map((g) => validatePayoutToken(g.asset.code))
+    .filter((r): r is PayoutTokenValidationFailure => !r.valid);
+  const hasUnsupportedPayoutToken = unsupportedPayoutTokens.length > 0;
+  const canSubmit =
+    run.status === "ready" && run.proofStatus === "ready" && !hasUnsupportedPayoutToken;
 
   const totalByAsset = run.assetGroups.map((g) => ({
     assetCode: g.asset.code,
     total: g.totalAmount,
+    paymentCount: g.transactionCount,
   }));
+
+  const hasUnsafeTotal = totalByAsset.some((t) => t.total > Number.MAX_SAFE_INTEGER);
+
+  // Map run.proofStatus to 7-state lifecycle for card
+  const mappedProofState: ProofLifecycleState =
+    run.proofStatus === "ready"
+      ? "ready"
+      : run.proofStatus === "generating"
+      ? "generating"
+      : run.proofStatus === "expired"
+      ? "expired"
+      : "queued";
 
   return (
     <div className="space-y-6">
@@ -188,6 +216,23 @@ export default function MultiAssetPayrollReview({
           {statusCfg.label}
         </span>
       </div>
+
+      {/* Unsupported payout token errors */}
+      {unsupportedPayoutTokens.map((r, i) => (
+        <div
+          key={`${r.errorCode}-${i}`}
+          role="alert"
+          data-error-code={r.errorCode}
+          className="flex items-start gap-3 rounded-lg bg-red-50 border border-red-200 p-4 text-sm text-red-800"
+        >
+          <XCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">Unsupported payout token</p>
+            <p className="text-red-700 mt-0.5">{r.message}</p>
+            <p className="text-xs text-red-600 mt-1">Error code: {r.errorCode}</p>
+          </div>
+        </div>
+      ))}
 
       {/* Global warnings */}
       {hasFundingIssue && (
@@ -216,6 +261,13 @@ export default function MultiAssetPayrollReview({
         </div>
       )}
 
+      {hasUnsafeTotal && (
+        <div className="flex items-start gap-3 rounded-lg bg-orange-50 border border-orange-200 p-4 text-sm text-orange-800">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <p className="font-semibold">Aggregate payout total exceeds safe precision — amounts above {Number.MAX_SAFE_INTEGER.toLocaleString()} cannot be represented exactly, so verify each asset total before submitting.</p>
+        </div>
+      )}
+
       {/* Totals summary */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div className="rounded-lg border border-gray-200 bg-white p-3">
@@ -227,7 +279,10 @@ export default function MultiAssetPayrollReview({
         </div>
         {totalByAsset.map((t) => (
           <div key={t.assetCode} className="rounded-lg border border-gray-200 bg-white p-3">
-            <p className="text-xs text-gray-500">{t.assetCode} total</p>
+            <p className="text-xs text-gray-500 flex items-center gap-1">
+              {t.assetCode} total
+              <RoundingInfoTooltip assetCode={t.assetCode} paymentCount={t.paymentCount} />
+            </p>
             <p className="text-lg font-bold text-gray-900 font-mono">
               {formatAssetAmount(t.total, t.assetCode)}
             </p>
@@ -256,32 +311,12 @@ export default function MultiAssetPayrollReview({
         ))}
       </div>
 
-      {/* Proof status */}
-      <div className="flex items-center gap-2 text-sm rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-        <ShieldAlert className="w-4 h-4 text-indigo-500" />
-        <span className="text-gray-700">
-          ZK proof:{" "}
-          <span
-            className={`font-semibold ${
-              run.proofStatus === "ready"
-                ? "text-green-700"
-                : run.proofStatus === "generating"
-                ? "text-blue-600"
-                : run.proofStatus === "expired"
-                ? "text-red-600"
-                : "text-gray-500"
-            }`}
-          >
-            {run.proofStatus === "ready"
-              ? "Ready"
-              : run.proofStatus === "generating"
-              ? "Generating…"
-              : run.proofStatus === "expired"
-              ? "Expired — regenerate before submission"
-              : "Not generated"}
-          </span>
-        </span>
-      </div>
+      {/* Proof status card integration */}
+      <ProofStatusCard
+        statusOverride={mappedProofState}
+        onRegenerateProof={onRegenerateProof}
+        onSubmitTransaction={onSubmit}
+      />
 
       {/* Actions */}
       <div className="flex items-center justify-between pt-2">

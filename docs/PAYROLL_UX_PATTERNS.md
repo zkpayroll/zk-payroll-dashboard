@@ -1,0 +1,1213 @@
+# Payroll UX Patterns
+
+Developer reference for the UX reliability patterns introduced in issues #455, #460, #462, #463, and #468–#471. Each section covers the motivation, the files involved, usage examples, and important design constraints.
+
+---
+
+## #470 — Payroll Run Progress Persistence
+
+**Goal:** Restore visible batch progress after a refresh without exposing
+sensitive payroll data.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `stores/payrollRunProgress.ts` | Zustand store with `persist` middleware. Holds a `PayrollRunProgressSnapshot`. |
+| `hooks/usePayrollRunProgress.ts` | Syncs `usePayrollWizardStore` state → progress store automatically. |
+| `components/features/payroll/PayrollRunProgressBanner.tsx` | Amber recovery banner shown on page load when a resumable run exists. |
+| `__tests__/payroll-run-progress.test.tsx` | Store unit tests, hook sync tests, banner render/action tests. |
+
+### How it works
+
+`usePayrollRunProgress` is mounted inside (or alongside) the `PayrollWizard`
+component. It watches `currentStep`, `employeeIds`, `proofStatus`, and
+`submissionStatus` from the wizard store and writes a safe snapshot to
+`localStorage` under the key `zk-payroll-run-progress` via the Zustand
+`persist` middleware.
+
+On the next page load, `PayrollRunProgressBanner` reads the store. If
+`hasResumableRun()` returns `true` (snapshot exists and `submitted === false`)
+the banner renders. The user can either resume (navigate to the wizard) or
+discard (calls `clearProgress()`).
+
+### What is intentionally excluded from the snapshot
+
+The snapshot **never** stores:
+
+- Employee IDs, names, or salary amounts
+- ZK proof data or proof hashes
+- Wallet addresses or transaction hashes
+- Any field from `PayrollWizardState` that carries a financial value
+
+The snapshot stores only: `runId`, `currentStep`, `employeeCount` (integer),
+`proofReady` (boolean), `submitted` (boolean), and `updatedAt` (ISO timestamp).
+
+### Usage
+
+```tsx
+// Inside PayrollWizard (or a parent layout):
+import { usePayrollRunProgress } from "@/hooks/usePayrollRunProgress";
+usePayrollRunProgress({ runId });
+
+// On the dashboard or payroll page header:
+import { PayrollRunProgressBanner } from "@/components/features/payroll/PayrollRunProgressBanner";
+<PayrollRunProgressBanner onResume={() => router.push("/payroll")} />
+```
+
+The banner includes a hydration guard (`useState(false)` + `useEffect`) so
+it never renders during SSR, preventing a server/client mismatch.
+
+---
+
+## #471 — Configurable Dashboard Session Timeout Warning
+
+**Goal:** Warn users before expiry and safely preserve non-sensitive draft
+state where appropriate.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `hooks/useSessionTimeoutWarning.ts` | Derives a `TimeoutWarningLevel` from `useSession` state; handles extend and dismiss. |
+| `components/features/session/SessionTimeoutWarning.tsx` | Renders banner (warning) or blocking modal (urgent / expired). |
+| `__tests__/session-timeout-warning.test.tsx` | Hook and component tests including escalation, onExpired, and sensitive-data checks. |
+
+### Warning levels
+
+| Level | Condition | UI |
+| --- | --- | --- |
+| `idle` | `timeRemaining > warningThresholdMs` | Nothing rendered |
+| `warning` | `≤ warningThresholdMs` and `> urgentThresholdMs` | Dismissible sticky banner |
+| `urgent` | `≤ urgentThresholdMs` | Blocking modal — cannot be dismissed, only extended |
+| `expired` | `sessionState === "expired"` | Blocking modal — "Sign in again" link only |
+
+The warning automatically **re-surfaces** when the level escalates (e.g. a
+dismissed `warning` banner reappears when the level reaches `urgent`).
+
+### Configuration
+
+```tsx
+<SessionTimeoutWarning
+  warningThresholdMs={10 * 60 * 1000}  // default: 10 min
+  urgentThresholdMs={2 * 60 * 1000}    // default: 2 min
+  onExtend={async () => {
+    await fetch("/api/auth/extend", { method: "POST" });
+  }}
+  onExpired={() => router.push("/login")}
+/>
+```
+
+`onExtend` is optional. When omitted the hook calls `useSession().refresh()`
+which re-fetches `/api/auth/session`.
+
+### Sensitive data policy
+
+The component never displays session token values, wallet public keys, or any
+payroll figures. It only renders the countdown string from
+`formatTimeRemaining()` (e.g. `"8m remaining"`).
+
+Mount `<SessionTimeoutWarning />` once in the root dashboard layout so all
+protected pages get the warning without per-page wiring.
+
+---
+
+## #469 — Accessible Toast Announcements for Payroll Results
+
+**Goal:** Make success and failure feedback available to assistive
+technologies (screen readers) without requiring operators to monitor visual
+toast notifications.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `stores/announcements.ts` | Zustand store with `politeMessage` and `assertiveMessage` slots. |
+| `components/ui/LiveRegion.tsx` | Two visually-hidden `aria-live` divs; mount once near the root. |
+| `hooks/usePayrollResultAnnouncer.ts` | Combined hook: fires both a `sonner` toast and an ARIA announcement. |
+| `__tests__/accessible-toast-announcements.test.tsx` | Store, LiveRegion, and hook tests. |
+
+### Architecture
+
+```text
+usePayrollResultAnnouncer
+  ├── toast.success/error/warning()   → visual sonner toast
+  └── useAnnouncementStore.announce() → politeMessage / assertiveMessage
+                                             ↓
+                                       <LiveRegion />
+                                       (sr-only aria-live divs)
+                                             ↓
+                               Screen reader reads announcement aloud
+```
+
+### Politeness rules
+
+| Method | sonner call | ARIA politeness |
+| --- | --- | --- |
+| `announceSuccess` | `toast.success` | `polite` |
+| `announceInfo` | `toast` | `polite` |
+| `announceWarning` | `toast.warning` | `polite` |
+| `announceError` | `toast.error` | **`assertive`** |
+
+Errors use `assertive` so screen readers interrupt current speech immediately —
+consistent with WCAG guidance that errors require prompt notification.
+
+### Setup (one-time)
+
+Add `<LiveRegion />` once in the root layout:
+
+```tsx
+// app/layout.tsx
+import { LiveRegion } from "@/components/ui/LiveRegion";
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        {children}
+        <LiveRegion />   {/* ← adds two sr-only aria-live regions */}
+      </body>
+    </html>
+  );
+}
+```
+
+### Usage in components
+
+```tsx
+import { usePayrollResultAnnouncer } from "@/hooks/usePayrollResultAnnouncer";
+
+const { announceSuccess, announceError } = usePayrollResultAnnouncer();
+
+// Replace direct toast.success() calls:
+announceSuccess("Proof generated successfully");
+
+// Replace direct toast.error() calls:
+announceError("Submission failed", "Network timeout. Please retry.");
+```
+
+### Message content policy
+
+Messages passed to the announcer must **not** contain salary amounts, employee
+names, wallet addresses, or proof hashes. Use generic operational language:
+"Proof generated", "Submission failed", "Batch of 5 employees queued".
+
+---
+
+## #468 — Reusable Form Unsaved-Changes Guard
+
+**Goal:** Prevent accidental loss of employee and payroll configuration edits
+when an operator navigates away or dismisses a form.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `hooks/useUnsavedChangesGuard.ts` | Headless guard: manages dialog state, `beforeunload` listener, and action callbacks. |
+| `components/ui/UnsavedChangesDialog.tsx` | Confirmation modal paired with the guard. |
+| `__tests__/unsaved-changes-guard.test.tsx` | Hook and component integration tests. |
+
+### How it works
+
+```text
+                     isDirty=false          isDirty=true
+                          │                      │
+guard.requestNavigation() │                      │
+guard.requestDismiss()    │                      │
+                          ▼                      ▼
+                    proceed()         open UnsavedChangesDialog
+                    immediately             │           │
+                                      confirmLeave   cancelLeave
+                                           │               │
+                                      proceed()       do nothing
+                                      (navigate/close)
+```
+
+`requestNavigation` and `requestDismiss` both accept a `proceed` callback.
+The guard tracks `pendingActionType` (`"navigation"` | `"dismiss"`) so the
+dialog can display context-appropriate copy:
+
+- Navigation: "Leave page?" / "Leave anyway" / "Stay and keep editing"
+- Dismiss: "Discard changes?" / "Discard changes" / "Keep editing"
+
+### Usage
+
+```tsx
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/ui/UnsavedChangesDialog";
+
+function EmployeeEditForm({ onClose }) {
+  const [isDirty, setIsDirty] = useState(false);
+  const guard = useUnsavedChangesGuard({ isDirty });
+
+  return (
+    <>
+      <form onChange={() => setIsDirty(true)}>
+        {/* ... fields ... */}
+      </form>
+
+      <button onClick={() => guard.requestDismiss(onClose)}>
+        Close
+      </button>
+
+      <UnsavedChangesDialog guard={guard} />
+    </>
+  );
+}
+```
+
+Custom copy can be passed to `UnsavedChangesDialog`:
+
+```tsx
+<UnsavedChangesDialog
+  guard={guard}
+  title="Unsaved employee edits"
+  description="Your employee configuration changes will be lost."
+  confirmLabel="Discard employee edits"
+  cancelLabel="Continue editing"
+/>
+```
+
+### Integration with `usePayrollPolicyStore`
+
+`PayrollPolicyEditor` already computes `isDirty` via `JSON.stringify`
+comparison. To add the guard:
+
+```tsx
+const guard = useUnsavedChangesGuard({ isDirty });
+// then wrap the back-navigation button:
+<button onClick={() => guard.requestNavigation(() => router.back())}>Back</button>
+<UnsavedChangesDialog guard={guard} />
+```
+
+### Accessibility
+
+- The dialog is a `role="dialog"` with `aria-modal="true"`, `aria-labelledby`,
+  and `aria-describedby`.
+- The **safe** action button (Keep editing / Stay) receives focus on open so
+  pressing Enter does not accidentally discard changes.
+- The background scroll is not locked in this implementation; add
+  `overflow: hidden` to `<body>` via a `useEffect` if needed for your layout.
+
+---
+
+## #460 — Stale Data Refresh Indicator
+
+**Goal:** Notify operators when displayed payroll calculations or operational
+snapshots may be out of date and offer a fast, non-blocking refresh action.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `hooks/useStaleDataRefresh.ts` | Tracks data age, stale threshold, polling intervals, and refresh execution state. |
+| `components/features/payroll/StaleDataIndicator.tsx` | Accessible indicator (banner or inline badge) with refresh trigger. |
+| `components/features/payroll/PayrollHistory.tsx` | Integrated into historical payroll run tables and summaries. |
+| `__tests__/stale-data-refresh-indicator.test.tsx` | Test suite covering stale calculations, refresh callbacks, and error handling. |
+
+### How it works
+
+`useStaleDataRefresh` accepts a `lastFetchedAt` timestamp (or `dataVersion`),
+a configurable `staleThresholdMs` (default: 60 seconds), and an `onRefresh`
+callback. A timer computes the elapsed duration and updates `isStale`.
+When stale, `StaleDataIndicator` displays a warning with an accessible
+refresh button (`aria-label="Refresh payroll data"`), spinning refresh icon,
+and live feedback for assistive technologies (`role="status"`).
+
+### Design constraints & privacy
+
+- Does not expose raw balances, salaries, or employee tokens in the stale notice.
+- Disables the refresh button while a fetch is in-flight to prevent duplicate requests.
+- Offers both compact inline and full-width banner presentation variants.
+
+---
+
+## #463 — Responsive Employee Table Controls
+
+**Goal:** Provide full sorting, search filtering, and responsive mobile-optimized
+controls for employee directories without horizontal scrolling or tiny touch targets.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `components/features/employees/EmployeeDirectory.tsx` | Main responsive employee directory component with search, sort, and dual layout. |
+| `__tests__/responsive-employee-table-controls.test.tsx` | Automated unit/integration tests for search, sorting, and responsive toggle controls. |
+| `__tests__/smoke/mobile-layout.test.tsx` | Mobile viewport smoke tests verifying touch targets (min 44px) and card layouts. |
+
+### Responsive behavior
+
+- **Desktop (md+):** Formatted table layout with interactive column headers
+  equipped with `aria-sort="ascending|descending|none"`. Clicking column headers
+  cycles sort direction (asc → desc → asc).
+- **Mobile (<md):** Card-based employee list rendering key attributes (name,
+  department, masked salary/currency, status badge) with dedicated sorting
+  select controls and minimum 44px touch targets.
+- **Search:** Real-time filtering by employee name, department, or employee ID
+  with accessible search input and clear filter options.
+
+---
+
+## #462 — Conflict-Aware Payroll Edit Warning
+
+**Goal:** Prevent accidental data overwrites when multiple operators or automated
+jobs modify payroll drafts or reconciliation periods concurrently.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `hooks/usePayrollConflictWarning.ts` | Conflict detection logic (`detectPeriodConflict`) comparing base and remote snapshots. |
+| `components/features/payroll/PayrollConflictBanner.tsx` | Sticky non-blocking alert banner rendered when concurrent edits are detected. |
+| `components/features/payroll/PayrollConflictWarningModal.tsx` | Detailed conflict resolution modal with reload and explicit overwrite protection. |
+| `__tests__/payroll-conflict-warning.test.tsx` | Unit and integration tests for conflict detection, reload, and overwrite flow. |
+
+### Conflict resolution flow
+
+1. **Detection:** When `baseSnapshot` (version/timestamp loaded by user) diverges
+   from `remoteSnapshot` (version, status, or timestamp on server), a conflict is raised.
+2. **Notification:** `PayrollConflictBanner` renders at the top of the view with
+   the nature of the remote change (e.g., status changed or edited elsewhere).
+3. **Resolution choices:**
+   - **Reload latest (Safe action):** Fetches remote data and discards local draft conflict.
+   - **Review changes:** Opens `PayrollConflictWarningModal` displaying side-by-side
+     metadata differences (version, status, timestamp, author).
+   - **Explicit overwrite:** Overwriting is protected by an explicit acknowledgement
+     checkbox. The overwrite button remains disabled until checked.
+
+---
+
+## #455 — Confirmation Dialog for Payroll Period Finalization
+
+**Goal:** Guard irreversible period finalization with an explicit confirmation
+step warning operators of immutability and downstream impacts.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `components/features/payroll/PeriodFinalizationDialog.tsx` | High-impact modal dialog detailing downstream impacts and requiring confirmation. |
+| `components/features/reconciliation/PeriodCloseDashboard.tsx` | Integrated with "Close period" action to replace direct state mutation with dialog. |
+| `__tests__/period-finalization-dialog.test.tsx` | Unit tests for dialog rendering, acknowledgement checkbox, and error handling. |
+| `__tests__/components/PeriodCloseDashboard.test.tsx` | Integration test verifying confirmation closes period and cancellation preserves state. |
+
+### Downstream impacts explained to operators
+
+- **Permanent Record Locking:** Payroll batches and employee lines cannot be edited.
+- **Funding Settlement:** Temporary reservations are permanently settled against vaults.
+- **Audit Compliance Seal:** ZK batch roots and audit timelines are immutably archived.
+- **Corrections:** Adjustments must be issued through off-cycle supplementary runs.
+
+### Safety defaults
+
+- Safe default focus is placed on the **"Cancel and keep open"** button to prevent
+  accidental submission via keyboard Enter.
+- The confirm action is disabled until the operator checks the acknowledgement box.
+- Escape key or backdrop click safely dismisses the dialog without changing period status.
+
+---
+
+## #464 — Empty States for Payroll Search and Filters
+
+When search or filters hide every run, payroll lists render
+`PayrollFilterEmptyState` (`components/filters/PayrollFilterEmptyState.tsx`)
+instead of a generic "no data" message.
+
+- **Why it's empty:** `describePayrollEmptyState` (`src/payroll/emptyState.ts`)
+  tells apart *no data yet*, *search miss*, *filter miss*, and
+  *search + filters*. Each case gets its own title and a "0 of N" explanation.
+- **How to recover:** each active constraint appears as a chip with its own
+  remove button. A single **Clear all filters** button resets search and every
+  filter.
+- **Privacy:** only filter labels appear. The search echo is cut to 32
+  characters, the employee filter shows as "Employee filter" without the name,
+  and run records (amounts, wallets, hashes) are never passed to the
+  component.
+- **Integrated in:** `PayrollHistory`, `TransactionHistory` (history and
+  archived modes).
+
+## Mobile Layout for Payroll Preflight Blockers (#527)
+
+Preflight blocker cards (`PayrollRiskWarnings`, `CompanyStateWarnings`, `OverduePayrollAlertBanner`) use flexible responsive layout containers (`flex-col sm:flex-row`, `p-4 sm:p-5`) to maintain full readability on narrow mobile screens. Touch targets (action buttons, dismiss controls) adhere to the minimum 44px height specification.
+
+## Audit-Friendly Amendment Export (#528)
+
+The amendment export utility (`exportAmendmentMetadata`) and preview modal (`AuditAmendmentExportModal`) enable exporting commitment amendment history in JSON or CSV formats. Only safe metadata fields (`id`, `commitmentVersion`, `previousVersion`, `employeeReference`, `period`, `asset`, `approvalStatus`, `previousCommitment`, `nextCommitment`, `createdAt`) are exported. Raw salary values and private keys are strictly excluded.
+
+## Privacy-Safe Operational Notes on Payroll Runs (#530)
+
+**Goal:** Let an admin hand off context on a payroll run ("second attempt
+after a reference collision") without a note ever becoming a place where a
+salary figure, an employee's personal data, or a credential is stored.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `lib/privacy/runNotes.ts` | Sensitive-content scanner and audit-metadata builder. Single source of truth for what a note may contain. |
+| `src/payroll/runNotes.ts` | Payroll-facing rules: length budget, validation, role gate, run lock states. |
+| `stores/payrollRunNotes.ts` | Session-scoped note store. Re-runs the same rules on write so the guard cannot be bypassed. |
+| `components/features/payroll/PayrollRunNotesPanel.tsx` | The panel rendered on `/payroll/[id]`. |
+| `__tests__/payroll-run-notes-rule.test.ts` | Scanner, validation, and role/lock rule unit tests. |
+| `__tests__/payroll-run-notes-panel.test.tsx` | Store write-path and panel render/interaction tests. |
+
+### Roles
+
+| Role | Behaviour |
+| --- | --- |
+| `admin` | Full editor: add, list, and remove notes. |
+| `operator` | Read-only. The panel states that notes are admin-only instead of hiding a disabled control. |
+| `auditor` | Read-only, same restriction copy. |
+
+`PayrollRunDetail` takes a `userRole` prop (default `operator`). The run page
+resolves it from the session cookie via `verifySessionToken` and falls back to
+`operator`, so an unauthenticated render can never unlock the admin editor.
+
+### States
+
+`validateRunNote` returns an explicit state that the panel renders:
+
+| State | Trigger | UI |
+| --- | --- | --- |
+| `empty` | Nothing entered (or whitespace only) | Save disabled |
+| `valid` | Clean note within the 280-character budget | Live character counter, save enabled |
+| `too_long` | Over 280 characters | Red alert stating the exact overflow; save disabled |
+| `blocked` | Privacy scanner matched a category | Red alert naming each category plus rewrite guidance; save disabled |
+| `read_only` | Non-admin role | Amber restriction banner, no editor |
+| `locked` | Run is `cancelled` or `failed` | Lock notice pointing at a replacement batch, no editor |
+
+A successful save shows a `role="status"` confirmation; a rejected write leaves
+the text in the editor so the admin can fix it rather than retype it.
+
+### What is blocked
+
+| Category | Examples |
+| --- | --- |
+| `compensation` | `$5,250`, `1200 USDC`, `48200`, `salary was 90000` |
+| `employee_identity` | A roster name, an email address, a `G…` wallet address, `emp_004` |
+| `credential` | `seed phrase`, `private key`, `0x` + 40 or more hex characters |
+
+Not blocked, so ordinary operations stay writable: dates (`2026-09-25`), years
+(`2026`), batch references (`20260925`), small counts, and compensation
+*vocabulary* without a figure ("compensation review", "Q1 bonus run").
+
+### Privacy guarantees
+
+- **No echo.** A finding is a static label and static guidance. A rejected note
+  is never quoted back into a message, so nothing from the note body can reach
+  a log, export, telemetry event, or rendered error.
+- **Two gates.** The store re-validates on write, so calling
+  `usePayrollRunNotesStore.getState().addNote(...)` directly cannot bypass the
+  role check, the lock check, or the scanner.
+- **Session-only.** Notes are held in memory; nothing is persisted to
+  `localStorage` and no note is sent to a payroll API.
+- **Audit metadata only.** `buildRunNoteAuditEntry` emits run id, note id,
+  author role, character count, and timestamp — never the body. Use that shape
+  if notes are ever added to an audit trail or export.
+
+### Usage
+
+```tsx
+<PayrollRunNotesPanel
+  run={run}
+  userRole={session.role}
+  employees={employeesInRun} // lets the scanner catch a name from this run
+/>
+```
+
+## Payroll Owner Transfer Review (#546)
+
+The payroll owner is the company admin wallet: it controls the treasury and signs payroll runs. `/settings/roles` now includes a **Transfer payroll ownership** review screen below the role directory.
+
+### Files
+
+- `src/payroll/ownerTransfer.ts`: pure validation (`reviewOwnerTransfer`), `maskWalletAddress`, `isValidStellarAccount`, and `buildOwnerTransferAuditEntry`
+- `components/features/settings/OwnerTransferReview.tsx`: the review screen (props-driven)
+- `components/features/settings/OwnerTransferReviewContainer.tsx`: supplies the current owner (company admin), role-directory candidates, and the in-flight run count
+
+### Flow
+
+1. Choose the new owner from the role directory (the current owner is excluded), or enter a wallet address.
+2. Review the current owner → new owner summary (masked addresses) and the consequences.
+3. Type `TRANSFER OWNERSHIP` and tick the acknowledgement.
+4. Submit. The request is recorded; the new owner must accept it from their wallet before it takes effect.
+
+### Blocking rules
+
+| Code | When |
+| --- | --- |
+| `no_candidate` | No new owner is chosen |
+| `invalid_address` | Not a valid Stellar account (`StrKey` checksum is verified) |
+| `same_as_current_owner` | The address already owns the payroll |
+| `runs_in_flight` | Any payroll run is still `pending`: the owner signs in-flight runs |
+| `confirmation_mismatch` | The phrase isn't typed exactly |
+| `not_acknowledged` | The loss-of-access checkbox isn't ticked |
+
+These are warnings, not blockers: the new owner has a read-only role (auditor or compliance reviewer), or the address is outside the role directory.
+
+### Privacy guarantees
+
+- Addresses are always shown masked (`GABCDE…WXYZ`). No payroll amounts appear on the screen, in messages, or in the audit entry.
+- `buildOwnerTransferAuditEntry` records only the action, both masked addresses, and a timestamp.
+- There is no backend endpoint yet: `onSubmit` receives the audit-safe entry for a future API or on-chain call.
+
+## #536 — Delegated Approver Management Panel
+
+**Goal:** Enable managing authorized delegated signers and surrogate approvers within the payroll approval workflow while strictly enforcing address validation, duplicate prevention, and zero exposure of sensitive financial values.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `stores/delegatedApprovers.ts` | Zustand store with `persist` middleware (`zk_delegated_approvers_store`). Holds delegated approvers list and CRUD actions. |
+| `lib/validation/delegatedApprover.ts` | Validation logic enforcing non-empty, valid format (Stellar `G...` or delegate identifier), and duplicate checking. |
+| `components/features/approvals/DelegatedApproverPanel.tsx` | React UI panel component for viewing, adding, and removing delegated approvers. |
+| `__tests__/components/DelegatedApproverPanel.test.tsx` | Unit and integration test suite covering rendering, add/remove actions, validation errors, and privacy guarantees. |
+
+### Validation Rules & Privacy Guarantees
+
+- **Empty Input:** Rejects empty or whitespace-only inputs (`"Approver address or identifier is required."`).
+- **Format Validation:** Validates against Stellar address format (`^G[A-Z0-9]{55}$`) or standard delegate identifier pattern (`^[a-zA-Z0-9_-]{3,64}$`).
+- **Duplicate Prevention:** Checks case-insensitive matches against existing approver list (`"Duplicate approver address or identifier already exists."`).
+- **Privacy Enforcement:** All error messages and UI controls omit sensitive payroll data (salaries, employee names, payment amounts).
+
+## #596 — Dashboard Payout Destination Change Review
+
+**Goal:** Provide an interactive review surface for employee payout destination updates before payroll execution, preventing unauthorized, invalid, or conflicting destination changes without exposing sensitive employee PII or financial amounts.
+
+### Files
+
+## #520 — Pagination Safety Controls
+
+**Goal:** Prevent accidental over-fetching and show clear pagination boundaries in large payroll lists without exposing sensitive salary values or employee PII.
+
+## #605 — SDK Blocked Execution Diagnostics
+
+**Goal:** Provide a typed, pure, privacy-safe diagnostics engine in the SDK layer of ZK Payroll to analyze, categorize, and explain why payroll executions are blocked, along with actionable remediations and formatted diagnostic reports.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `src/payroll/paginationSafety.ts` | Pure validation and calculation rules (`calculatePaginationSafety`, `MAX_PAGE_SIZE = 100`). |
+| `components/payroll/PaginationSafetyControls.tsx` | Pagination UI component rendering safe range boundaries and over-fetch warning banners. |
+| `__tests__/payroll-pagination-safety.test.tsx` | Unit and component test suite covering standard pagination, over-fetch clamping, and out-of-bounds page handling. |
+
+## #518 — Dashboard Support for Payroll Run Amendments
+
+**Goal:** Allow authorized users to review amendment details alongside original payroll run metadata without overwriting or mutating the original payroll record.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `src/payroll/amendments.ts` | Domain helpers (`createPayrollRunAmendmentReview`, `assertOriginalRecordIntact`). |
+| `components/payroll/PayrollRunAmendmentReview.tsx` | Dashboard review component rendering immutable original record banner, proposed amendment details, safe diff, and action buttons. |
+| `__tests__/payroll-run-amendment-review.test.tsx` | Unit and component tests verifying record immutability, safe diff rendering, and stale/policy warning handling. |
+
+## #517 — Treasury Snapshot Activity Cards
+
+**Goal:** Display privacy-safe treasury health metrics and snapshot activity events on payroll operation views.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `src/treasury/snapshotActivity.ts` | Domain calculation rules (`calculateTreasurySnapshotHealth`, `formatMerkleRootShort`). |
+| `components/treasury/TreasurySnapshotActivityCard.tsx` | UI card displaying coverage ratios, status badges, Merkle root digests, and snapshot activity event logs. |
+| `__tests__/treasury-snapshot-activity-card.test.tsx` | Unit and component tests covering healthy metrics, funding deficit warnings, and event verification errors. |
+
+## #519 — Cancellable Data Refresh Actions
+
+**Goal:** Allow users to stop long-running refreshes while maintaining consistent loading states and zero financial data leaks.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `hooks/useCancellableDataRefresh.ts` | React hook managing `AbortController` signal, cancellation state, and privacy-safe status messages. |
+| `components/payroll/CancellableRefreshButton.tsx` | UI button displaying active refreshing indicator with a Cancel button. |
+| `__tests__/cancellable-data-refresh.test.tsx` | Unit and component tests for successful refresh, mid-flight cancellation, and error handling. |
+
+| `lib/sdk/blockedExecutionDiagnostics.ts` | Pure diagnostics engine evaluating treasury reserves, proof validity, capacity limits, approvals, recipient eligibility, and auth state. |
+| `src/lib/sdk/blockedExecutionDiagnostics.ts` | SDK re-export module for dashboard and external consumers. |
+| `lib/sdk/index.ts` / `src/lib/sdk/index.ts` | SDK root package index exporting diagnostic tools, types, and assertions. |
+| `__tests__/blocked-execution-diagnostics.test.ts` | Comprehensive unit and integration test suite (31 tests) covering success, blocker categories, error assertions, and privacy guarantees. |
+
+### Categories & Blocker Codes
+
+- **Treasury:** `TREASURY_INSUFFICIENT_FUNDS`, `TREASURY_BELOW_RESERVE_BUFFER`, `TREASURY_ACCOUNT_UNAVAILABLE`.
+- **Proof:** `PROOF_MISSING`, `PROOF_EXPIRED`, `PROOF_UNVERIFIED`, `PROOF_VERIFICATION_FAILED`.
+- **Contract & Network:** `CONTRACT_PAUSED`, `CONTRACT_LOCKED`, `UNSUPPORTED_NETWORK`.
+- **Policy & Limits:** `BATCH_SIZE_EXCEEDED`, `BATCH_PAYOUT_EXCEEDED`, `INSTRUCTION_VERSION_STALE`.
+- **Approvals & Governance:** `APPROVAL_REQUIRED`, `APPROVAL_REJECTED`, `APPROVAL_EXPIRED`, `APPROVAL_CONFLICT`.
+- **Recipients & Commitments:** `RECIPIENT_EMPTY`, `RECIPIENT_INELIGIBLE`, `COMMITMENT_MISSING`, `RECIPIENT_COOLDOWN_ACTIVE`, `DESTINATION_UNVERIFIED`.
+- **Auth & Session:** `SESSION_EXPIRED`, `OPERATOR_UNAUTHORIZED`, `EXECUTION_NONCE_INVALID`, `DUPLICATE_EXECUTION`.
+
+### Privacy Guarantees
+
+- **No Individual Salary Exposure:** All diagnostics report aggregate shortfalls and counts only.
+- **Sanitized Reports:** Formatted diagnostic bundles omit private keys, mnemonics, or individual secrets.
+- **Actionable Remediation:** Each blocker carries a typed `remediation` with clear human-readable steps and action routes.
+
+## #453 — Payroll Period Status Filter
+
+**Goal:** Let payroll teams narrow the period list by the lifecycle status a
+period is currently in — `draft`, `active`, `finalized`, or `archived` —
+without exposing any private payroll values.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `src/payroll/periodStatusFilter.ts` | Pure status vocabulary, validation, counts, and filtering (`countPeriodsByStatus`, `filterPeriodsByStatus`, `normalizePeriodStatusFilter`). |
+| `components/payroll/PeriodStatusFilter.tsx` | Status filter options with live counts, the filtered period list, and an actionable empty state. |
+| `app/payroll/periods/page.tsx` | Route that renders the filter (`/payroll/periods`). |
+| `__tests__/payroll-period-status-filter.test.ts` | Filtering, validation, and privacy unit tests. |
+| `__tests__/payroll-period-status-filter-ui.test.tsx` | Component render, filter, empty-state, and privacy tests. |
+
+### Statuses
+
+| Status | Meaning |
+| --- | --- |
+| `draft` | Period is being prepared and is still editable. |
+| `active` | Period is open and payroll runs are in flight. |
+| `finalized` | Period has been closed and locked. |
+| `archived` | Period has been moved into the historical archive. |
+
+### Behaviour & failure handling
+
+- Selecting a status narrows the list and announces the result through a
+  `role="status"` summary that contains counts only.
+- An unknown filter value (e.g. a stale URL query) is normalised back to
+  `"all"` by `normalizePeriodStatusFilter`, so the list still renders instead
+  of throwing.
+- When no period matches, an actionable empty state offers **Show all
+  periods**, which resets the filter.
+
+### Privacy guarantees
+
+- Periods carry only lifecycle metadata (`id`, label, status, run count,
+  updated timestamp). No amounts, employee identifiers, wallet addresses,
+  proofs, or hashes are read or rendered.
+- Empty/error copy names only the status; it never echoes a payroll value.
+
+### Usage
+
+```tsx
+import { PeriodStatusFilter } from "@/components/payroll/PeriodStatusFilter";
+
+// Defaults to the safe demo fixture:
+<PeriodStatusFilter />
+
+// Or pass real periods and react to filter changes:
+<PeriodStatusFilter periods={periods} onFilterChange={(status) => {}} />
+```
+
+## Dashboard Asset Availability Safety Check
+
+**Goal:** Ensure that the organization has valid, supported Stellar assets configured for payroll disbursements before payroll creation or execution proceeds, providing early actionable feedback on the main dashboard without exposing sensitive financial values.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `types/assets.ts` | Domain types for asset availability safety status (`available`, `warning`, `blocked`), configuration items, and structured diagnostic results. |
+| `lib/assets/assetAvailabilitySafety.ts` | Pure evaluation rules (`evaluateAssetAvailabilitySafety`), Stellar code and issuer validation, and safety assertion (`assertAssetAvailabilitySafety`). |
+| `components/features/dashboard/DashboardAssetAvailabilityCheck.tsx` | Main dashboard safety check banner rendering available, warning, and blocked states with actionable remediation links. |
+| `__tests__/asset-availability-safety.test.ts` | Unit tests covering allowlist checks, code validation, issuer validation, duplicate detection, and assertion errors. |
+| `__tests__/dashboard-asset-availability.test.tsx` | Component test suite verifying available, blocked, and warning states, fallback resolution, action callbacks, and accessibility. |
+
+### Safety States
+
+| Status | Meaning | Action / Behavior |
+| --- | --- | --- |
+| `available` | At least one supported asset (USDC, XLM, EURC) is configured with valid specifications. | Displays green badge and confirmation of supported assets ready for payroll. |
+| `warning` | Supported assets are present, but unsupported, duplicate, or malformed asset configurations were detected. | Displays amber banner, lists supported assets ready for payroll, notes ignored unsupported assets or duplicates, and provides link to `/settings/assets`. |
+| `blocked` (`unavailable`) | No supported assets are configured (e.g. empty array, all unsupported, or invalid). | Blocks payroll creation, displays amber alert with blocker explanation, and links to `/settings/assets` for asset setup. |
+
+### Privacy Guarantees
+
+- Evaluates strictly asset identifiers (symbols and public issuer keys). Zero employee records, salary amounts, treasury balances, or private credentials are read or rendered.
+- Error messages and diagnostics name only asset codes and reason strings; no payroll amounts or secrets are ever leaked.
+
+### Usage
+
+```tsx
+import DashboardAssetAvailabilityCheck from "@/components/features/dashboard/DashboardAssetAvailabilityCheck";
+
+// Automatically uses configured assets or falls back to treasury store:
+<DashboardAssetAvailabilityCheck />
+
+// Or with explicit configured assets:
+<DashboardAssetAvailabilityCheck
+  configuredAssets={[{ code: "USDC" }, { code: "XLM" }]}
+  onConfigureClick={() => {}}
+/>
+```
+
+## Dashboard Compensation Policy Effective-Date Validation
+
+**Goal:** Ensure every compensation policy revision takes effect on a valid, forward-only calendar date before any further compensation change is scheduled, surfacing actionable findings on the main dashboard without exposing compensation values.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `types/compensation.ts` | Domain types for compensation policy lifecycle status, the `CompensationPolicyScheduleEntry` input shape, findings, and evaluation options/results. |
+| `lib/compensation/compensationPolicyEffectiveDate.ts` | Pure evaluation rules (`evaluateCompensationPolicyEffectiveDate`), date helpers (`isIsoCalendarDate`, `normalizeReferenceDate`), and the safety assertion (`assertCompensationPolicyEffectiveDate`). |
+| `src/payroll/compensationPolicyEffectiveDate.ts` | Re-export shim so payroll code can import the rules through the `src/payroll` barrel. |
+| `components/features/dashboard/DashboardCompensationPolicyCheck.tsx` | Dashboard panel rendering valid, warning, and invalid states with per-finding remediation and the next effective date. |
+| `__tests__/compensation-policy-effective-date.test.ts` | Unit tests for every rule, malformed input, date edge cases, the assertion, and privacy guarantees. |
+| `__tests__/dashboard-compensation-policy-effective-date.test.tsx` | Component tests covering each rendered state, fallbacks, callbacks, and accessibility. |
+
+### Effective-Date Rules
+
+| # | Rule | Severity | Rationale |
+| --- | --- | --- | --- |
+| 1 | Policy revision needs a non-empty id of at most 64 characters. | error | Without a usable id, a revision's effective date cannot be tracked or audited. |
+| 2 | Effective date is required. | error | Payroll cannot tell when the revision's terms take effect. |
+| 3 | Effective date must be a real `YYYY-MM-DD` calendar day. | error | `Date.parse` silently rolls `2026-02-30` forward to March 2, which would shift payroll by two days unnoticed. |
+| 4 | Lifecycle status must be `draft`, `scheduled`, `active`, or `superseded`. | error | Ordering rules are meaningless without a known status. |
+| 5 | Pending (`draft` / `scheduled`) revisions may not be backdated. | error | Retroactive changes would rewrite payroll runs already committed on-chain. `active` and `superseded` revisions are exempt because they necessarily took effect in the past. |
+| 6 | At most one revision may be `active`. | error | An ambiguous "current" policy means payroll cannot determine which policy governs an open period. |
+| 7 | No two revisions may share an effective date. | error | The policy in force for that day would be ambiguous. |
+| 8 | Pending revisions may not take effect before the active revision. | error | Creates overlapping policy windows. |
+| 9 | Revisions beyond the scheduling horizon (default 400 days). | warning | The payroll engine cannot guarantee a change that far ahead will be honoured. Superseded revisions are exempt — there is nothing left to schedule. |
+
+### Validation States
+
+| Status | Meaning | Action / Behavior |
+| --- | --- | --- |
+| `valid` | Every revision has a real, forward-only, correctly ordered effective date. | Green panel, "Ready" badge, next effective date and countdown, no remediation link. |
+| `warning` | Dates are usable but an advisory applies (for example, beyond the scheduling horizon). | Amber panel, "Notice" badge, advisory list with a next step, scheduling still allowed. |
+| `invalid` | At least one revision cannot be scheduled as declared. | Amber panel, "Action Required" badge, every blocking finding with its remediation, link to `/settings/payroll-policy`. |
+
+### Error and Failure Handling
+
+- Malformed revisions are reported and skipped, so one bad row cannot hide the rest of the schedule. The healthy revisions are still listed and counted in `validPolicyCount`.
+- Untrusted policy input never throws. `evaluateCompensationPolicyEffectiveDate` is total over `unknown`; only a developer-supplied `referenceDate` that cannot be resolved throws `RangeError`, because an unusable reference date would silently invert every comparison.
+- The reference date and horizon are injectable (`referenceDate`, `maxHorizonDays`) so checks are deterministic and testable without touching the clock. An invalid horizon falls back to the 400-day default and raises an advisory rather than failing.
+- `assertCompensationPolicyEffectiveDate` throws `CompensationPolicyEffectiveDateError` with the full result attached, so callers can render every finding instead of only the first.
+
+### Privacy Guarantees
+
+- Evaluation reads only policy ids, lifecycle statuses, and effective dates. `CompensationPolicyScheduleEntry` deliberately has no amount, employee, or payout fields, so a consumer cannot leak compensation values through this module.
+- Findings interpolate only validated date strings and bounded policy ids; free-text compensation descriptions are never echoed.
+- The panel is wrapped in an `ErrorBoundary` in `DashboardHome`, so a malformed schedule can never take the dashboard down.
+
+### Usage
+
+```tsx
+import DashboardCompensationPolicyCheck from "@/components/features/dashboard/DashboardCompensationPolicyCheck";
+
+// Uses a relative demo schedule when no prop is supplied:
+<DashboardCompensationPolicyCheck />
+
+// Or with the real schedule; pass [] to exercise the "nothing scheduled" state:
+<DashboardCompensationPolicyCheck
+  policies={[
+    { id: "comp_current", effectiveDate: "2026-08-01", status: "active" },
+    { id: "comp_next", effectiveDate: "2026-10-15", status: "scheduled" },
+  ]}
+  onReviewClick={() => {}}
+/>
+```
+
+The same rules can gate a save path without rendering anything:
+
+```ts
+import { assertCompensationPolicyEffectiveDate } from "@/lib/compensation/compensationPolicyEffectiveDate";
+
+assertCompensationPolicyEffectiveDate(policies, { referenceDate: "2026-09-29" });
+```
+
+## Test coverage summary
+
+| #510 | `payroll-preflight-results-screen.test.tsx` | Renders readiness score, blocker cards, warnings, passed checks, and dry-run summary | Disables execution button when blockers exist; enables fix actions and re-run dry run |
+| #509 | `payroll-amendment-history-panel.test.tsx` | Displays authorized amendment revision history, safe reason labels, and details drawer | Filters by status & search query; exports safe JSON/CSV metadata |
+| #514 | `payroll-cancellation-reason-selector.test.tsx` | Enforces selecting documented cancellation reason before confirming cancellation | Provides helper text and custom audit notes input; disables confirmation until reason selected |
+| #515 | `audit-grant-scope-details-drawer.test.tsx` | Displays auditor identity, expiry indicator, accessible scopes, restricted scopes, and masking tier | Triggers extend, revoke, and export scope callbacks |
+| #536 | `DelegatedApproverPanel.test.tsx` | Renders panel, adds valid approver, rejects duplicates/invalid inputs with clear error, removes approver, and enforces zero sensitive payroll data exposure |
+| #596 | `payout-destination-change-review.test.tsx` | Validates approval criteria, blocks invalid addresses / identical addresses / active cooldowns, validates rejection reasons, displays masked addresses, renders dashboard mode |
+| #520 | `payroll-pagination-safety.test.tsx` | Calculates safe pagination boundaries, clamps page size to MAX_PAGE_SIZE (100), handles empty lists & out-of-bounds pages, renders UI controls |
+| #518 | `payroll-run-amendment-review.test.tsx` | Reviews proposed amendments non-destructively, preserves original payroll record intact, renders safe diff & stale/policy warning alerts |
+| #517 | `treasury-snapshot-activity-card.test.tsx` | Calculates coverage ratio & status badges, renders truncated Merkle digests & snapshot activity logs, triggers actionable deficit warnings |
+| #519 | `cancellable-data-refresh.test.tsx` | Manages AbortController signal, cancels in-flight refreshes, maintains consistent loading states, displays actionable privacy-safe feedback |
+| #605 | `blocked-execution-diagnostics.test.ts` | Validates ready states, treasury/proof/policy/approval/recipient/auth blockers, assertion errors, and privacy report formatting |
+| #453 | `payroll-period-status-filter.test.ts` / `payroll-period-status-filter-ui.test.tsx` | Filters the period list by draft/active/finalized/archived, falls back to all on unknown input, and renders an actionable empty state with no private payroll data |
+| Core | `asset-availability-safety.test.ts` / `dashboard-asset-availability.test.tsx` | Validates configured Stellar assets against allowlist, enforces format/issuer rules, flags duplicates & malformed entries, surfaces available/warning/blocked dashboard states |
+| Core | `compensation-policy-effective-date.test.ts` / `dashboard-compensation-policy-effective-date.test.tsx` | Validates compensation policy effective dates, rejects roll-over dates & backdating, enforces single-active/duplicate/overlap rules, warns past the horizon, surfaces valid/warning/invalid dashboard states |
+| #633 | `payment-instruction-duplicate-detection.test.tsx` | Validates unique instructions, duplicate IDs, duplicate recipients, shared addresses, exact duplicates, historical collisions, masked addresses, and accessible alert UI |
+
+## Payment instruction duplicate detection (#633)
+
+**Goal:** Detect, categorize, and explain duplicate payment instructions within payroll drafts or against historical execution records to strengthen payroll correctness and prevent accidental double-payouts, while upholding strict zero-knowledge privacy guarantees.
+
+### Key Components & Modules
+
+| File | Purpose |
+| --- | --- |
+| `lib/duplicateDetection.ts` | Pure evaluation engine detecting duplicate instruction IDs, recipient duplications, exact duplicate disbursements, shared destination addresses, and collisions with previously executed instructions. |
+| `src/payroll/paymentInstructionDuplicate.ts` | Domain re-export module providing clean access for payroll features and review workflows. |
+| `components/features/payroll/PaymentInstructionDuplicateWarning.tsx` | Accessible alert component (`role="alert"`) presenting categorized duplicate issues with clear remediation steps, masked wallet addresses, and optional resolution triggers. |
+| `components/employees/DuplicateWarningPanel.tsx` | Dual-mode warning panel maintaining backward compatibility for employee lists (#366) while delegating payment instruction batches to the instruction detector (#633). |
+| `__tests__/payment-instruction-duplicate-detection.test.tsx` | Comprehensive test suite verifying success, failure, edge cases, privacy protections, and UI accessibility. |
+
+### Duplicate Categories & Behavior
+
+- **`instruction_id` (Blocking):** Multiple payment instructions share the same normalized instruction identifier. Remediation prompts assigning distinct identifiers.
+- **`recipient` (Blocking):** The same employee appears in multiple instructions within the same batch. Prompts consolidating multiple payouts or removing redundant entries.
+- **`exact_match` (Blocking):** Identical recipient, destination address, asset, and amount. Prevents double-transfer errors on-chain.
+- **`collision` (Blocking):** Instruction identifier or batch reference matches an already executed/confirmed payroll instruction from previous runs.
+- **`address` (Warning / Strict Blocking):** Destination Stellar address is assigned to multiple distinct employees. Warns operators to verify destination authenticity while allowing pooled/custodial setups when intentional.
+
+### Privacy Guarantees
+
+- **Masked Addresses:** Stellar public keys in error text and values are truncated (`GDQP2K…4W37`) to prevent address reconnaissance.
+- **Zero Salary Leaks:** Raw salary or payment amounts are never rendered in unformatted error headings or system log echoes.
+
+## Contract Pause Mutation Guard
+
+**Goal:** Disable mutation actions while smart contracts are paused in the dashboard layer, providing predictable behavior for operators and integrators while strictly preserving employee privacy and financial secrecy.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `src/payroll/contractPauseGuard.ts` | Pure evaluation engine, error classes, and assertions determining if a dashboard mutation action can proceed. |
+| `hooks/useContractPauseGuard.ts` | Client React hook subscribing to company/contract pause warnings and providing action checking helpers. |
+| `app/operations/page.tsx` & `components/features/operations/OperationsCommandCenter.tsx` | Operations dashboard displaying `CONTRACT_PAUSED` banner and disabling mutation cards/navigation when paused. |
+| `app/payroll/page.tsx` | Main payroll operations view with disabled action controls (Create Batch, Execute Payroll) and pause status banner. |
+| `app/payroll/create/page.tsx` | Draft batch creation page preventing form dispatch and disabling submit button when contracts are paused. |
+| `__tests__/contract-pause-guard.test.ts` | Comprehensive unit tests for successful, rejected, and boundary conditions. |
+| `__tests__/operations-contract-pause.test.tsx` | Component tests for OperationsCommandCenter under active and paused contract states. |
+| `__tests__/payroll-contract-pause.test.tsx` | Component tests for payroll overview and creation pages under contract pause conditions. |
+
+### Error Codes & Behavior
+
+- **`CONTRACT_PAUSED` / `MUTATION_DISABLED_CONTRACTS_PAUSED`**: Returned when an operator or component attempts a mutation action (`execute_payroll`, `create_payroll_draft`, `approve_payroll`, `reject_payroll`, `retry_failed_run`, `cancel_payroll`, `period_close`) while contract operations are paused.
+- **Allowed Actions**: Read-only actions (`view_payroll`, `view_audit`, `view_treasury`, `inspect_payload`, `export_payroll_report`) remain fully accessible during pauses.
+- **Category Granularity**: If a pause is scoped strictly to non-payroll categories (e.g., `["audit"]`), payroll mutation actions remain permitted.
+
+### Privacy Guarantees
+
+- **Zero Financial Leaks:** Error messages, alerts, and tooltips provide generic, actionable guidance ("Payroll smart contract operations are currently paused") and never echo private salary amounts, asset balances, or recipient counts.
+- **Zero Employee PII:** Employee records, names, and wallet addresses are excluded from all pause guard results and diagnostic banners.
+- **Actionable Remediation:** Each rejection includes a remediation route (`/admin`) and suggested action to resume operations once administrative checks clear.
+
+Run with:
+
+```bash
+npm test
+```
+
+---
+
+## Audit Grant Revocation Status & Timestamp (#515)
+
+**Goal:** Provide clear, predictable behavior and immutable timestamp visibility when audit grants are revoked, while strictly preserving private employee identities and salary data.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `components/features/audit/AuditGrantRevocationStatus.tsx` | Modular component rendering badge, banner, and inline revocation status, timestamp, actor, and reason. |
+| `components/audit/AuditGrantRevocationStatus.tsx` | Clean re-export interface for dashboard and compliance layers. |
+| `components/features/audit/AuditGrantScopeDetailsDrawer.tsx` | Audit scope inspection drawer with revocation banner, metadata timestamp, and disabled action guards. |
+| `components/features/audit/AuditExportWizard.tsx` | Export wizard displaying grant revocation status and blocking packet generation for revoked grants. |
+| `app/audit/page.tsx` | Audit dashboard layer view surfacing active vs revoked grants, filters, and revocation timestamps. |
+| `__tests__/audit-grant-revocation.test.tsx` | Unit and integration test suite covering active cases, revoked cases, boundary timestamps, and zero-PII guarantees. |
+
+### Expected Behavior & Lifecycle
+
+1. **Active Grant:**
+   - Displays `ACTIVE GRANT` badge.
+   - Shows valid expiration date.
+   - Allows operator to revoke access or extend grant validity.
+
+2. **Revoked Grant:**
+   - Displays `REVOKED` badge across tables and inspection views.
+   - Renders a prominent `grant-revoked-banner` (`role="status"`) containing:
+     - Exact formatted revocation timestamp (`grant-revoked-timestamp`).
+     - Revoking actor (`grant-revoked-by`) and revocation reason (`grant-revoked-reason`), if provided.
+   - Disables `revoke-grant-btn` (`disabled`, `aria-disabled="true"`) to prevent double-revocation mutations.
+   - Disables `extend-grant-btn` with tooltip explaining that revoked grants cannot be extended.
+   - Blocks packet export generation in `AuditExportWizard`.
+
+3. **Boundary Handling:**
+   - Null or undefined `revokedAt` timestamps fall back gracefully to `"Timestamp unavailable"` without crashing.
+   - Malformed timestamp strings are caught and handled safely.
+   - Missing optional actor and reason fields are omitted cleanly without displaying `undefined` or `null`.
+
+### Privacy Guarantees
+
+- **Zero Salary Leaks:** No employee compensation figures, salary numbers, or dollar amounts appear in revocation states.
+- **Masked Addresses:** Auditor Stellar addresses are truncated (`0x1111...0000`).
+- **ZK Circuit Protection:** Audit view keys only permit off-chain cryptographic proof verification and aggregated metrics, preventing disclosure of individual payroll commitments.
+
+---
+
+## #739 — Dashboard Concurrent Payroll Edit Warnings
+
+**Goal:** Detect concurrent edits, optimistic lock / revision conflicts, and active operator presence when multiple operators or dashboard tabs edit payroll drafts or payroll runs simultaneously, preventing accidental overwrites while maintaining zero-leakage privacy guarantees.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `src/payroll/concurrentPayrollEditWarning.ts` | Pure evaluation engine, session lifecycle functions, conflict detection, and privacy sanitization. |
+| `lib/payroll/concurrentPayrollEditWarning.ts` | Clean re-export interface for domain logic across dashboard modules. |
+| `components/payroll/ConcurrentPayrollEditWarningBanner.tsx` | Accessible banner (`role="alert"`) rendering critical, warning, and info states with reload/renew/review actions. |
+| `hooks/useConcurrentPayrollEdit.ts` | React hook managing session heartbeats, conflict evaluations, and action handlers. |
+| `stores/payrollConcurrency.ts` | Zustand store managing active edit sessions, peer presences, and remote change tracking. |
+| `app/payroll/page.tsx` | Dashboard layer overview displaying active concurrent edit warnings and reload affordances. |
+| `__tests__/concurrent-payroll-edit-warnings.test.ts` | Comprehensive unit tests for session lifecycle, optimistic locks, expiration, and privacy guarantees. |
+| `__tests__/concurrent-payroll-edit-warning-banner.test.tsx` | React component tests verifying rendering, severity styling, active editor counts, and callback interactions. |
+
+### Conflict Types & Resolution
+
+1. **`version_mismatch` (Critical, Blocking):**
+   - Triggered when `latestRemoteVersion` differs from session `baseVersion`.
+   - Blocks mutation actions (`canSubmit: false`).
+   - Surfaces primary action "Reload Latest Version" and secondary "Review Changes".
+   - Displays masked operator identifier (e.g. `op_...c123` or `GBBD...FLA5`).
+
+2. **`session_expired` (Critical, Blocking):**
+   - Triggered when edit session exceeds operational TTL (30 minutes) without renewal.
+   - Blocks mutation actions (`canSubmit: false`).
+   - Surfaces "Renew Session" and "Reload Latest" actions.
+
+3. **`concurrent_active_editor` (Warning, Non-blocking):**
+   - Triggered when peer sessions on the same payroll have sent a heartbeat within 2 minutes.
+   - Displays active editor badge (e.g. `2 active`).
+   - Non-blocking advisory to coordinate edits with other operators.
+
+4. **`stale_timestamp` (Warning, Non-blocking):**
+   - Triggered when remote `updatedAt` is newer than session `baseUpdatedAt` while versions match.
+   - Advises reloading latest state to avoid missing intermediate edits.
+
+### Privacy Guarantees
+
+- **Zero Compensation Leaks:** Warning objects and audit summaries never contain employee salary figures, dollar amounts, recipient arrays, or cryptographic keys.
+- **Masked Identifiers:** Operator IDs and Stellar addresses are systematically truncated (e.g., `GBBD...FLA5`).
+- **Audit-Safe Serialization:** `sanitizeConcurrentWarningForAudit` strips all contextual draft data, recording only opaque version stamps and collision counts.
+
+## Proof Input Validation UI Behavior
+
+- `ProofReferenceInput` trims and lowercases pasted values before validating against `zkp_ref_YYYYMMDD_NNN`.
+- Guidance is always visible under the field: the expected format `zkp_ref_YYYYMMDD_NNN`, the rule that only the reference is entered (no amounts or employee details), and the recovery step (re-copy the full reference from the proof receipt, or clear the field). It is exported as `PROOF_REFERENCE_GUIDANCE` from `lib/validation/proofReference.ts`.
+- Errors surface only after the field is touched and non-empty, keeping empty states quiet. Error messages never echo the entered value.
+- `validateProofReference` returns a `reason` of `empty` or `malformed` (or `null` when valid) so callers can branch without parsing messages.
+- Valid input shows inline confirmation and reports validity to the parent via `onValidityChange`.
+- `PayrollVerificationForm` blocks an invalid submit, shows the validation message in a `role="alert"` region, and clears it once the reference is edited. Valid submits show the verified toast.
+
+## #762 — Inactive Company Payroll Run Warning
+
+### Files
+
+- `lib/payroll/inactiveCompanyWarning.ts`
+- `components/payroll/InactiveCompanyWarningBanner.tsx`
+- `components/features/payroll/PayrollRunDetail.tsx`
+- `app/payroll/page.tsx`
+- `stores/companyWarnings.ts`
+
+### Overview & Rationale
+
+When a payroll run references an inactive or archived company, executing payouts or submitting on-chain transactions could lead to invalid disbursements or failed settlements. The dashboard surfaces prominent, actionable warnings whenever a payroll run references an inactive company, blocks execution actions, and guides operators to reactivate the company profile or switch contexts.
+
+### Warning Codes & Behavior
+
+1. **`COMPANY_INACTIVE` (Critical, Blocking):**
+   - Triggered when `run.companyId` references a registered company where `isActive === false`.
+   - Surfaces `InactiveCompanyWarningBanner` with actionable remediation to reactivate the company or switch company context (`/company/switch`).
+   - Disables execution actions in `PayrollRunDetail` and displays an `Execution blocked — company inactive` badge.
+2. **`COMPANY_NOT_FOUND` (Critical, Blocking):**
+   - Triggered when `run.companyId` cannot be resolved against the registered company catalog.
+   - Blocks execution and prompts the operator to verify company configuration or switch company context.
+3. **`COMPANY_ID_MISSING` (Critical, Blocking):**
+   - Triggered when the payroll run record lacks a valid company identifier.
+   - Blocks execution and directs the operator back to the payroll overview.
+
+### Privacy Guarantees
+
+- **Zero Compensation Leaks:** Warning banners and failure guidance never contain employee salary figures, compensation commitments, individual payout amounts, or cryptographic keys.
+- **Privacy-Safe Identifiers:** Only sanitized company identifiers and registered company display names are presented.
+- **Audit-Safe Serialization:** `sanitizeCompanyWarningForAudit` records only warning codes, company IDs, severity levels, and blocking flags, stripping any ambient payroll draft data.
+
+---
+
+## Payout Batch Retry Guidance
+
+**Goal:** Provide actionable, context-aware operator guidance for payout batch retries, ensuring operational clarity and preventing duplicate payouts while preserving privacy without exposing employee or salary data.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `lib/payroll/payoutBatchRetryGuidance.ts` | Pure evaluation engine classifying batch retry eligibility, attempt limits, pause flags, and actionable guidance. |
+| `src/payroll/payoutBatchRetryGuidance.ts` | Clean domain re-export for imports across src and lib. |
+| `components/features/payroll/PayoutBatchRetryGuidanceCard.tsx` | Accessible UI component (`role="status"`) presenting retry outcome badges, messages, next steps, and remediation links. |
+| `app/payroll/page.tsx` | Dashboard overview integrating retry decision tracking, sequential attempt increments, and actionable guidance in the retry log. |
+| `__tests__/payout-batch-retry-guidance.test.ts` | Unit tests covering success, blocking, boundary (attempt thresholds), and privacy guarantees. |
+| `__tests__/components/PayoutBatchRetryGuidanceCard.test.tsx` | Component unit tests covering allowed, blocked, and deferred guidance rendering. |
+| `__tests__/payroll-batch-retry-dashboard.test.tsx` | Integration tests verifying retry decision recording, settled run blocking, and attempt exhaustion. |
+
+### Evaluation States & Outcomes
+
+1. **`CONTRACT_PAUSED` (Blocked, `outcome: "blocked"`):**
+   - Triggered when smart contracts are paused (`isMutationDisabled: true`).
+   - Actionable message directs the operator to review pause status in Admin Settings (`/admin`).
+   - Prohibits mutation and retry actions while contracts are suspended.
+
+2. **`ALREADY_SETTLED` (Blocked, `outcome: "blocked"`):**
+   - Triggered when a payout batch has a settlement receipt (`receiptId`), verified on-chain execution (`status === "verified"`), or transaction hash.
+   - Prohibits retrying settled transactions to prevent duplicate disbursements.
+   - Provides direct link to Transaction History (`/history`).
+
+3. **`COMPANY_INACTIVE` (Blocked, `outcome: "blocked"`):**
+   - Triggered when a run references an inactive or archived company.
+   - Instructs the operator to reactivate the company in Company Settings or switch company context (`/company/switch`).
+
+4. **`RUN_CANCELLED` (Blocked, `outcome: "blocked"`):**
+   - Triggered when a run has been cancelled.
+   - Directs the operator to create a new draft batch (`/payroll/create`) instead of retrying a cancelled run.
+
+5. **`TREASURY_INSUFFICIENT`, `APPROVAL_REJECTED`, `COMPLIANCE_HOLD`, `EXPIRED_PROOF`, `DUPLICATE_BATCH` (Blocked):**
+   - Maps specific failure / cancellation reasons to targeted next steps and direct remediation links (`/treasury`, `/payroll/approvals`, `/compliance`, `/payroll/execute`, `/history`).
+
+6. **`MAX_ATTEMPTS_EXCEEDED` (Deferred, `outcome: "deferred"`):**
+   - Triggered when retry attempts exceed the maximum configured threshold (default 3).
+   - Defers automated retries to protect payroll integrity; directs the operator to investigate reconciliation logs (`/payroll/reconciliation`) and request approval for a new batch.
+
+7. **`RETRY_WITHIN_POLICY` / `RECONCILIATION_FAILED` / `DISCREPANCIES_FOUND` (Allowed, `outcome: "allowed"`):**
+   - Indicates the retry attempt is within safe operational limits.
+   - Displays remaining attempts count and recommended next steps for re-queuing the batch safely.
+
+### Privacy Guarantees
+
+- **Zero Compensation Leaks:** All guidance strings, titles, and recommended steps contain zero salary values, compensation commitments, dollar amounts, recipient identities, or wallet addresses.
+- **Privacy-Safe Serialization:** Logs and reports serialize only opaque run identifiers, attempt counters, outcome codes, and remediation links.
+
+---
+
+## Salary Commitment Version Recovery Flow (#899, #900, #962)
+
+**Goal:** Enable operators to inspect historical salary commitment versions for an employee and safely recover/restore a previous version (e.g. after a bad import, circuit mismatch, or rollbacked compensation adjustment), ensuring payroll correctness, operational clarity, and strict privacy preservation without exposing employee salary figures or private cryptographic inputs.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `lib/employees/salaryCommitmentVersionRecovery.ts` | Pure decision logic, version history reconstruction, validation rules, error codes, and privacy sanitization. |
+| `stores/employees.ts` | Zustand store actions (`recoverCommitmentVersion`, `confirmCommitmentReplacement`) and version-aware audit log entries. |
+| `components/features/employees/CommitmentVersionRecoveryDialog.tsx` | Confirmation dialog showing target/recovered version metadata, commitment hash previews, guidance, and privacy shield. |
+| `components/features/employees/EmployeeDetailPageContent.tsx` | Employee detail view surfacing version-aware Salary Commitment History table with status badges (`Active`, `Superseded`, `Restored`) and per-version recovery action buttons. |
+| `components/features/employees/EmployeeDetail.tsx` | Slide-over drawer surfacing version-aware history and status badges. |
+| `types/models.ts` | Public type definitions including `salaryCommitmentVersion` on `Employee`. |
+| `__tests__/salary-commitment-version-recovery.test.ts` | Domain unit tests for version derivation, recovery validation, boundary cases, and zero-leakage guarantees. |
+| `__tests__/components/CommitmentVersionRecoveryDialog.test.tsx` | Component tests for recovery review modal, validation errors, confirm actions, and privacy guarantees. |
+| `__tests__/employee-commitment-version-recovery-flow.test.tsx` | Integration tests for the full version recovery flow on the employee detail page. |
+
+### Expected Behavior & Version Lifecycle
+
+1. **Version History Reconstruction:**
+   - Every employee begins at **Version 1 (Active)** representing the baseline commitment hash established at onboarding.
+   - When a replacement is confirmed via `CommitmentReplacementDialog`, the existing version transitions to **Superseded** and a new monotonic version (e.g., **Version 2**) becomes **Active**.
+   - When a superseded version is recovered, the recovery evaluator validates the target version and generates a new active version (e.g., **Version 3 (Restored from v1)**), maintaining an immutable, append-only historical audit trail.
+
+2. **Recovery Validation Rules (`reviewCommitmentVersionRecovery`):**
+   - **`VERSION_ALREADY_ACTIVE`:** Blocks no-op recovery when the selected target version is currently active (`target.status === "active"` or commitment matches active hash).
+   - **`VERSION_NOT_FOUND`:** Rejects requests where the specified target version does not exist in the employee's history.
+   - **`COMMITMENT_EMPTY` / `COMMITMENT_MALFORMED`:** Rejects target versions containing empty or structurally invalid commitment hashes (less than minimum 8 characters).
+   - **`EMPLOYEE_NOT_FOUND`:** Rejects operations when the employee record is missing or unresolved.
+   - **Wallet Synchronization:** When a historical version had a distinct wallet address attached, the recovery review evaluates whether the wallet address also requires restoration and provides dual previews.
+
+3. **Privacy Guarantees:**
+   - **Zero Salary Leaks:** Raw salary figures and private blinding secrets are never passed to, handled by, or rendered in review objects or error states.
+   - **Truncated Previews:** All commitment hashes and Stellar addresses are displayed as truncated previews (e.g., `0x11111111…`).
+   - **Audit Provenance:** Recovery actions record the operator attribution, timestamp, target version reference, and privacy-safe explanation in `commitmentReplacementLog`.
+
+---
+
+## Pending-Settlement Retention Purge Safeguard (#859)
+
+**Goal:** Disable retention purge in the dashboard layer whenever payroll settlement is pending or unverified so operators cannot prematurely prune commitments, receipts, or reconciliation context needed for active disbursements, while keeping all feedback strictly free of private employee or salary data.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `src/audit/recordRetention.ts` | Settlement finality classification (`classifyRecordSettlementState`), per-record hold in `evaluateAuditRetention`, and batch-level `evaluateRetentionPurgeGuard`. |
+| `components/audit/RetentionSafeguardPanel.tsx` | Audit safeguard panel displaying pending-settlement hold banners and disabling purge triggers until settlements finalize. |
+| `stores/archive.ts` | Settlement-aware `ArchivedPayrollRun` metadata, `evaluateArchiveRetentionPurge`, and fail-closed `purgeExpiredRuns` action. |
+| `components/features/archive/PayrollArchiveCenter.tsx` | Archive center Retention Purge Safeguard region, disabled purge button with actionable remediation links, and per-run settlement finality badges. |
+| `app/archive/page.tsx` | Canonical `/archive` dashboard route rendering `PayrollArchiveCenter`. |
+| `__tests__/retention-purge-pending-settlement.test.tsx` | Focused tests covering settled purge success, pending/unverified settlement rejection, exact cutoff boundaries, and privacy invariants. |
+
+### Safeguard Outcomes
+
+1. **`SETTLEMENT_PENDING` (Blocked):**
+   - Triggered when one or more runs carry `settlementPending: true` or an in-flight status (`pending`, `in_progress`, `submitting`, `executing`, `awaiting_confirmation`, `unconfirmed`, `paused`).
+   - Disables the purge button and directs operators to `/payroll/reconciliation` to verify on-chain settlement finality.
+
+2. **`SETTLEMENT_UNVERIFIED` (Blocked, Fail-Closed):**
+   - Triggered when a record's settlement state is missing, empty, `unknown`, `failed`, or unrecognized.
+   - Fails closed without echoing raw unrecognized strings into the UI.
+
+3. **`IMMUTABLE_AUDIT_LOG` / `INVALID_POLICY` / `NO_EXPIRED_RECORDS` (Blocked):**
+   - Preserves existing append-only log, 30–3650 day policy validation, dispute holds, and retention window protections.
+
+4. **Eligible Purge (`purgeAllowed: true`):**
+   - Enabled only when policy validation passes, `immutableAuditLog` is `false`, zero runs have pending or unverified settlements, and at least one archived non-disputed run has aged past `retentionPeriodDays`.
+
+### Privacy Guarantees
+
+- **Zero Compensation or Identity Exposure:** Rejection reasons, safeguard banners, and toast notifications never include employee names, salary figures, disbursement totals, wallet addresses, or raw input strings.
+
+---
+
+## #886 — Payroll Period Boundary Guidance
+
+The **Draft a settlement window** form in `PayrollScheduleEditor`
+(`/payroll/schedule`) explains how its start and end dates define a payroll
+period.
+
+### Boundary and validation behavior
+
+- Both date fields are inclusive calendar days. A start and end on the same
+  date is a valid one-day window.
+- A following window should start on the day after the previous window ends.
+  Windows that share even one date overlap and cannot be saved.
+- Invalid start or end dates are rejected with a field-specific corrective
+  message. An end date before the start is rejected with guidance to place the
+  end on or after the start.
+- Overlap errors identify the number of conflicting draft windows; cross-
+  template conflicts also identify the conflicting schedule name.
+- The boundary explanation is associated with both date inputs for assistive
+  technology and remains associated when a validation error is displayed.
+- Saving creates a draft only. The success notice reminds operators to submit
+  the policy to apply the window.
+
+### Privacy
+
+Boundary guidance and validation feedback use date and schedule metadata only;
+they do not expose employee records or salary values.
+## Treasury Reservation Guidance (#887)
+
+**Goal:** Provide operators with deterministic, privacy-safe guidance across every treasury reservation lifecycle state (unconfigured assets, malformed data, insufficient balance, cumulative over-reservation, locked/recoverable expired holds, 5-minute expiry warning window, tight capacity, setup guidance, and active coverage) without exposing employee or salary data.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `types/treasury.ts` | Public reservation guidance domain types re-exported through `types/index.ts`. |
+| `lib/treasury/reservationGuidance.ts` | Pure 7-decimal `BigInt` evaluator (`evaluateTreasuryReservationGuidance`), per-lock helper (`describeSingleReservationGuidance`), and bounded $O(n)$ PII sanitizer (`sanitizeReservationIdentifier`). |
+| `src/treasury/reservationGuidance.ts` | Domain module re-export matching repository conventions. |
+| `components/features/treasury/TreasuryReservationGuidanceCard.tsx` | Accessible guidance card surfacing status badges, aggregate lock metrics, ordered next steps, controls reference, and remediation links. |
+| `components/features/treasury/ReservationExpiryWarning.tsx` | Hardened expiry list with warning banner, locked-expired fallback copy, per-item guidance, corrupt-entry fail-closed alerts, and sanitized `title`/text fields. |
+| `components/features/treasury/TreasuryView.tsx` | Integrates `TreasuryReservationGuidanceCard` and cumulative `BigInt` over-reservation protection alongside reservation amount validation. |
+| `docs/TREASURY_RESERVATIONS.md` | Detailed architecture table, reason code matrix, and security invariants. |
+| `__tests__/treasury-reservation-guidance.test.ts` | Unit tests covering all 10 reason codes, `BigInt` precision, fail-closed timestamps, and ReDoS/PII sanitization. |
+| `__tests__/components/TreasuryReservationGuidanceCard.test.tsx` | Isolated component unit tests covering tone roles, store isolation, override props, and remediation links. |
+| `__tests__/treasury-reservations.test.tsx` | End-to-end `TreasuryView` and `TreasuryPage` integration and privacy tests. |

@@ -22,7 +22,8 @@ describe("Payroll Run Detail", () => {
 
     expect(screen.getByText("Completed")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /process payroll/i })).not.toBeInTheDocument();
-    expect(screen.getByText("abc123def456")).toBeInTheDocument();
+    // txHash appears in Run Metadata, BatchRootComparison (observed root + event reference)
+    expect(screen.getAllByText("abc123def456").length).toBeGreaterThanOrEqual(1);
   });
 
   it("provides back navigation button", () => {

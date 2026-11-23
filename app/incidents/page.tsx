@@ -1,5 +1,7 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { IncidentBanner } from "@/components/ui/IncidentBanner";
+import PartialReleaseFailureAlert from "@/components/features/treasury/PartialReleaseFailureAlert";
+import { MOCK_PARTIAL_RELEASE_FAILURES } from "@/lib/api/mockData";
 
 function IncidentsPage() {
   return (
@@ -15,6 +17,9 @@ function IncidentsPage() {
           variant="warning"
           message="Treasury balance is below the recommended buffer. Fund your account before next payroll."
         />
+        {MOCK_PARTIAL_RELEASE_FAILURES.map((failure) => (
+          <PartialReleaseFailureAlert key={failure.releaseId} failure={failure} />
+        ))}
       </div>
     </DashboardLayout>
   );

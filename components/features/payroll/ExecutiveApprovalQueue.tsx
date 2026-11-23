@@ -1,7 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { useApprovalQueueStore, type ApprovalDraft } from "@/stores/approvalQueue";
+import { useEffect, useState } from "react";
+import { CORRECTION_REQUEST_TTL_MS, useApprovalQueueStore, type ApprovalDraft } from "@/stores/approvalQueue";
+import { usePayrollPolicyStore } from "@/stores/payrollPolicy";
+import {
+  approvalsRecorded,
+  requiredApprovalsFor,
+  type ApprovalActionResult,
+  type ApprovalConflictDetail,
+} from "@/lib/payroll/approvalConflict";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,16 +22,70 @@ import {
   RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
+import DelegatedApproverPanel from "@/components/features/approvals/DelegatedApproverPanel";
+
+function correctionExpiry(draft: ApprovalDraft): number | null {
+  if (draft.correctionExpiresAt) {
+    const storedExpiry = new Date(draft.correctionExpiresAt).getTime();
+    return Number.isNaN(storedExpiry) ? null : storedExpiry;
+  }
+  const requestedAt = draft.approvalHistory
+    ?.slice()
+    .reverse()
+    .find((entry) => entry.action === "correction_requested")?.approvedAt;
+  if (!requestedAt) return null;
+  const requestedTime = new Date(requestedAt).getTime();
+  return Number.isNaN(requestedTime) ? null : requestedTime + CORRECTION_REQUEST_TTL_MS;
+}
 
 export function ExecutiveApprovalQueue() {
   const { drafts, approveDraft, rejectDraft, requestCorrection, resubmitDraft } =
     useApprovalQueueStore();
+  const approvalsPolicy = usePayrollPolicyStore((s) => s.policy.approvals);
   const [filter, setFilter] = useState<
     "pending" | "corrections" | "approved" | "rejected" | "all"
   >("pending");
   const [selectedDraft, setSelectedDraft] = useState<ApprovalDraft | null>(null);
   const [comment, setComment] = useState("");
+  // Quorum (#664) requires distinct reviewers; this mock UI has no real
+  // multi-user session, so the acting reviewer's name is editable here
+  // rather than hardcoded, so a second, different approver can be simulated.
+  const [reviewerName, setReviewerName] = useState("Executive Admin");
   const [correctionErrorId, setCorrectionErrorId] = useState<string | null>(null);
+  // #552 — set when a decision is refused because the draft no longer holds
+  // the state this reviewer was looking at (someone else acted first).
+  const [conflict, setConflict] = useState<ApprovalConflictDetail | null>(null);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  /**
+   * Applies a decision and reports a conflict instead of silently overwriting.
+   *
+   * The store returns the gate's verdict. On conflict the row is left alone and
+   * the reviewer keeps their comment and selection, because the fix is to
+   * reload and re-read the payroll — not to retype what they had already
+   * written.
+   */
+  const applyDecision = (
+    act: () => ApprovalActionResult,
+    resetSelection: boolean,
+  ) => {
+    const result = act();
+    if (!result.ok) {
+      setConflict(result.conflict);
+      return;
+    }
+    setConflict(null);
+    if (resetSelection) {
+      setSelectedDraft(null);
+      setComment("");
+      setCorrectionErrorId(null);
+    }
+  };
 
   const filteredDrafts = drafts.filter((d) => {
     if (filter === "pending") return d.approvalStatus === "pending_executive_approval";
@@ -35,22 +96,25 @@ export function ExecutiveApprovalQueue() {
   });
 
   const pendingCount = drafts.filter((d) => d.approvalStatus === "pending_executive_approval").length;
-  const correctionsCount = drafts.filter((d) => d.approvalStatus === "correction_requested").length;
+  const correctionsCount = drafts.filter((d) =>
+    d.approvalStatus === "correction_requested" &&
+    (correctionExpiry(d) === null || correctionExpiry(d)! > now),
+  ).length;
 
   const currentComment = (draft: ApprovalDraft) => (selectedDraft?.id === draft.id ? comment : "");
 
   const handleApprove = (draft: ApprovalDraft) => {
-    approveDraft(draft.id, "Executive Admin", "Admin", comment || "Approved for execution");
-    setSelectedDraft(null);
-    setComment("");
-    setCorrectionErrorId(null);
+    applyDecision(
+      () => approveDraft(draft.id, reviewerName.trim() || "Executive Admin", "Admin", comment || "Approved for execution"),
+      true,
+    );
   };
 
   const handleReject = (draft: ApprovalDraft) => {
-    rejectDraft(draft.id, "Executive Admin", "Admin", comment || "Rejected during executive review");
-    setSelectedDraft(null);
-    setComment("");
-    setCorrectionErrorId(null);
+    applyDecision(
+      () => rejectDraft(draft.id, reviewerName.trim() || "Executive Admin", "Admin", comment || "Rejected during executive review"),
+      true,
+    );
   };
 
   const handleRequestCorrection = (draft: ApprovalDraft) => {
@@ -59,14 +123,14 @@ export function ExecutiveApprovalQueue() {
       setCorrectionErrorId(draft.id);
       return;
     }
-    requestCorrection(draft.id, "Executive Admin", "Admin", trimmed);
-    setSelectedDraft(null);
-    setComment("");
-    setCorrectionErrorId(null);
+    applyDecision(
+      () => requestCorrection(draft.id, reviewerName.trim() || "Executive Admin", "Admin", trimmed),
+      true,
+    );
   };
 
   const handleResubmit = (draft: ApprovalDraft) => {
-    resubmitDraft(draft.id, "Payroll Drafter", "Operator");
+    applyDecision(() => resubmitDraft(draft.id, "Payroll Drafter", "Operator"), false);
   };
 
   return (
@@ -81,9 +145,21 @@ export function ExecutiveApprovalQueue() {
             Review and authorize high-value payroll drafts prior to cryptographic signing and network dispatch.
           </p>
         </div>
-        <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg text-sm text-indigo-800">
-          <AlertTriangle className="h-4 w-4 text-indigo-600" />
-          <span className="font-semibold">{pendingCount}</span> draft(s) awaiting review
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-xs text-gray-600">
+            Reviewing as
+            <input
+              type="text"
+              value={reviewerName}
+              onChange={(e) => setReviewerName(e.target.value)}
+              className="px-2 py-1 border rounded-md text-xs w-36 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              aria-label="Reviewer name"
+            />
+          </label>
+          <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg text-sm text-indigo-800">
+            <AlertTriangle className="h-4 w-4 text-indigo-600" />
+            <span className="font-semibold">{pendingCount}</span> draft(s) awaiting review
+          </div>
         </div>
       </div>
 
@@ -140,6 +216,34 @@ export function ExecutiveApprovalQueue() {
         </button>
       </div>
 
+{/* #552 — a decision was refused because the payroll moved on. */}
+{conflict && (
+  <div
+    role="alert"
+    aria-live="assertive"
+    data-testid="approval-conflict-banner"
+    className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-300 rounded-lg text-sm"
+  >
+    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+    <div className="min-w-0">
+      <p className="font-medium text-amber-900">
+        Approval conflict — nothing was changed
+      </p>
+      <p className="text-amber-800 mt-0.5 break-words">{conflict.message}</p>
+      <p className="text-amber-700 mt-1 text-xs">
+        Current state: {conflict.currentStatusLabel}
+        {conflict.decidedAt
+          ? ` · recorded ${new Date(conflict.decidedAt).toLocaleString()}`
+          : ""}
+      </p>
+      <p className="text-amber-700 mt-2 text-xs">
+        Your comment has been kept. Reload the queue to review the current
+        state before deciding again.
+      </p>
+    </div>
+  </div>
+)}
+
       {filteredDrafts.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 border border-dashed rounded-xl">
           <CheckCircle2 className="h-10 w-10 text-gray-400 mx-auto mb-3" />
@@ -151,6 +255,17 @@ export function ExecutiveApprovalQueue() {
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {filteredDrafts.map((draft) => (
+            (() => {
+              const expiry = draft.approvalStatus === "correction_requested" ? correctionExpiry(draft) : null;
+              const correctionExpired = expiry !== null && expiry <= now;
+              const requiredApprovals = requiredApprovalsFor({
+                requiredApprovalsCount: approvalsPolicy.requiredApprovalsCount,
+                requireDualApproval: approvalsPolicy.requireDualApproval,
+                dualApprovalThreshold: approvalsPolicy.dualApprovalThreshold,
+                totalAmount: draft.totalAmount,
+              });
+              const approversRecorded = approvalsRecorded(draft);
+              return (
             <div
               key={draft.id}
               className="bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow space-y-4"
@@ -172,11 +287,13 @@ export function ExecutiveApprovalQueue() {
                     />
                     <span className="text-xs text-gray-500">
                       {draft.approvalStatus === "pending_executive_approval"
-                        ? "Executive Review Required"
+                        ? requiredApprovals > 1
+                          ? `Executive Review Required (${approversRecorded.length} of ${requiredApprovals} approvals)`
+                          : "Executive Review Required"
                         : draft.approvalStatus === "approved"
                         ? "Approved for Signing"
                         : draft.approvalStatus === "correction_requested"
-                        ? "Awaiting Corrections from Drafter"
+                        ? correctionExpired ? "Correction Request Expired" : "Awaiting Corrections from Drafter"
                         : "Rejected"}
                     </span>
                   </div>
@@ -286,11 +403,13 @@ export function ExecutiveApprovalQueue() {
               {draft.approvalStatus === "correction_requested" && (
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t pt-3 bg-amber-50 -mx-5 -mb-5 px-5 py-3 rounded-b-xl">
                   <p className="text-xs text-amber-800">
-                    Corrections requested. The drafter should address the feedback above and
-                    resubmit for another review.
+                    {correctionExpired
+                      ? "This correction request expired after seven days. Ask an executive to issue a new request before resubmitting."
+                      : `Corrections requested. Address the feedback and resubmit before ${expiry ? new Date(expiry).toLocaleString() : "the request expires"}.`}
                   </p>
                   <Button
                     size="sm"
+                    disabled={correctionExpired}
                     className="bg-amber-600 hover:bg-amber-700 text-white text-xs shrink-0"
                     onClick={() => handleResubmit(draft)}
                   >
@@ -311,9 +430,14 @@ export function ExecutiveApprovalQueue() {
                 </div>
               )}
             </div>
+              );
+            })()
           ))}
         </div>
       )}
+
+      <DelegatedApproverPanel />
     </div>
   );
 }
+

@@ -88,6 +88,42 @@ export function deriveRunStatus(groups: AssetGroup[]): MultiAssetPayrollRun["sta
   return "draft";
 }
 
+/**
+ * Rounds a single payment amount to the nearest Stellar stroop (#667).
+ *
+ * Every Stellar asset settles with exactly `STELLAR_ASSET_DECIMALS` (7)
+ * decimal places, so a payment amount that arrives with more precision than
+ * that (e.g. from a salary split or a percentage-based bonus calculation)
+ * cannot actually be paid out as entered — the network rounds it. Rounding
+ * each payment independently, rather than rounding only the group total,
+ * mirrors how the real dispatch path pays employees one transaction at a
+ * time.
+ */
+export function roundToStroop(amount: number): number {
+  if (!Number.isFinite(amount)) return 0;
+  const scale = 10 ** STELLAR_ASSET_DECIMALS;
+  return Math.round(amount * scale) / scale;
+}
+
+/**
+ * Sums a group's per-employee amounts after each is independently rounded
+ * to the nearest stroop, and reports the resulting "dust" versus a naive
+ * floating-point sum (#667). Used by `buildReconciliation` to distinguish
+ * expected rounding dust from an actual missing/mismatched payment.
+ */
+export function computeRoundingSafeguard(
+  amounts: number[],
+): { roundedTotal: number; roundingDust: number; roundingDriftExceeded: boolean } {
+  const naiveTotal = amounts.reduce((s, a) => s + a, 0);
+  const roundedTotal = amounts.reduce((s, a) => s + roundToStroop(a), 0);
+  const roundingDust = roundToStroop(roundedTotal - naiveTotal);
+  // Bound matches describeAssetRounding's maxDrift (#544): at most half a
+  // stroop of drift per payment, accumulated across the group.
+  const maxExpectedDrift = (amounts.length * STELLAR_MIN_UNIT) / 2;
+  const roundingDriftExceeded = Math.abs(roundingDust) > maxExpectedDrift + STELLAR_MIN_UNIT;
+  return { roundedTotal, roundingDust, roundingDriftExceeded };
+}
+
 /** Build a reconciliation summary for a completed (or partial) run. */
 export function buildReconciliation(run: MultiAssetPayrollRun): MultiAssetReconciliation {
   const groups = run.assetGroups.map((group) => {
@@ -113,6 +149,13 @@ export function buildReconciliation(run: MultiAssetPayrollRun): MultiAssetReconc
     const totalConfirmed = entries.reduce((s, e) => s + e.confirmedAmount, 0);
     const discrepancyCount = entries.filter((e) => e.status !== "confirmed").length;
 
+    // Rounding safeguard (#667): computed from *confirmed* amounts, since
+    // expected (pre-settlement) amounts haven't gone through the stroop
+    // rounding the network actually applies yet.
+    const { roundingDust, roundingDriftExceeded } = computeRoundingSafeguard(
+      entries.map((e) => e.confirmedAmount),
+    );
+
     return {
       asset: group.asset,
       status:
@@ -127,10 +170,19 @@ export function buildReconciliation(run: MultiAssetPayrollRun): MultiAssetReconc
       totalExpected: group.totalAmount,
       totalConfirmed,
       discrepancyCount,
+      roundingDust,
+      roundingDriftExceeded,
     } as MultiAssetReconciliation["groups"][number];
   });
 
-  const canExportAudit = groups.every((g) => g.status === "complete" || g.status === "partial");
+  // Rounding safeguard (#667): a group whose dust exceeds the expected
+  // per-payment stroop bound signals a real arithmetic problem (not benign
+  // rounding), so the audit export is blocked until it's investigated —
+  // exporting a reconciliation that silently absorbed unexplained drift
+  // would defeat the point of an audit trail.
+  const canExportAudit = groups.every(
+    (g) => (g.status === "complete" || g.status === "partial") && !g.roundingDriftExceeded,
+  );
 
   return {
     runId: run.id,
@@ -143,6 +195,57 @@ export function buildReconciliation(run: MultiAssetPayrollRun): MultiAssetReconc
 /** Format a Stellar stroops amount as a human-readable string. */
 export function formatAssetAmount(amount: number, assetCode: string): string {
   return `${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 7 })} ${assetCode}`;
+}
+
+/** Every Stellar asset (native XLM and issued assets) has 7 decimal places. */
+export const STELLAR_ASSET_DECIMALS = 7;
+
+/** Smallest transferable unit of any Stellar asset (1 stroop). */
+export const STELLAR_MIN_UNIT = 1 / 10 ** STELLAR_ASSET_DECIMALS;
+
+export interface AssetRoundingExplanation {
+  /** One-line summary suitable for a tooltip heading. */
+  summary: string;
+  /** Supporting sentences, rendered as separate lines. */
+  details: string[];
+  /** Largest possible total drift, in asset units (count × ½ stroop). */
+  maxDrift: number;
+}
+
+/**
+ * Plain-language explanation of how a multi-asset group's amounts are rounded
+ * (#544). Deliberately derived only from the asset code and the number of
+ * payments — never from individual amounts — so the tooltip can't leak
+ * salary information.
+ */
+export function describeAssetRounding(
+  assetCode: string,
+  paymentCount: number,
+): AssetRoundingExplanation {
+  const count = Number.isFinite(paymentCount) && paymentCount > 0 ? Math.floor(paymentCount) : 0;
+  const maxDrift = (count * STELLAR_MIN_UNIT) / 2;
+  const unit = STELLAR_MIN_UNIT.toFixed(STELLAR_ASSET_DECIMALS);
+
+  const details = [
+    `${assetCode} amounts settle on Stellar with ${STELLAR_ASSET_DECIMALS} decimal places, so each payment is rounded to the nearest ${unit} ${assetCode}.`,
+    "Totals are shown with at least 2 and at most 7 decimals; trailing zeros beyond 2 decimals are hidden.",
+  ];
+  if (count > 1) {
+    details.push(
+      `Across ${count} payments the group total may differ from an unrounded or converted figure by at most ${maxDrift.toFixed(STELLAR_ASSET_DECIMALS)} ${assetCode}.`,
+    );
+  } else if (count === 1) {
+    details.push("With a single payment, rounding affects at most half of one stroop.");
+  } else {
+    details.push("No payments in this group, so no rounding applies.");
+  }
+  details.push("Each asset is rounded independently; amounts are never converted between assets.");
+
+  return {
+    summary: `How ${assetCode} amounts are rounded`,
+    details,
+    maxDrift,
+  };
 }
 
 /** Risk label for a group's status. */

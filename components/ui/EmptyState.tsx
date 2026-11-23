@@ -15,6 +15,9 @@ import {
   ClipboardCheck,
   Shield,
   Upload,
+  Coins,
+  Settings,
+  AlertTriangle,
 } from "lucide-react";
 
 // ─── Screen-specific empty-state definitions ─────────────────────
@@ -37,7 +40,10 @@ export type EmptyStateScreen =
   | "first-payroll"
   | "onboarding-incomplete"
   | "first-audit"
-  | "import-review-empty";
+  | "import-review-empty"
+  | "supported-assets-empty"
+  | "treasury-assets-empty"
+  | "settings-assets-empty";
 
 export interface EmptyStateDefinition {
   icon: LucideIcon;
@@ -150,6 +156,27 @@ export const EMPTY_STATE_COPY: Record<EmptyStateScreen, EmptyStateDefinition> =
       description:
         "When you import employee records in bulk, they will appear here for validation before being added to the directory. Use the bulk import flow to get started.",
     },
+    "supported-assets-empty": {
+      icon: Coins,
+      title: "No supported payroll assets configured",
+      description:
+        "Payroll creation is blocked until a supported asset (USDC, XLM, EURC) is configured. Add an asset in Settings → Assets to enable payroll batches.",
+      actionLabel: "Configure assets",
+    },
+    "treasury-assets-empty": {
+      icon: Landmark,
+      title: "No treasury assets configured",
+      description:
+        "No supported payroll assets are configured for this treasury. Fund or configure an asset (USDC, XLM, EURC) to enable payroll creation and disbursement.",
+      actionLabel: "Configure treasury assets",
+    },
+    "settings-assets-empty": {
+      icon: Settings,
+      title: "No payroll assets configured",
+      description:
+        "No supported assets are configured yet. Payroll batches cannot be created until at least one supported asset is added. Choose from USDC, XLM, or EURC.",
+      actionLabel: "Add supported asset",
+    },
   };
 
 interface EmptyStateProps {
@@ -163,6 +190,16 @@ interface EmptyStateProps {
     onClick?: () => void;
     href?: string;
   };
+  /**
+   * Secondary, lower-emphasis action rendered under the primary one (#365)
+   * — e.g. "Clear filters" next to a filtered-empty state's primary CTA, or
+   * a link out to setup/documentation guidance.
+   */
+  secondaryAction?: {
+    label: string;
+    onClick?: () => void;
+    href?: string;
+  };
 }
 
 function EmptyState({
@@ -171,6 +208,7 @@ function EmptyState({
   title,
   description,
   action,
+  secondaryAction,
 }: EmptyStateProps) {
   // Resolve from screen preset when provided, then allow overrides
   const preset = screen ? EMPTY_STATE_COPY[screen] : null;
@@ -197,24 +235,44 @@ function EmptyState({
     <p className="text-sm text-gray-500 mb-4 max-w-sm mx-auto">
       {resolvedDescription}
     </p>
-    {resolvedAction && resolvedAction.label && (
-      resolvedAction.href ? (
-        <Link
-          href={resolvedAction.href}
-          className="inline-flex px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors"
-        >
-          {resolvedAction.label}
-        </Link>
-      ) : (
-        <button
-          type="button"
-          onClick={resolvedAction.onClick}
-          className="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors"
-        >
-          {resolvedAction.label}
-        </button>
-      )
-    )}
+    <div className="flex flex-wrap items-center justify-center gap-3">
+      {resolvedAction && resolvedAction.label && (
+        resolvedAction.href ? (
+          <Link
+            href={resolvedAction.href}
+            className="inline-flex px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors"
+          >
+            {resolvedAction.label}
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={resolvedAction.onClick}
+            className="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors"
+          >
+            {resolvedAction.label}
+          </button>
+        )
+      )}
+      {secondaryAction && secondaryAction.label && (
+        secondaryAction.href ? (
+          <Link
+            href={secondaryAction.href}
+            className="inline-flex px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:underline transition-colors"
+          >
+            {secondaryAction.label}
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={secondaryAction.onClick}
+            className="px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:underline transition-colors"
+          >
+            {secondaryAction.label}
+          </button>
+        )
+      )}
+    </div>
     </div>
   );
 }

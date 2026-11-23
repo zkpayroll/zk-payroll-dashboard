@@ -39,7 +39,7 @@ export const createPayrollSchema = z.object({
 });
 
 export const updatePayrollStatusSchema = z.object({
-  status: z.enum(["pending", "verified", "failed", "cancelled"]),
+  status: z.enum(["pending", "verified", "failed", "cancelled", "paused"]),
   txHash: z.string().optional(),
 });
 
@@ -51,7 +51,7 @@ export type UpdatePayrollStatusInput = z.infer<
 // ─── Transaction Query Schema ─────────────────────────────────────────────────
 
 export const transactionQuerySchema = paginationSchema.extend({
-  status: z.enum(["pending", "verified", "failed", "cancelled"]).optional(),
+  status: z.enum(["pending", "verified", "failed", "cancelled", "paused"]).optional(),
   companyId: z.string().optional(),
   from: z.string().optional(),
   to: z.string().optional(),
@@ -66,6 +66,52 @@ export const cancelPayrollSchema = z.object({
 });
 
 export type CancelPayrollInput = z.infer<typeof cancelPayrollSchema>;
+
+// ─── Emergency Payroll Pause Schema (#665) ───────────────────────────────────
+
+export const pausePayrollSchema = z.object({
+  reason: z.string().min(3, "Pause reason must be at least 3 characters"),
+});
+
+export type PausePayrollInput = z.infer<typeof pausePayrollSchema>;
+
+export const resumePayrollSchema = z.object({
+  notes: z.string().optional(),
+});
+
+export type ResumePayrollInput = z.infer<typeof resumePayrollSchema>;
+
+// ─── Upload Checkpoint Schema ─────────────────────────────────────────────────
+
+/**
+ * Body sent by the dashboard when recording a payroll upload checkpoint.
+ *
+ * Privacy contract: salary amounts, employee IDs, wallet addresses, and ZK
+ * proof data are explicitly excluded from this payload. Only structural
+ * progress metadata is accepted.
+ */
+export const saveUploadCheckpointSchema = z.object({
+  /** Opaque run identifier generated when the wizard session started. */
+  runId: z.string().min(1, "runId is required"),
+  /** Upload stage at which the checkpoint is being written. */
+  stage: z.enum(
+    ["draft_started", "proof_generated", "confirmed", "submitting", "completed"],
+    { message: "stage must be a valid UploadCheckpointStage" },
+  ),
+  /**
+   * Number of employees in the batch.
+   * Must be a non-negative integer — zero is valid for an empty-batch edge case.
+   * Raw salary amounts must NOT be sent.
+   */
+  employeeCount: z
+    .number()
+    .int("employeeCount must be an integer")
+    .nonnegative("employeeCount cannot be negative"),
+  /** Whether a valid ZK proof existed at checkpoint time. */
+  proofReady: z.boolean(),
+});
+
+export type SaveUploadCheckpointInput = z.infer<typeof saveUploadCheckpointSchema>;
 
 // ─── Validation Helper ────────────────────────────────────────────────────────
 

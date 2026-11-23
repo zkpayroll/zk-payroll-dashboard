@@ -13,6 +13,11 @@ import { useWalletStore } from "@/stores/walletStore";
 import { useEmployeeStore } from "@/stores/employees";
 import { sha256Hex } from "@/lib/zk/hash";
 import type { Employee } from "@/types";
+import {
+  describeStellarAddressIssue,
+  STELLAR_ADDRESS_FORMAT_HINT,
+  STELLAR_ADDRESS_LENGTH,
+} from "@/lib/employees/identifierFormat";
 
 // ─── Form State ───────────────────────────────────────────────────────────────
 
@@ -48,10 +53,9 @@ function validateForm(values: FormState): FormErrors {
     errors.email = "Invalid email address";
   }
 
-  if (values.address.length !== 56) {
-    errors.address = "Must be a valid Stellar public key (56 characters)";
-  } else if (!values.address.startsWith("G")) {
-    errors.address = "Stellar public keys begin with G";
+  const addressIssue = describeStellarAddressIssue(values.address);
+  if (addressIssue) {
+    errors.address = addressIssue;
   }
 
   const salary = parseFloat(values.salary);
@@ -445,9 +449,12 @@ export function AddEmployeeModal({ isOpen, onClose }: AddEmployeeModalProps) {
                 ) : (
                   <p
                     id="emp-address-hint"
-                    className="mt-1 text-xs text-gray-400"
+                    className="mt-1 text-xs text-gray-500"
                   >
-                    {form.address.length}/56 characters
+                    {STELLAR_ADDRESS_FORMAT_HINT}{" "}
+                    <span className="text-gray-400">
+                      ({form.address.trim().length}/{STELLAR_ADDRESS_LENGTH})
+                    </span>
                   </p>
                 )}
               </div>

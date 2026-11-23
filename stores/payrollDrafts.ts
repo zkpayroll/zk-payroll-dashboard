@@ -1,5 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import {
+  buildProvenanceEntry,
+  MAX_PROVENANCE_ENTRIES,
+  SYSTEM_ACTOR,
+  type DraftContentChecksumInput,
+} from "@/lib/payroll/draftProvenance";
+import type { DraftProvenanceEntry } from "@/types/models";
 
 export type DraftStatus = "draft" | "recovering" | "recovered" | "expired" | "discarded";
 
@@ -18,6 +25,8 @@ export interface PayrollDraft {
   recoveryToken?: string;
   error?: string;
   metadata?: Record<string, unknown>;
+  /** Chain of custody entries recording who created or modified this draft. */
+  provenance?: DraftProvenanceEntry[];
 }
 
 export type DraftSortField = "updatedAt" | "createdAt" | "expiresAt" | "totalAmount";
@@ -32,8 +41,11 @@ interface PayrollDraftsStore {
   sortField: DraftSortField;
   sortDirection: DraftSortDirection;
 
-  addDraft: (draft: Omit<PayrollDraft, "id" | "createdAt" | "updatedAt" | "expiresAt" | "status">) => PayrollDraft;
-  updateDraft: (id: string, updates: Partial<PayrollDraft>) => void;
+  addDraft: (
+    draft: Omit<PayrollDraft, "id" | "createdAt" | "updatedAt" | "expiresAt" | "status">,
+    options?: { actor?: string },
+  ) => PayrollDraft;
+  updateDraft: (id: string, updates: Partial<PayrollDraft>, options?: { actor?: string }) => void;
   removeDraft: (id: string) => void;
   setActiveDraft: (id: string | null) => void;
   recoverDraft: (id: string) => void;
@@ -44,6 +56,7 @@ interface PayrollDraftsStore {
   toggleSortDirection: () => void;
   getFilteredDrafts: () => PayrollDraft[];
   getActiveDraft: () => PayrollDraft | null;
+  getDraftProvenance: (id: string) => DraftProvenanceEntry[];
   cleanupExpired: () => void;
   reset: () => void;
 }
@@ -67,7 +80,18 @@ export const usePayrollDraftsStore = create<PayrollDraftsStore>()(
   persist(
     (set, get) => ({
       ...initialState,
-      addDraft: (draftData) => {
+      addDraft: (draftData, options) => {
+        const actor = options?.actor?.trim() || SYSTEM_ACTOR;
+        // Validates structural fields and throws an actionable error on bad input.
+        const input: DraftContentChecksumInput = {
+          name: draftData.name,
+          payPeriod: draftData.payPeriod,
+          currency: draftData.currency,
+          employeeCount: draftData.employeeIds.length,
+          totalAmount: draftData.totalAmount,
+        };
+        const entry = buildProvenanceEntry("created", actor, input);
+
         const now = new Date().toISOString();
         const expiresAt = new Date(
           Date.now() + EXPIRY_HOURS * 60 * 60 * 1000
@@ -79,18 +103,38 @@ export const usePayrollDraftsStore = create<PayrollDraftsStore>()(
           createdAt: now,
           updatedAt: now,
           expiresAt,
+          provenance: [entry],
         };
         set((state) => ({ drafts: [...state.drafts, draft] }));
         return draft;
       },
-      updateDraft: (id, updates) =>
-        set((state) => ({
-          drafts: state.drafts.map((d) =>
-            d.id === id
-              ? { ...d, ...updates, updatedAt: new Date().toISOString() }
-              : d
-          ),
-        })),
+      updateDraft: (id, updates, options) => {
+        const actor = options?.actor?.trim() || SYSTEM_ACTOR;
+        set((state) => {
+          const draft = state.drafts.find((d) => d.id === id);
+          if (!draft) return state;
+
+          const merged = { ...draft, ...updates, updatedAt: new Date().toISOString() };
+          const input: DraftContentChecksumInput = {
+            name: merged.name,
+            payPeriod: merged.payPeriod,
+            currency: merged.currency,
+            employeeCount: merged.employeeIds.length,
+            totalAmount: merged.totalAmount,
+          };
+          const entry = buildProvenanceEntry("updated", actor, input);
+          const provenance = [
+            ...(draft.provenance ?? []),
+            entry,
+          ].slice(-MAX_PROVENANCE_ENTRIES);
+
+          return {
+            drafts: state.drafts.map((d) =>
+              d.id === id ? { ...merged, provenance } : d
+            ),
+          };
+        });
+      },
       removeDraft: (id) =>
         set((state) => ({
           drafts: state.drafts.filter((d) => d.id !== id),
@@ -148,6 +192,10 @@ export const usePayrollDraftsStore = create<PayrollDraftsStore>()(
       getActiveDraft: () => {
         const { drafts, activeDraftId } = get();
         return drafts.find((d) => d.id === activeDraftId) ?? null;
+      },
+      getDraftProvenance: (id) => {
+        const { drafts } = get();
+        return drafts.find((d) => d.id === id)?.provenance ?? [];
       },
       cleanupExpired: () =>
         set((state) => ({

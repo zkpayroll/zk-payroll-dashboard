@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 export type CompanyBlockReason =
+  | "inactive"
   | "paused"
   | "archived"
   | "incomplete_setup"
@@ -60,6 +61,20 @@ const defaultCompanyState = {
 function generateWarnings(state: CompanyWarningsStore["companyState"]): CompanyWarning[] {
   const now = new Date().toISOString();
   const warnings: CompanyWarning[] = [];
+
+  if (!state.isActive) {
+    warnings.push({
+      id: `warn_inactive_${Date.now()}`,
+      reason: "inactive",
+      severity: "critical",
+      title: "Company is inactive",
+      message: "Payroll runs and disbursements cannot be processed while the company is inactive. Reactivate the company to proceed.",
+      nextSteps: ["Go to Company Settings or switch company context", "Verify company status and administrative permissions", "Contact organization administrator"],
+      blockedActions: ["run_payroll", "send_payments", "approve_transactions", "modify_treasury"],
+      createdAt: now,
+      dismissed: false,
+    });
+  }
 
   if (state.isPaused) {
     warnings.push({
@@ -189,7 +204,12 @@ export const useCompanyWarningsStore = create<CompanyWarningsStore>()(
         get().warnings.filter((w) => !w.dismissed && w.severity === "critical"),
       hasBlockingWarnings: () => {
         const { companyState } = get();
-        return companyState.isPaused || companyState.isArchived || !companyState.contractsConfigured;
+        return (
+          !companyState.isActive ||
+          companyState.isPaused ||
+          companyState.isArchived ||
+          !companyState.contractsConfigured
+        );
       },
       getBlockedActions: () => {
         const active = get().getActiveWarnings();

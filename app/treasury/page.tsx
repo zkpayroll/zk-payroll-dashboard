@@ -1,10 +1,12 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import TreasuryView from "@/components/features/treasury/TreasuryView";
+import TreasuryView, { type TreasuryViewProps } from "@/components/features/treasury/TreasuryView";
 
-function TreasuryPage() {
+export type TreasuryPageProps = TreasuryViewProps;
+
+function TreasuryPage(props: TreasuryPageProps = {}) {
   return (
     <DashboardLayout>
-      <TreasuryView />
+      <TreasuryView {...props} />
     </DashboardLayout>
   );
 }

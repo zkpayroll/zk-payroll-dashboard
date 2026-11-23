@@ -45,6 +45,7 @@ const REASON_CODES: Record<PayrollTransaction["status"], string> = {
   failed: "Transaction submission failed",
   verified: "",
   cancelled: "Transaction was cancelled by user",
+  paused: "Transaction was emergency-paused for review",
 };
 
 const NEXT_STEPS: Record<PayrollTransaction["status"], string> = {
@@ -52,6 +53,7 @@ const NEXT_STEPS: Record<PayrollTransaction["status"], string> = {
   failed: "Review failure details and retry",
   verified: "No action required",
   cancelled: "Create a new payroll run if needed",
+  paused: "Review the pause reason and resume once cleared",
 };
 
 const STATUS_ICONS: Record<PayrollTransaction["status"], ElementType> = {
@@ -59,6 +61,7 @@ const STATUS_ICONS: Record<PayrollTransaction["status"], ElementType> = {
   failed: XCircle,
   verified: UserCheck,
   cancelled: Lock,
+  paused: ShieldAlert,
 };
 
 const STATUS_CLASSES: Record<PayrollTransaction["status"], string> = {
@@ -66,6 +69,7 @@ const STATUS_CLASSES: Record<PayrollTransaction["status"], string> = {
   failed: "text-red-600",
   verified: "text-green-600",
   cancelled: "text-gray-500",
+  paused: "text-amber-700",
 };
 
 export interface PayrollExceptionItem {

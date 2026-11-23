@@ -7,13 +7,26 @@ import { useWalletStore } from "@/stores/walletStore";
 import { useCompanyStore } from "@/stores/company";
 import WalletConnect from "@/components/features/wallet/WalletConnect";
 import PayrollSummary from "@/components/features/payroll/PayrollSummary";
+import PeriodSummaryCard from "@/components/features/payroll/PeriodSummaryCard";
 import SystemStatus from "@/components/features/dashboard/SystemStatus";
+import TreasuryBalanceSummaryCard from "@/components/features/dashboard/TreasuryBalanceSummaryCard";
+import TreasuryLiquidityReserveCard from "@/components/features/dashboard/TreasuryLiquidityReserveCard";
 import QuickActions from "@/components/features/dashboard/QuickActions";
 import OnboardingChecklistPanel from "@/components/features/dashboard/OnboardingChecklistPanel";
 import OnboardingReadinessTracker from "@/components/features/employees/OnboardingReadinessTracker";
 import PinnedAlertsPanel from "@/components/features/dashboard/PinnedAlertsPanel";
 import { SessionTimeoutBanner } from "@/components/features/dashboard/SessionTimeoutBanner";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import DashboardAssetAvailabilityCheck from "@/components/features/dashboard/DashboardAssetAvailabilityCheck";
+import DashboardPaymentAssetCompatibilityCheck from "@/components/features/dashboard/DashboardPaymentAssetCompatibilityCheck";
+import PayoutScheduleCollisionPanel from "@/components/features/dashboard/PayoutScheduleCollisionPanel";
+import DashboardCompensationPolicyCheck from "@/components/features/dashboard/DashboardCompensationPolicyCheck";
+import DashboardEmployeeEligibilityStatusCheck from "@/components/features/dashboard/DashboardEmployeeEligibilityStatusCheck";
+import DashboardPayoutVarianceAnomalyDetection from "@/components/features/dashboard/DashboardPayoutVarianceAnomalyDetection";
+import DashboardOrganizationConfigChangeLedger from "@/components/features/dashboard/DashboardOrganizationConfigChangeLedger";
+import DashboardPayrollOperationsHealthCard from "@/components/features/dashboard/DashboardPayrollOperationsHealthCard";
+import TreasurySettlementSummaryCard from "@/components/features/dashboard/TreasurySettlementSummaryCard";
+import { MOCK_COMPANIES, MOCK_EMPLOYEES } from "@/lib/api/mockData";
 
 function DashboardHome() {
   const { isFreighterInstalled } = useStellar();
@@ -141,7 +154,48 @@ function DashboardHome() {
         <OnboardingReadinessTracker />
       </ErrorBoundary>
       <ErrorBoundary>
+        <DashboardPayrollOperationsHealthCard />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <TreasuryBalanceSummaryCard />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <TreasuryLiquidityReserveCard />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <TreasurySettlementSummaryCard />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <DashboardAssetAvailabilityCheck
+          configuredAssets={MOCK_COMPANIES[0]?.treasury ? [{ code: "USDC" }, { code: "XLM" }] : []}
+        />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <DashboardPaymentAssetCompatibilityCheck />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <PayoutScheduleCollisionPanel
+          templates={[]}
+          runs={[]}
+        />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <DashboardEmployeeEligibilityStatusCheck employees={MOCK_EMPLOYEES} />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <DashboardCompensationPolicyCheck />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <DashboardPayoutVarianceAnomalyDetection />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <DashboardOrganizationConfigChangeLedger />
+      </ErrorBoundary>
+      <ErrorBoundary>
         <SystemStatus />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <PeriodSummaryCard />
       </ErrorBoundary>
       <ErrorBoundary>
         <PayrollSummary />

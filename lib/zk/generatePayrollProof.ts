@@ -8,6 +8,8 @@ import { zkEngine } from "./engine";
 import { sha256Hex } from "./hash";
 import { toSorobanScVals } from "./serialize";
 
+const MAX_PROOF_INPUT_BYTES = 4096;
+
 function normalizeRequired(value: string, fieldName: string): string {
   const normalized = value.trim();
   if (!normalized) {
@@ -49,6 +51,11 @@ export async function generatePayrollProof(
   }
 
   const normalized = normalizeInputs(inputs);
+
+  const inputBytes = Object.values({ ...normalized.privateInputs, ...normalized.publicInputs }).reduce((n, v) => n + v.length, 0);
+  if (inputBytes > MAX_PROOF_INPUT_BYTES) {
+    throw new Error(`Proof input size (${inputBytes} bytes) exceeds the maximum of ${MAX_PROOF_INPUT_BYTES} bytes`);
+  }
 
   const [employeeIdHash, employeeSsnHash, salaryAmountHash, saltHash] =
     await Promise.all([
