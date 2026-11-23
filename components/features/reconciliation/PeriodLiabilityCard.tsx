@@ -34,6 +34,24 @@ export function PeriodLiabilityCard({ period }: { period: ReconciliationPeriodSu
 
       <AssetLiabilityChart assets={period.assets} />
 
+      {period.reservationChecks.length > 0 && (
+        <ul
+          aria-label="Reserved amount versus final payout"
+          className="space-y-1"
+          data-testid={`period-reservation-checks-${period.periodId}`}
+        >
+          {period.reservationChecks.map((check, index) => (
+            <li
+              key={`${check.assetCode}-${index}`}
+              data-status={check.status}
+              className={`text-xs ${check.status === "matched" ? "text-gray-600" : check.status === "over_reserved" ? "text-amber-700" : "text-red-700"}`}
+            >
+              {check.message}
+            </li>
+          ))}
+        </ul>
+      )}
+
       <ReconciliationBlockerPanel blockersByCategory={period.blockersByCategory} />
 
       <div>

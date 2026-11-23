@@ -11,6 +11,11 @@
  * salary or payment amount — only totals, counts, and safe metadata.
  */
 
+import {
+  compareReservedToPayout,
+  type ReservationComparison,
+} from "@/lib/reconciliation/reservationComparison";
+
 export type ReconciliationHealthStatus = "healthy" | "warning" | "blocked";
 
 export type ReconciliationBlockerCategory =
@@ -47,6 +52,12 @@ export interface ReconciliationAssetAmount {
   settled: number;
   /** liability - settled, clamped to >= 0. */
   outstanding: number;
+  /**
+   * Total reserved for this asset in this run (#860). Leave undefined when no
+   * reservation data is available; the run is then not compared. Only
+   * meaningful per run: merged period and dashboard totals do not carry it.
+   */
+  reserved?: number;
 }
 
 export interface ReconciliationRunInput {
@@ -70,6 +81,8 @@ export interface ReconciliationRunSummary extends ReconciliationRunInput {
   totalLiability: number;
   totalSettled: number;
   totalOutstanding: number;
+  /** Reserved amount vs final payout, one entry per asset that has reservation data. */
+  reservationChecks: ReservationComparison[];
   health: ReconciliationHealthStatus;
 }
 
@@ -87,6 +100,8 @@ export interface ReconciliationPeriodSummary {
   assets: ReconciliationAssetAmount[];
   blockersByCategory: ReconciliationBlockersByCategory;
   totalBlockerCount: number;
+  /** Every run's reservation checks, so a mismatch in one run is not averaged away. */
+  reservationChecks: ReservationComparison[];
   health: ReconciliationHealthStatus;
   runs: ReconciliationRunSummary[];
 }
@@ -105,16 +120,18 @@ function assetKey(asset: ReconciliationAsset): string {
 /**
  * Blocked whenever any actionable blocker exists (mismatch, hold, dispute,
  * or refund blocker) — these are exactly the things that must be resolved
- * before a period can safely close. Otherwise, an unsettled balance is a
- * warning (still settling, nothing actionable yet). No blockers and no
- * outstanding balance is healthy.
+ * before a period can safely close. Otherwise, an unsettled balance, or a
+ * reservation larger than the final payout that still has to be released, is
+ * a warning (nothing actionable is blocked yet). No blockers, no outstanding
+ * balance and no excess reservation is healthy.
  */
 export function evaluateReconciliationHealth(
   blockerCount: number,
   outstanding: number,
+  hasExcessReservation = false,
 ): ReconciliationHealthStatus {
   if (blockerCount > 0) return "blocked";
-  if (outstanding > 0) return "warning";
+  if (outstanding > 0 || hasExcessReservation) return "warning";
   return "healthy";
 }
 
@@ -133,7 +150,13 @@ export function mergeAssetAmounts(
         existing.settled += entry.settled;
         existing.outstanding += entry.outstanding;
       } else {
-        byKey.set(key, { ...entry });
+        // `reserved` is a per-run figure and is deliberately not carried into totals.
+        byKey.set(key, {
+          asset: entry.asset,
+          liability: entry.liability,
+          settled: entry.settled,
+          outstanding: entry.outstanding,
+        });
       }
     }
   }
@@ -160,12 +183,30 @@ export function summarizeRun(input: ReconciliationRunInput): ReconciliationRunSu
   const totalSettled = input.assets.reduce((sum, a) => sum + a.settled, 0);
   const totalOutstanding = input.assets.reduce((sum, a) => sum + a.outstanding, 0);
 
+  // Compare per asset: amounts in different assets must never be added together.
+  const reservationChecks = input.assets
+    .filter((a) => a.reserved !== undefined)
+    .map((a) => compareReservedToPayout(a.asset.code, a.reserved, a.liability));
+
+  // A payout the reservation does not cover is a mismatch that blocks closing.
+  const shortfallBlockers: ReconciliationBlocker[] = reservationChecks
+    .filter((c) => c.status === "under_reserved" || c.status === "invalid")
+    .map((c) => ({
+      category: "mismatches",
+      payrollRunId: input.payrollRunId,
+      description: c.message,
+    }));
+  const blockers = [...input.blockers, ...shortfallBlockers];
+  const hasExcessReservation = reservationChecks.some((c) => c.status === "over_reserved");
+
   return {
     ...input,
+    blockers,
     totalLiability,
     totalSettled,
     totalOutstanding,
-    health: evaluateReconciliationHealth(input.blockers.length, totalOutstanding),
+    reservationChecks,
+    health: evaluateReconciliationHealth(blockers.length, totalOutstanding, hasExcessReservation),
   };
 }
 
@@ -178,6 +219,7 @@ export function summarizePeriod(input: ReconciliationPeriodInput): Reconciliatio
   const totalLiability = runs.reduce((sum, r) => sum + r.totalLiability, 0);
   const totalSettled = runs.reduce((sum, r) => sum + r.totalSettled, 0);
   const totalOutstanding = runs.reduce((sum, r) => sum + r.totalOutstanding, 0);
+  const reservationChecks = runs.flatMap((r) => r.reservationChecks);
 
   return {
     periodId: input.periodId,
@@ -188,7 +230,12 @@ export function summarizePeriod(input: ReconciliationPeriodInput): Reconciliatio
     assets,
     blockersByCategory,
     totalBlockerCount: allBlockers.length,
-    health: evaluateReconciliationHealth(allBlockers.length, totalOutstanding),
+    reservationChecks,
+    health: evaluateReconciliationHealth(
+      allBlockers.length,
+      totalOutstanding,
+      reservationChecks.some((c) => c.status === "over_reserved"),
+    ),
     runs,
   };
 }
