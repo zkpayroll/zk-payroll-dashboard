@@ -1193,6 +1193,9 @@ period.
 
 Boundary guidance and validation feedback use date and schedule metadata only;
 they do not expose employee records or salary values.
+
+---
+
 ## Treasury Reservation Guidance (#887)
 
 **Goal:** Provide operators with deterministic, privacy-safe guidance across every treasury reservation lifecycle state (unconfigured assets, malformed data, insufficient balance, cumulative over-reservation, locked/recoverable expired holds, 5-minute expiry warning window, tight capacity, setup guidance, and active coverage) without exposing employee or salary data.
@@ -1211,3 +1214,41 @@ they do not expose employee records or salary values.
 | `__tests__/treasury-reservation-guidance.test.ts` | Unit tests covering all 10 reason codes, `BigInt` precision, fail-closed timestamps, and ReDoS/PII sanitization. |
 | `__tests__/components/TreasuryReservationGuidanceCard.test.tsx` | Isolated component unit tests covering tone roles, store isolation, override props, and remediation links. |
 | `__tests__/treasury-reservations.test.tsx` | End-to-end `TreasuryView` and `TreasuryPage` integration and privacy tests. |
+
+---
+
+## #906 — Beneficiary Changes UI Behavior
+
+**Goal:** Provide operators with clear, accessible, and privacy-preserving UI guidance and validation for employee beneficiary (payout destination) changes without exposing employee identities or salary amounts.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `types/beneficiary.ts` | Centralized domain, guidance, status, and validation types re-exported in `types/index.ts`. |
+| `lib/beneficiary-validation.ts` | Pure validation functions for Stellar public key format (`isValidStellarAddress`), change parameters, confirmations, and 24h recovery codes. |
+| `src/payroll/beneficiaryChangeVerificationWorkflow.ts` | Multi-stage verification workflow engine governing requests, verification steps, cooling-off windows, and active payroll cycle locks. |
+| `lib/employees/beneficiaryChangeGuidance.ts` | Pure guidance evaluator mapping workflow decisions to status tones, plain descriptions, and ordered next steps. |
+| `lib/payroll/beneficiaryVerificationStatus.ts` | Aggregate status evaluator summarizing pending, ready, and blocked requests for dashboard views. |
+| `components/features/employees/BeneficiaryChangeGuidance.tsx` | Accessible guidance card displaying tone-based alert and actionable steps list. |
+| `components/features/dashboard/DashboardBeneficiaryVerificationStatusCheck.tsx` | Summary status check component displaying aggregate counts without exposing employee records. |
+| `components/features/beneficiaries/BeneficiaryChangesView.tsx` | Dedicated beneficiary management view rendering request queues, validation form, step sign-offs, and 24h recovery undo. |
+| `app/beneficiaries/page.tsx` | Dedicated `/beneficiaries` route wrapped in `DashboardLayout`. |
+| `docs/BENEFICIARY_CHANGES.md` | Comprehensive operational guide and security invariants. |
+| `__tests__/beneficiary-changes.test.ts` | Unit tests for format validation, confirmation checks, and recovery code verification. |
+| `__tests__/beneficiary-change-guidance.test.ts` | Unit tests for guidance evaluation, cooling-off formatting, and next steps. |
+| `__tests__/beneficiary-change-verification-workflow.test.ts` | Workflow state machine tests including active payroll lock and TTL expiration. |
+| `__tests__/beneficiary-ui-behavior.test.tsx` | Integration and component tests covering rendering, validation errors, accessibility, and privacy boundaries. |
+
+### How It Works
+
+1. **Request Submission**: An operator submits a proposed Stellar public key at `/beneficiaries`. The input is verified via `isValidStellarAddress` (`^G[A-Z2-7]{55}$`), requiring explicit confirmation of the destination switch and version increment.
+2. **Multi-Party Verification**: Requests enter `pending_verification` status and require `contributor_confirmation`, `two_factor_auth`, and `dual_operator_signoff`. Self-signoff by the requesting operator is rejected.
+3. **Cooling-Off Window**: Once all verification steps pass, the request enters `cooling_off` (default 24 hours). The UI displays the remaining time formatted as hours or days.
+4. **Active Payroll Lock**: If `isPayrollInProgress` is true, all beneficiary changes are blocked to prevent state conflicts during ongoing payroll disbursement.
+5. **24-Hour Administrative Undo**: Administrators can revert changes within 24 hours using a 32-character recovery code and explicit confirmation.
+
+### Privacy and Zero-Knowledge Guarantees
+
+- **Address Masking**: Destination addresses are always masked as `GA7Q...VSGZ` (`maskAddress`). Raw full addresses are omitted from all general UI displays.
+- **Zero Salary Disclosure**: Beneficiary forms and cards strictly omit salary values, payout amounts, and employee PII.

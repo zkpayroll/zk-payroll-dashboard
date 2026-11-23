@@ -15,8 +15,10 @@ export function isValidStellarAddress(address: string): boolean {
   if (!address || typeof address !== 'string') return false;
   if (address.length !== 56) return false;
   if (!address.startsWith('G')) return false;
-  // Basic alphanumeric check
-  return /^G[A-Z2-7]{54}$/.test(address);
+  // Reject degenerate/all-zero key format
+  if (address === 'G' + 'A'.repeat(55)) return false;
+  // Basic alphanumeric check: G followed by 55 characters in [A-Z2-7]
+  return /^G[A-Z2-7]{55}$/.test(address);
 }
 
 /**
@@ -89,7 +91,7 @@ export function validateBeneficiaryRecovery(
   }
 
   if (!adminConfirmed) {
-    errors.push('Administrator confirmation is required for recovery');
+    errors.push('Administrator confirmation is required');
   }
 
   if (recoveryCode && !/^[A-Z0-9]{32}$/.test(recoveryCode)) {
