@@ -95,6 +95,11 @@ const MONTH_INDEX_MAP: Record<string, number> = {
   december: 12,
 };
 
+/** Number of days in a 1-indexed month of a given year (UTC, leap-year aware). */
+function daysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
 /**
  * Extract raw period identifier or timestamp candidate from various input shapes.
  */
@@ -262,6 +267,27 @@ export function parsePeriod(input: unknown): ParsedPeriod {
   }
 
   // Pattern 5: Full ISO date/timestamp (e.g. "2025-02-28T09:01:00Z", "2026-03-15")
+  // `new Date()` silently rolls impossible calendar days forward
+  // ("2025-02-30" -> March 2), which would mislabel a run into the next
+  // period. Reject those explicitly so period boundaries stay honest.
+  const isoDateMatch = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T\s])/.exec(str);
+  if (isoDateMatch) {
+    const year = Number.parseInt(isoDateMatch[1], 10);
+    const month = Number.parseInt(isoDateMatch[2], 10);
+    const day = Number.parseInt(isoDateMatch[3], 10);
+    if (month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)) {
+      return {
+        isValid: false,
+        label: "",
+        shortLabel: "",
+        periodId: "",
+        year: null,
+        month: null,
+        error: `Impossible calendar date: "${isoDateMatch[0].slice(0, 10)}"`,
+      };
+    }
+  }
+
   const dateAttempt = new Date(str);
   if (!Number.isNaN(dateAttempt.getTime())) {
     const year = dateAttempt.getUTCFullYear();
