@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useViewKeyStore } from "@/stores/viewKeys";
 import { IncidentBanner } from "@/components/ui/IncidentBanner";
 import type { ViewKey } from "@/types";
@@ -53,6 +53,8 @@ export interface AuditorAccessExpirationBannerProps {
   viewKeysSelector?: (state: { viewKeys: ViewKey[] }) => ViewKey[];
 }
 
+const defaultViewKeysSelector = (state: { viewKeys: ViewKey[] }) => state.viewKeys;
+
 /**
  * Surface auditor view keys that are about to expire (or have already
  * expired) so admin/auditor workflows don't fail silently (#199).
@@ -72,9 +74,15 @@ export interface AuditorAccessExpirationBannerProps {
 export default function AuditorAccessExpirationBanner({
   now,
   warningWindowMs = AUDITOR_EXPIRATION_SOON_MS,
-  viewKeysSelector = (state) => state.viewKeys,
+  viewKeysSelector = defaultViewKeysSelector,
 }: AuditorAccessExpirationBannerProps = {}) {
-  const viewKeys = useViewKeyStore(viewKeysSelector);
+  const selectorRef = useRef(viewKeysSelector);
+  if (selectorRef.current !== viewKeysSelector) selectorRef.current = viewKeysSelector;
+  const storeKeys = useViewKeyStore((state) => state.viewKeys);
+  const viewKeys =
+    selectorRef.current === defaultViewKeysSelector
+      ? storeKeys
+      : selectorRef.current({ viewKeys: storeKeys });
 
   const classifications = useMemo(() => {
     const effectiveNow = now ?? Date.now();
