@@ -15,6 +15,7 @@ import {
   Lock,
   ChevronRight,
   Info,
+  Archive,
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
@@ -310,6 +311,13 @@ export default function AuditGrantsPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <Link
+              href="/audit/archived-periods"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              <Archive className="w-4 h-4" />
+              Archived Periods
+            </Link>
             <Link
               href="/audit/export"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-sm"
