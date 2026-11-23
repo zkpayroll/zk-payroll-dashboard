@@ -9,20 +9,28 @@ import { ReserveThresholdExceptionApprovals } from "@/components/features/payrol
 
 export default function PayrollApprovalsPage() {
   const pendingRun = MOCK_PAYROLL_RUNS.find((r) => r.status === "pending");
+  // Approval progress is tied to the draft version it was granted against.
+  // Any draft change invalidates prior approvals so stale progress is never shown.
+  const approvalRuns = MOCK_PAYROLL_RUNS.map((r) =>
+    r.status === "pending" && r.draftChangedSinceApproval === true
+      ? { ...r, approvals: [] }
+      : r
+  );
+  const activePendingRun = approvalRuns.find((r) => r.status === "pending");
 
   return (
     <DashboardLayout>
-      <PayrollAdjustmentApprovalExpiryPanel runs={MOCK_PAYROLL_RUNS} />
-      <PendingPayrollObligationsPanel runs={MOCK_PAYROLL_RUNS} />
+      <PayrollAdjustmentApprovalExpiryPanel runs={approvalRuns} />
+      <PendingPayrollObligationsPanel runs={approvalRuns} />
       <ReserveThresholdExceptionApprovals exceptions={MOCK_RESERVE_THRESHOLD_EXCEPTIONS} />
-      {pendingRun && (
+      {activePendingRun && (
         <>
           <InactiveEmployeeWarning
             employees={MOCK_EMPLOYEES}
-            employeeIds={pendingRun.employeeIds}
+            employeeIds={activePendingRun.employeeIds}
           />
           <PayrollReviewRiskScoring
-            payrollRun={pendingRun}
+            payrollRun={activePendingRun}
             employees={MOCK_EMPLOYEES}
           />
         </>

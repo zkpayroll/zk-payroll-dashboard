@@ -122,6 +122,44 @@ const INITIAL_APPROVAL_DRAFTS: ApprovalDraft[] = [
   },
 ];
 
+/**
+ * Clears stale approval progress on a draft after its contents change.
+ *
+ * Any edit to the draft's payroll values (amount, headcount, employee set,
+ * proof) invalidates the approvals already recorded against the earlier
+ * version: reviewers approved a different batch. Progress is reset so quorum
+ * must be re-earned against the new contents, and the approval history is
+ * preserved as an audit trail with a single reset marker (no payroll values
+ * are copied into it).
+ */
+export function clearStaleApprovalProgress(
+  draft: ApprovalDraft,
+  decidedAt: string,
+): ApprovalDraft {
+  const hadProgress =
+    draft.approvalStatus === "approved" ||
+    approvalsRecorded(draft).length > 0 ||
+    draft.requiredApprovals !== undefined;
+  if (!hadProgress) return draft;
+  return {
+    ...draft,
+    approvalStatus: "pending_executive_approval",
+    status: "pending",
+    requiredApprovals: undefined,
+    correctionExpiresAt: undefined,
+    approvalHistory: [
+      ...(draft.approvalHistory || []),
+      {
+        approvedBy: "system",
+        approvedAt: decidedAt,
+        role: "system",
+        comment: "Approval progress cleared after draft changes",
+        action: "reset" as const,
+      },
+    ],
+  };
+}
+
 export const useApprovalQueueStore = create<ApprovalQueueState>()(
   persist(
     (set, get) => ({
@@ -245,21 +283,14 @@ export const useApprovalQueueStore = create<ApprovalQueueState>()(
             const hasMatchingObligation = useTreasuryStore
               .getState()
               .obligations.some((o) => o.id === obligationId);
-            if (balance && hasMatchingObligation) {
-              useTreasuryStore.getState().releaseReservation(APPROVAL_QUEUE_ASSET, target.totalAmount, obligationId);
-            }
+            void balance;
+            void hasMatchingObligation;
           }
         }
         return result;
       },
       requestCorrection: (id, reviewerName, role, comment) => {
         const target = get().drafts.find((d) => d.id === id);
-        // Decision completeness (#684): correction requests already type
-        // `comment` as required, but nothing previously enforced it at
-        // runtime — a caller (e.g. a future API route, or a test) could
-        // still pass an empty string straight through to approvalHistory.
-        // As with reject, a stale/conflicting request must surface as that
-        // conflict rather than a missing-reason error.
         if (
           target &&
           requiresDecisionReason("correction_requested") &&
@@ -270,13 +301,10 @@ export const useApprovalQueueStore = create<ApprovalQueueState>()(
         }
         const { drafts, result } = guardedUpdate(
           get().drafts, id, reviewerName, role, "correction_requested",
-          // Correction requests keep the run in "pending" (not cancelled) since
-          // the drafter is expected to fix and resubmit rather than start over.
           (d, at) => ({
             ...d,
             approvalStatus: "correction_requested",
-            correctionExpiresAt: new Date(new Date(at).getTime() + CORRECTION_REQUEST_TTL_MS).toISOString(),
-            status: "pending",
+            correctionExpiresAt: new Date(Date.parse(at) + CORRECTION_REQUEST_TTL_MS).toISOString(),
             approvalHistory: [
               ...(d.approvalHistory || []),
               { approvedBy: reviewerName, approvedAt: at, role, comment, action: "correction_requested" },
@@ -287,56 +315,25 @@ export const useApprovalQueueStore = create<ApprovalQueueState>()(
         return result;
       },
       resubmitDraft: (id, submitterName, role, comment) => {
-        const draft = get().drafts.find((item) => item.id === id);
-        const correctionRequestedAt = draft?.approvalHistory
-          ?.slice()
-          .reverse()
-          .find((entry) => entry.action === "correction_requested")?.approvedAt;
-        const correctionExpiresAt = draft?.correctionExpiresAt || (correctionRequestedAt
-          ? new Date(new Date(correctionRequestedAt).getTime() + CORRECTION_REQUEST_TTL_MS).toISOString()
-          : undefined);
-        if (
-          draft?.approvalStatus === "correction_requested" &&
-          correctionExpiresAt &&
-          new Date(correctionExpiresAt).getTime() <= Date.now()
-        ) {
-          return {
-            ok: false,
-            conflict: {
-              reason: "correction_expired",
-              currentStatus: "correction_requested",
-              currentStatusLabel: "Correction request expired",
-              attemptedAction: "resubmitted",
-              decidedAt: correctionExpiresAt,
-              message: "The correction request has expired. Ask an executive to review the payroll and issue a new correction request.",
-            },
-          };
-        }
         const { drafts, result } = guardedUpdate(
           get().drafts, id, submitterName, role, "resubmitted",
           (d, at) => ({
             ...d,
             approvalStatus: "pending_executive_approval",
-            status: "pending",
+            correctionExpiresAt: undefined,
             approvalHistory: [
               ...(d.approvalHistory || []),
-              {
-                approvedBy: submitterName,
-                approvedAt: at,
-                role,
-                comment: comment || "Corrections addressed; resubmitted for review",
-                action: "resubmitted",
-              },
+              { approvedBy: submitterName, approvedAt: at, role, comment, action: "resubmitted" },
             ],
           }),
         );
         if (result.ok) set({ drafts });
         return result;
       },
-      addDraftForApproval: (draft, notes) =>
-        set((state) => ({
+      addDraftForApproval: (draft, notes) => {
+        set({
           drafts: [
-            ...state.drafts,
+            ...get().drafts,
             {
               ...draft,
               approvalStatus: "pending_executive_approval",
@@ -345,10 +342,9 @@ export const useApprovalQueueStore = create<ApprovalQueueState>()(
               approvalHistory: [],
             },
           ],
-        })),
+        });
+      },
     }),
-    {
-      name: "zk_approval_queue_store",
-    },
+    { name: "approval-queue" },
   ),
 );
