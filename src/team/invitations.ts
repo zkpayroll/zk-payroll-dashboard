@@ -28,6 +28,42 @@ export const TEAM_ROLE_DESCRIPTIONS: Record<TeamRole, string> = {
   auditor: "Read-only access to audit logs, compliance evidence, and reports",
 };
 
+const TEAM_ROLES = new Set<TeamRole>([
+  "payroll_admin",
+  "reviewer",
+  "treasury_operator",
+  "auditor",
+]);
+
+export interface TeamInvitationValidation {
+  valid: boolean;
+  error?: string;
+}
+
+/** Validate role changes before an invitation can mutate the local team view. */
+export function validateTeamInvitation(
+  email: string,
+  role: string,
+  invitations: readonly TeamInvitation[] = [],
+): TeamInvitationValidation {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return { valid: false, error: "Enter a valid recipient email address." };
+  }
+  if (!TEAM_ROLES.has(role as TeamRole)) {
+    return { valid: false, error: "Select a supported team role before sending the invitation." };
+  }
+  const hasActiveInvitation = invitations.some(
+    (invitation) =>
+      invitation.email.trim().toLowerCase() === normalizedEmail &&
+      (invitation.status === "pending" || invitation.status === "accepted"),
+  );
+  if (hasActiveInvitation) {
+    return { valid: false, error: "This recipient already has an active team role." };
+  }
+  return { valid: true };
+}
+
 export const INITIAL_TEAM_INVITATIONS: TeamInvitation[] = [
   {
     id: "inv_001",

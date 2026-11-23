@@ -65,10 +65,14 @@ export default function PayrollFailureRecoveryCenter({
     });
     onRetryPolicyDecision?.(runId, report);
 
+    const settlementAlreadyRecorded = Boolean(
+      run.receiptId || (run.transactionHash && run.status === "verified"),
+    );
+
     // A settled transaction must never be re-queued from the recovery UI.
     // The check is repeated here, rather than relying only on the button's
     // disabled state, because callers can invoke the handler programmatically.
-    if (status === "pending" && (run.transactionHash || run.receiptId || !report.canRetry)) {
+    if (status === "pending" && (settlementAlreadyRecorded || !report.canRetry)) {
       setActionError(report.summary);
       return;
     }
@@ -178,7 +182,9 @@ export default function PayrollFailureRecoveryCenter({
                     const diagnostics = diagnosePayrollRunRetry(run, {
                       retryCount: retryAttempts[run.id] ?? 0,
                     });
-                    const settlementAlreadyRecorded = Boolean(run.transactionHash || run.receiptId);
+                    const settlementAlreadyRecorded = Boolean(
+                      run.receiptId || (run.transactionHash && run.status === "verified"),
+                    );
                     return (
                     <li
                       key={run.id}

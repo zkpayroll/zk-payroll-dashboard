@@ -24,6 +24,7 @@ import {
   filterInvitations,
   revokeInvitationHelper,
   resendInvitationHelper,
+  validateTeamInvitation,
 } from "@/src/team/invitations";
 
 export interface TeamRoleInvitationStatusViewProps {
@@ -123,11 +124,16 @@ export function TeamRoleInvitationStatusView({
 
   const handleCreateInvitation = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newEmail.trim()) return;
+    setFeedback(null);
+    const validation = validateTeamInvitation(newEmail, newRole, invitations);
+    if (!validation.valid) {
+      setFeedback({ type: "error", message: validation.error ?? "Invalid invitation details." });
+      return;
+    }
 
     const newInv: TeamInvitation = {
       id: `inv_${Date.now()}`,
-      email: newEmail.trim(),
+      email: newEmail.trim().toLowerCase(),
       role: newRole,
       status: "pending",
       invitedBy: "admin@zkpayroll.io",

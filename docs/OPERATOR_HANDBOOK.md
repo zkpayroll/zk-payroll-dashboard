@@ -369,6 +369,18 @@ See [Employee Lifecycle Management Guide](EMPLOYEE_LIFECYCLE.md) for full detail
 
 Quick-filter chips show a count of matching runs and update as other filters narrow the list. They describe lifecycle state only — amounts, employee identities, wallet addresses, and proofs are never displayed in the toolbar.
 
+### Rejected Corrections
+
+The **Rejected Corrections** panel at the bottom of the **History** page lists every run an executive rejected after it had been sent back for corrections. Each entry shows:
+
+- The run reference, the rejecting reviewer and their role, and when it was rejected
+- How many correction rounds came before the rejection, when corrections were last requested, and whether the drafter resubmitted
+- The reviewer's rejection reason
+
+A rejected run is final and cannot be resubmitted. Create a new draft that addresses the feedback.
+
+If a reviewer's reason mentions a salary figure, employee data (names, emails, employee ids, wallet addresses), or a credential, the whole reason is hidden and the panel asks you to get the reviewer to restate it. If an older rejection has no reason at all, contact the reviewer before drafting a replacement. Amounts, headcount, employee ids, and draft notes never appear in this panel.
+
 ### Payroll Run Details
 
 1. Click any payroll run from history

@@ -15,6 +15,7 @@ import {
   Lock,
   ChevronRight,
   Info,
+  Archive,
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
@@ -26,6 +27,7 @@ import {
   AuditGrantRevocationStatus,
   formatRevocationTimestamp,
 } from "@/components/features/audit/AuditGrantRevocationStatus";
+import { evaluateAuditorAccessExpiry } from "@/lib/date/auditorAccessExpiry";
 
 // Initial seeded audit grants for operators and integrators
 export const MOCK_AUDIT_GRANTS: AuditGrantDetail[] = [
@@ -165,7 +167,7 @@ export const MOCK_AUDIT_GRANTS: AuditGrantDetail[] = [
     auditorAddress: "0x12C7656EC7ab88b098defB751B7401B5f6d81111",
     grantedBy: "Operator Admin (0x8920...)",
     createdAt: "2026-10-01T09:00:00Z",
-    expiresAt: "2026-10-25T09:00:00Z",
+    expiresAt: "2026-11-25T09:00:00Z",
     expiresAtLedger: 5_100_000,
     status: "expiring_soon",
     maskingTier: "FULL_ZERO_KNOWLEDGE",
@@ -194,7 +196,7 @@ export default function AuditGrantsPage() {
   const [grants, setGrants] = useState<AuditGrantDetail[]>(MOCK_AUDIT_GRANTS);
   const [selectedGrant, setSelectedGrant] = useState<AuditGrantDetail | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "revoked">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "expired" | "revoked">("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   const handleOpenDrawer = (grant: AuditGrantDetail) => {
@@ -271,7 +273,9 @@ export default function AuditGrantsPage() {
 
   const filteredGrants = grants.filter((grant) => {
     const isRevoked = grant.status === "revoked" || Boolean(grant.revokedAt);
-    if (statusFilter === "active" && isRevoked) return false;
+    const expiryState = evaluateAuditorAccessExpiry(grant, Date.now()).state;
+    if (statusFilter === "active" && (isRevoked || expiryState === "expired")) return false;
+    if (statusFilter === "expired" && (isRevoked || expiryState !== "expired")) return false;
     if (statusFilter === "revoked" && !isRevoked) return false;
 
     if (searchQuery.trim()) {
@@ -288,8 +292,12 @@ export default function AuditGrantsPage() {
   const totalGrants = grants.length;
   const activeGrants = grants.filter((g) => g.status === "active" || g.status === "expiring_soon").length;
   const revokedGrants = grants.filter((g) => g.status === "revoked" || Boolean(g.revokedAt)).length;
-  const expiredGrants = grants.filter((g) => g.status === "expired");
-  const expiringGrants = grants.filter((g) => g.status === "expiring_soon");
+  const expiredGrants = grants.filter((g) =>
+    g.status !== "revoked" && !g.revokedAt && evaluateAuditorAccessExpiry(g).state === "expired",
+  );
+  const expiringGrants = grants.filter((g) =>
+    g.status !== "revoked" && !g.revokedAt && evaluateAuditorAccessExpiry(g).state === "expiring_soon",
+  );
 
   return (
     <DashboardLayout>
@@ -306,6 +314,13 @@ export default function AuditGrantsPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <Link
+              href="/audit/archived-periods"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              <Archive className="w-4 h-4" />
+              Archived Periods
+            </Link>
             <Link
               href="/audit/export"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-sm"
@@ -404,6 +419,15 @@ export default function AuditGrantsPage() {
               }`}
             >
               Active ({activeGrants})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("expired")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                statusFilter === "expired" ? "bg-amber-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              Expired ({expiredGrants.length})
             </button>
             <button
               type="button"

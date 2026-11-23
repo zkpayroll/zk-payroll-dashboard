@@ -27,6 +27,8 @@ export interface Employee {
   department?: string;
   salary: number;
   salaryCommitment: string;
+  /** Salary commitment format version; omitted values are treated as legacy version 1. */
+  salaryCommitmentVersion?: number;
   isActive: boolean;
   status?: "active" | "inactive" | "pending";
   onboardingStatus: OnboardingStatus;
@@ -41,6 +43,8 @@ export interface Employee {
   offboardedAt?: string | null;
   /** Privacy-safe reason for the most recent lifecycle transition. */
   lifecycleNote?: string | null;
+  /** Currently active salary commitment version (starts at 1). */
+  salaryCommitmentVersion?: number;
 }
 
 export interface Company {
@@ -195,6 +199,8 @@ export interface PayrollTransaction {
   receiptId?: string | null;
   /** Account sequence reported by the network for this execution, when available. */
   confirmationNonce?: string | null;
+  /** Whether this run's payout asset is currently paused by its issuer or configuration. */
+  payoutTokenPaused?: boolean;
   isArchived?: boolean;
   /**
    * Cancellation reason for run-derived history rows (#284). Mirrors

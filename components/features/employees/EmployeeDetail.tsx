@@ -25,10 +25,14 @@ import {
 import { useEmployeeStore } from "@/stores/employees";
 import { MOCK_EMPLOYEES, MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import type { Employee } from "@/types";
+import {
+  buildCommitmentVersionHistory,
+} from "@/lib/employees/salaryCommitmentVersionRecovery";
 import OnboardingBadge from "./OnboardingBadge";
 import EmptyState from "@/components/ui/EmptyState";
 import WalletChangeReviewCard from "@/components/review/WalletChangeReviewCard";
 import RecipientLockBadge from "./RecipientLockBadge";
+import { SalaryCommitmentVersionWarning } from "./SalaryCommitmentVersionWarning";
 
 export interface EmployeeDetailDrawerProps {
   employee: Employee | null;
@@ -155,6 +159,9 @@ export function EmployeeDetailDrawer({ employee, isOpen, onClose }: EmployeeDeta
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <CustomCheckCircleIcon className="w-3.5 h-3.5 text-indigo-500" /> Salary Commitment
                   </div>
+                  <SalaryCommitmentVersionWarning
+                    version={employee.salaryCommitmentVersion}
+                  />
                   <p className="text-xs font-mono break-all text-gray-500">
                     {employee.salaryCommitment}
                   </p>
@@ -197,13 +204,6 @@ function CustomCheckCircleIcon(props: any) {
   )
 }
 
-interface CommitmentEntry {
-  id: string;
-  commitment: string;
-  date: string;
-  type: "created" | "updated";
-}
-
 function deriveStatus(e: Employee): "active" | "inactive" | "pending" {
   if (e.status) return e.status;
   if (!e.isActive) return "inactive";
@@ -211,31 +211,9 @@ function deriveStatus(e: Employee): "active" | "inactive" | "pending" {
   return "active";
 }
 
-
-
-function buildCommitmentHistory(employee: Employee): CommitmentEntry[] {
-  const entries: CommitmentEntry[] = [
-    {
-      id: `${employee.id}-commit-1`,
-      commitment: employee.salaryCommitment,
-      date: employee.startDate,
-      type: "created",
-    },
-  ];
-  if (employee.lastPayment) {
-    entries.push({
-      id: `${employee.id}-commit-2`,
-      commitment: employee.salaryCommitment,
-      date: employee.lastPayment,
-      type: "updated",
-    });
-  }
-  return entries;
-}
-
 export default function EmployeeDetail({ employeeId }: { employeeId: string }) {
   const router = useRouter();
-  const { employees: storedEmployees, isLoading } = useEmployeeStore();
+  const { employees: storedEmployees, isLoading, commitmentReplacementLog } = useEmployeeStore();
   const retryOnboarding = useEmployeeStore((s) => s.retryOnboarding);
 
   const employees =
@@ -247,8 +225,8 @@ export default function EmployeeDetail({ employeeId }: { employeeId: string }) {
   );
 
   const commitmentHistory = useMemo(
-    () => (employee ? buildCommitmentHistory(employee) : []),
-    [employee],
+    () => (employee ? buildCommitmentVersionHistory(employee, commitmentReplacementLog) : []),
+    [employee, commitmentReplacementLog],
   );
 
   const payrollActivity = useMemo(
@@ -399,7 +377,13 @@ export default function EmployeeDetail({ employeeId }: { employeeId: string }) {
                   scope="col"
                   className="px-6 py-3 text-xs font-medium text-gray-600 uppercase"
                 >
-                  Event
+                  Version
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-xs font-medium text-gray-600 uppercase"
+                >
+                  Status
                 </th>
                 <th
                   scope="col"
@@ -418,24 +402,33 @@ export default function EmployeeDetail({ employeeId }: { employeeId: string }) {
             <tbody className="divide-y divide-gray-100">
               {commitmentHistory.map((entry) => (
                 <tr key={entry.id}>
+                  <td className="px-6 py-3 text-sm font-semibold text-gray-900">
+                    v{entry.version}
+                  </td>
                   <td className="px-6 py-3">
-                    <span className="inline-flex items-center gap-1.5 text-sm text-gray-700 capitalize">
-                      <Circle
-                        className={`w-3 h-3 ${
-                          entry.type === "created"
-                            ? "text-green-500"
-                            : "text-blue-500"
-                        }`}
-                        aria-hidden="true"
-                      />
-                      {entry.type}
-                    </span>
+                    {entry.status === "active" && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <Circle className="w-2 h-2 fill-green-500 text-green-500" aria-hidden="true" />
+                        Active
+                      </span>
+                    )}
+                    {entry.status === "restored" && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                        <RotateCcw className="w-2.5 h-2.5 text-indigo-600" aria-hidden="true" />
+                        Restored (v{entry.restoredFromVersion})
+                      </span>
+                    )}
+                    {entry.status === "superseded" && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                        Superseded
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-3 font-mono text-xs text-gray-600">
-                    {entry.commitment}
+                    {entry.commitmentPreview || entry.commitment}
                   </td>
                   <td className="px-6 py-3 text-sm text-gray-600">
-                    {new Date(entry.date).toLocaleDateString()}
+                    {new Date(entry.createdAt).toLocaleDateString()}
                   </td>
                 </tr>
               ))}

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Info, ChevronDown, ChevronUp, AlertCircle, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useEnvironmentStore } from "@/stores/environment";
 
 interface TransactionFeeEstimateProps {
   /** Total payroll amount in USDC */
@@ -25,6 +26,9 @@ export function TransactionFeeEstimate({
   error = null,
 }: TransactionFeeEstimateProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const networkPassphrase = useEnvironmentStore(
+    (state) => state.getActiveProfileConfig().networkPassphrase,
+  );
 
   // Fee calculation logic (Stellar network fees)
   // Base fee: 0.00001 XLM per operation
@@ -104,6 +108,15 @@ export function TransactionFeeEstimate({
           <span className="text-xs text-gray-400">
             (${formatXLM(estimatedNetworkFeeXLM)} XLM network + ~${protocolFeeUSDC.toFixed(2)} USDC protocol)
           </span>
+        </div>
+        <div className="mt-3 border-t border-gray-200 pt-2">
+          <p className="text-xs font-medium text-gray-700">Network passphrase for signing</p>
+          <code
+            data-testid="network-passphrase"
+            className="mt-1 block break-all rounded bg-white px-2 py-1 text-left text-xs text-gray-800"
+          >
+            {networkPassphrase}
+          </code>
         </div>
       </div>
 

@@ -23,6 +23,7 @@ import OnboardingBadge from "./OnboardingBadge";
 import { EmployeeDetailDrawer } from "./EmployeeDetail";
 import { AddEmployeeModal } from "./AddEmployeeModal";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { SalaryCommitmentVersionWarning } from "./SalaryCommitmentVersionWarning";
 
 export type StatusFilter = "all" | "active" | "inactive" | "pending";
 export type EmployeeSortField = "name" | "department" | "salary" | "status" | "startDate";
@@ -360,6 +361,9 @@ function EmployeeDirectory() {
                               <StatusBadge status={status} showIcon={false} className="px-2 py-0.5 text-[10px]" />
                               <OnboardingBadge status={emp.onboardingStatus} showIcon={false} />
                             </div>
+                            <SalaryCommitmentVersionWarning
+                              version={emp.salaryCommitmentVersion}
+                            />
                             {emp.onboardingError && (
                               <p className="mt-2 text-[11px] text-amber-700">
                                 Last onboarding failure: {emp.onboardingError}
@@ -515,6 +519,9 @@ function EmployeeDirectory() {
                         {emp.email && (
                           <div className="text-xs text-gray-500">{emp.email}</div>
                         )}
+                        <SalaryCommitmentVersionWarning
+                          version={emp.salaryCommitmentVersion}
+                        />
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">{emp.department ?? "—"}</td>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">

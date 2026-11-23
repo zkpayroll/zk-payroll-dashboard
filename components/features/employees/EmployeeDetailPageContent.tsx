@@ -11,20 +11,20 @@ import {
   CheckCircle2,
   XCircle,
   RefreshCcw,
+  RotateCcw,
 } from "lucide-react";
 import { useEmployeeStore } from "@/stores/employees";
 import { MOCK_EMPLOYEES, MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import type { Employee } from "@/types";
+import {
+  buildCommitmentVersionHistory,
+  type SalaryCommitmentVersion,
+} from "@/lib/employees/salaryCommitmentVersionRecovery";
 import EmptyState from "@/components/ui/EmptyState";
 import EmployeeAuditSidebar from "./EmployeeAuditSidebar";
 import { CommitmentReplacementDialog } from "./CommitmentReplacementDialog";
-
-interface CommitmentEntry {
-  id: string;
-  commitment: string;
-  date: string;
-  type: "created" | "updated";
-}
+import { SalaryCommitmentVersionWarning } from "./SalaryCommitmentVersionWarning";
+import { CommitmentVersionRecoveryDialog } from "./CommitmentVersionRecoveryDialog";
 
 function deriveStatus(e: Employee): "active" | "inactive" | "pending" {
   if (e.status) return e.status;
@@ -51,31 +51,13 @@ const PAYROLL_STATUS_COLOR: Record<string, string> = {
   failed: "text-red-600",
 };
 
-function buildCommitmentHistory(employee: Employee): CommitmentEntry[] {
-  const entries: CommitmentEntry[] = [
-    {
-      id: `${employee.id}-commit-1`,
-      commitment: employee.salaryCommitment,
-      date: employee.startDate,
-      type: "created",
-    },
-  ];
-  if (employee.lastPayment) {
-    entries.push({
-      id: `${employee.id}-commit-2`,
-      commitment: employee.salaryCommitment,
-      date: employee.lastPayment,
-      type: "updated",
-    });
-  }
-  return entries;
-}
-
 function EmployeeDetailPageContent({ employeeId }: { employeeId: string }) {
   const router = useRouter();
-  const { employees: storedEmployees, isLoading } = useEmployeeStore();
+  const { employees: storedEmployees, isLoading, commitmentReplacementLog } = useEmployeeStore();
   const [isReplacementDialogOpen, setIsReplacementDialogOpen] = useState(false);
   const [pendingCommitment, setPendingCommitment] = useState("");
+  const [isRecoveryDialogOpen, setIsRecoveryDialogOpen] = useState(false);
+  const [selectedRecoveryVersion, setSelectedRecoveryVersion] = useState<SalaryCommitmentVersion | null>(null);
 
   const employees =
     storedEmployees.length > 0 ? storedEmployees : MOCK_EMPLOYEES;
@@ -86,8 +68,8 @@ function EmployeeDetailPageContent({ employeeId }: { employeeId: string }) {
   );
 
   const commitmentHistory = useMemo(
-    () => (employee ? buildCommitmentHistory(employee) : []),
-    [employee],
+    () => (employee ? buildCommitmentVersionHistory(employee, commitmentReplacementLog) : []),
+    [employee, commitmentReplacementLog],
   );
 
   const payrollActivity = useMemo(
@@ -228,6 +210,10 @@ function EmployeeDetailPageContent({ employeeId }: { employeeId: string }) {
           </button>
         </div>
 
+        <SalaryCommitmentVersionWarning
+          version={employee.salaryCommitmentVersion}
+        />
+
         {commitmentHistory.length === 0 ? (
           <div className="px-6 py-8 text-center text-sm text-gray-500">
             No commitment records available.
@@ -241,7 +227,13 @@ function EmployeeDetailPageContent({ employeeId }: { employeeId: string }) {
                   scope="col"
                   className="px-6 py-3 text-xs font-medium text-gray-600 uppercase"
                 >
-                  Event
+                  Version
+                </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-xs font-medium text-gray-600 uppercase"
+                >
+                  Status
                 </th>
                 <th
                   scope="col"
@@ -255,32 +247,69 @@ function EmployeeDetailPageContent({ employeeId }: { employeeId: string }) {
                 >
                   Date
                 </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-xs font-medium text-gray-600 uppercase text-right"
+                >
+                  Action
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {commitmentHistory.map((entry) => (
-                <tr key={entry.id}>
-                  <td className="px-6 py-3">
-                    <span className="inline-flex items-center gap-1.5 text-sm text-gray-700 capitalize">
-                      <Circle
-                        className={`w-3 h-3 ${
-                          entry.type === "created"
-                            ? "text-green-500"
-                            : "text-blue-500"
-                        }`}
-                        aria-hidden="true"
-                      />
-                      {entry.type}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3 font-mono text-xs text-gray-600">
-                    {entry.commitment}
-                  </td>
-                  <td className="px-6 py-3 text-sm text-gray-600">
-                    {new Date(entry.date).toLocaleDateString()}
-                  </td>
-                </tr>
-              ))}
+              {commitmentHistory.map((entry) => {
+                const isRecoverable = entry.status === "superseded";
+                return (
+                  <tr key={entry.id}>
+                    <td className="px-6 py-3 text-sm font-semibold text-gray-900">
+                      v{entry.version}
+                    </td>
+                    <td className="px-6 py-3">
+                      {entry.status === "active" && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <Circle className="w-2 h-2 fill-green-500 text-green-500" aria-hidden="true" />
+                          Active
+                        </span>
+                      )}
+                      {entry.status === "restored" && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                          <RotateCcw className="w-2.5 h-2.5 text-indigo-600" aria-hidden="true" />
+                          Restored (v{entry.restoredFromVersion})
+                        </span>
+                      )}
+                      {entry.status === "superseded" && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                          Superseded
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3 font-mono text-xs text-gray-600">
+                      {entry.commitmentPreview || entry.commitment}
+                    </td>
+                    <td className="px-6 py-3 text-sm text-gray-600">
+                      {new Date(entry.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-3 text-sm text-right">
+                      {isRecoverable ? (
+                        <button
+                          type="button"
+                          data-testid={`recover-version-${entry.version}`}
+                          onClick={() => {
+                            setSelectedRecoveryVersion(entry);
+                            setIsRecoveryDialogOpen(true);
+                          }}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded transition-colors"
+                          aria-label={`Recover commitment version ${entry.version}`}
+                        >
+                          <RotateCcw className="w-3 h-3" aria-hidden="true" />
+                          Recover
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-400 font-medium">Current</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -370,6 +399,21 @@ function EmployeeDetailPageContent({ employeeId }: { employeeId: string }) {
         nextCommitment={pendingCommitment}
         onCancel={() => setIsReplacementDialogOpen(false)}
         onConfirmed={() => setIsReplacementDialogOpen(false)}
+      />
+
+      <CommitmentVersionRecoveryDialog
+        isOpen={isRecoveryDialogOpen}
+        employee={employee}
+        targetVersion={selectedRecoveryVersion}
+        versionHistory={commitmentHistory}
+        onCancel={() => {
+          setIsRecoveryDialogOpen(false);
+          setSelectedRecoveryVersion(null);
+        }}
+        onConfirmed={() => {
+          setIsRecoveryDialogOpen(false);
+          setSelectedRecoveryVersion(null);
+        }}
       />
     </section>
   );

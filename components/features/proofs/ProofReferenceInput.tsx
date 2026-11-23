@@ -5,7 +5,7 @@ import { CheckCircle2, AlertCircle } from "lucide-react";
 import {
   normalizeProofReference,
   validateProofReference,
-  PROOF_REFERENCE_FORMAT_HINT,
+  PROOF_REFERENCE_GUIDANCE,
 } from "@/lib/validation/proofReference";
 
 export interface ProofReferenceInputProps {
@@ -19,6 +19,14 @@ export interface ProofReferenceInputProps {
  * Text field for entering a proof reference ID with inline format
  * validation. Pasted values are trimmed/normalized before being validated
  * so copy/paste from explorers or logs doesn't trip false negatives.
+ * Guidance on what a valid reference looks like and how to recover from an
+ * error is always visible; error messages never echo the entered value.
+ *
+ * When the entered value is not a supported proof format, the error message
+ * explains which formats are accepted and how to correct the reference. The
+ * message is generic and never includes the raw input, so private payroll
+ * identifiers are not surfaced in the UI or in announcements to assistive
+ * technology.
  */
 export function ProofReferenceInput({
   value,
@@ -27,7 +35,8 @@ export function ProofReferenceInput({
   label = "Proof reference",
 }: ProofReferenceInputProps) {
   const inputId = useId();
-  const hintId = useId();
+  const guidanceId = useId();
+  const errorId = useId();
   const [touched, setTouched] = useState(false);
 
   const validation = validateProofReference(value);
@@ -37,6 +46,10 @@ export function ProofReferenceInput({
     onChange(next);
     onValidityChange?.(validateProofReference(next).isValid);
   };
+
+  const errorText = showError
+    ? `${validation.message} Supported format: ${PROOF_REFERENCE_GUIDANCE}`
+    : null;
 
   return (
     <div className="space-y-1.5">
@@ -56,7 +69,7 @@ export function ProofReferenceInput({
           }}
           onBlur={() => setTouched(true)}
           placeholder="zkp_ref_20250228_001"
-          aria-describedby={hintId}
+          aria-describedby={showError ? `${guidanceId} ${errorId}` : guidanceId}
           aria-invalid={showError}
           className={`w-full rounded-md border px-3 py-2 text-sm font-mono shadow-sm focus:outline-none focus:ring-2 ${
             showError
@@ -74,14 +87,14 @@ export function ProofReferenceInput({
         )}
       </div>
 
-      {showError ? (
-        <p id={hintId} role="alert" className="flex items-center gap-1 text-xs text-red-600">
+      <p id={guidanceId} className="text-xs text-gray-500">
+        {PROOF_REFERENCE_GUIDANCE}
+      </p>
+
+      {showError && errorText && (
+        <p id={errorId} role="alert" className="flex items-center gap-1 text-xs text-red-600">
           <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-          {validation.message}
-        </p>
-      ) : (
-        <p id={hintId} className="text-xs text-gray-400">
-          {PROOF_REFERENCE_FORMAT_HINT}
+          {errorText}
         </p>
       )}
     </div>

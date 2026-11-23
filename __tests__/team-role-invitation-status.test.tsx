@@ -6,6 +6,7 @@ import {
   filterInvitations,
   revokeInvitationHelper,
   resendInvitationHelper,
+  validateTeamInvitation,
 } from "@/src/team/invitations";
 
 describe("TeamRoleInvitationStatusView", () => {
@@ -92,5 +93,16 @@ describe("Invitation helpers unit tests", () => {
     expect(res.success).toBe(true);
     const updatedItem = res.updated.find((i) => i.id === "inv_003");
     expect(updatedItem?.status).toBe("pending");
+  });
+
+  it("validates recipient email, supported role, and active-role duplicates", () => {
+    expect(validateTeamInvitation("not-an-email", "reviewer").valid).toBe(false);
+    expect(validateTeamInvitation("new@zkpayroll.io", "unknown").valid).toBe(false);
+    expect(
+      validateTeamInvitation("ALEX.REVIEWER@ZKPAYROLL.IO", "reviewer", INITIAL_TEAM_INVITATIONS),
+    ).toEqual({ valid: false, error: "This recipient already has an active team role." });
+    expect(validateTeamInvitation("new@zkpayroll.io", "auditor", INITIAL_TEAM_INVITATIONS)).toEqual({
+      valid: true,
+    });
   });
 });

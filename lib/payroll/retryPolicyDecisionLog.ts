@@ -5,6 +5,7 @@ export type RetryReasonCode =
   | "invalid_batch_reference"
   | "invalid_description"
   | "invalid_adjustment_limit"
+  | "role_refresh_failed"
   | "validation_passed";
 
 export interface RetryPolicyDecisionEntry {

@@ -1,8 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Archive, AlertCircle, AlertTriangle, Info } from "lucide-react";
 import type { AuditRetentionPolicy, PolicyValidationIssue } from "@/types/policy";
+import {
+  RETENTION_PERIOD_RECOMMENDED_DAYS,
+  validateRetentionPeriodDays,
+} from "@/lib/payroll/retentionPeriodValidation";
 
 interface AuditRetentionPolicySectionProps {
   auditRetention: AuditRetentionPolicy;
@@ -19,6 +23,16 @@ export function AuditRetentionPolicySection({
   const warnings = issues.filter((i) => i.severity === "warning");
 
   const presets = [90, 180, 365, 730, 2555];
+  const [lastValidDays, setLastValidDays] = useState(
+    validateRetentionPeriodDays(auditRetention.retentionPeriodDays).valid
+      ? auditRetention.retentionPeriodDays : RETENTION_PERIOD_RECOMMENDED_DAYS,
+  );
+  const retentionCheck = validateRetentionPeriodDays(auditRetention.retentionPeriodDays);
+  const validDays = retentionCheck.valid;
+  const updateDays = (days: number) => {
+    if (validateRetentionPeriodDays(days).valid) setLastValidDays(days);
+    onChange({ retentionPeriodDays: days });
+  };
 
   return (
     <section
@@ -71,9 +85,12 @@ export function AuditRetentionPolicySection({
               type="number"
               min="30"
               max="3650"
+              step="1"
+              aria-invalid={!validDays}
+              aria-describedby="retention-update-guidance"
               value={auditRetention.retentionPeriodDays}
               onChange={(e) =>
-                onChange({ retentionPeriodDays: Number(e.target.value) })
+                updateDays(Number(e.target.value))
               }
               className="w-full sm:w-48 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-indigo-500"
             />
@@ -83,7 +100,7 @@ export function AuditRetentionPolicySection({
                 <button
                   key={days}
                   type="button"
-                  onClick={() => onChange({ retentionPeriodDays: days })}
+                  onClick={() => updateDays(days)}
                   className={`px-2.5 py-1 text-xs rounded-md border font-medium transition-colors ${
                     auditRetention.retentionPeriodDays === days
                       ? "bg-amber-100 text-amber-800 border-amber-300"
@@ -95,6 +112,22 @@ export function AuditRetentionPolicySection({
               ))}
             </div>
           </div>
+          <div id="retention-update-guidance" role="note" className="mt-2 text-xs text-gray-600 space-y-1">
+            <p>Choose 30–3650 whole days. Increasing retention keeps audit records longer; reducing it may make older records eligible for pruning. Review compliance obligations before saving.</p>
+            <p>Changing this setting does not delete existing records automatically. Immutable records and legal holds remain protected.</p>
+          </div>
+          {!validDays && (
+            <div role="alert" className="mt-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+              <p>Enter a whole number between 30 and 3650 days before saving. No policy change has been confirmed.</p>
+              {!retentionCheck.valid && <p className="mt-1">{retentionCheck.reason}</p>}
+              <button type="button" onClick={() => updateDays(lastValidDays)} className="mt-2 rounded border border-red-300 bg-white px-3 py-1 font-semibold">
+                Restore last valid value ({lastValidDays} days)
+              </button>
+              <button type="button" onClick={() => updateDays(RETENTION_PERIOD_RECOMMENDED_DAYS)} className="ml-2 rounded border border-red-300 bg-white px-3 py-1 font-semibold">
+                Use recommended {RETENTION_PERIOD_RECOMMENDED_DAYS} days
+              </button>
+            </div>
+          )}
           <p className="text-[11px] text-gray-500 mt-1">
             Minimum required by regulatory compliance is 30 days; standard enterprise is 365 days.
           </p>

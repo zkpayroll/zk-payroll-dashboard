@@ -45,4 +45,17 @@ describe("EmployeeDirectory status badges", () => {
     expect(screen.getAllByRole("status", { name: "Status: Inactive" }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("status", { name: "Status: Active" })).not.toBeInTheDocument();
   });
+
+  it("shows a privacy-safe warning for unsupported commitment versions", () => {
+    useEmployeeStore.getState().setEmployees([
+      employee({ name: "Versioned employee", salaryCommitmentVersion: 2 }),
+    ]);
+
+    render(<EmployeeDirectory />);
+
+    const warnings = screen.getAllByTestId("salary-commitment-version-warning");
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings[0]).toHaveTextContent("unsupported format");
+    expect(warnings[0].textContent).not.toMatch(/\$|\d{4,}/);
+  });
 });

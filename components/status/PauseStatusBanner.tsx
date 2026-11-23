@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, RefreshCw, X } from "lucide-react";
 import { fetchPauseStatus, type PauseCategory, type PauseStatus } from "@/lib/sdk/pauseStatus";
+import { useCompanyWarningsStore } from "@/stores/companyWarnings";
 
 export type { PauseCategory, PauseStatus };
 
@@ -20,32 +21,72 @@ const CATEGORY_DESCRIPTIONS: Record<PauseCategory, string> = {
   admin: "Administrative operations are restricted during this pause.",
 };
 
+const POLL_INTERVAL_MS = 30_000;
+
+/**
+ * Re-reads the persisted company state so a pause or resume made in another
+ * tab reaches a page that has been open for a long time (#842). Failures are
+ * ignored: the in-memory state is still a valid fallback.
+ */
+async function syncFromPersistedState(): Promise<void> {
+  try {
+    await useCompanyWarningsStore.persist.rehydrate();
+  } catch {
+    // Storage unavailable or unreadable; keep the in-memory state.
+  }
+}
+
 function usePauseStatus(): {
   status: PauseStatus | null;
   loading: boolean;
   refresh: () => void;
 } {
   const [status, setStatus] = useState<PauseStatus | null>(null);
+  // Only true until the first read completes; later refreshes keep showing the
+  // current status instead of toggling back to a loading state.
   const [loading, setLoading] = useState(true);
 
-  const fetchStatus = () => {
-    setLoading(true);
+  const fetchStatus = useCallback(() => {
     try {
-      const result = fetchPauseStatus();
-      setStatus(result);
+      setStatus(fetchPauseStatus());
     } catch (err) {
+      // Keep the last known status: hiding an active pause because one refresh
+      // failed would tell the operator payroll is safe when it may not be.
       console.error("[PauseStatusBanner] Failed to fetch pause status:", err);
-      setStatus(null);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchStatus();
-    const interval = setInterval(fetchStatus, 30_000);
-    return () => clearInterval(interval);
-  }, []);
+    const interval = setInterval(fetchStatus, POLL_INTERVAL_MS);
+
+    // Timers are throttled or frozen in background tabs, so a page left open
+    // can be hours behind. Re-sync as soon as the operator comes back to it.
+    const resync = () => {
+      if (document.visibilityState === "hidden") return;
+      void syncFromPersistedState().then(fetchStatus);
+    };
+
+    // Another tab changed the persisted pause state.
+    const storageKey = useCompanyWarningsStore.persist.getOptions().name;
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== storageKey) return;
+      void syncFromPersistedState().then(fetchStatus);
+    };
+
+    document.addEventListener("visibilitychange", resync);
+    window.addEventListener("focus", resync);
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", resync);
+      window.removeEventListener("focus", resync);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [fetchStatus]);
 
   return { status, loading, refresh: fetchStatus };
 }
@@ -53,6 +94,13 @@ function usePauseStatus(): {
 export function PauseStatusBanner() {
   const { status, loading, refresh } = usePauseStatus();
   const [dismissed, setDismissed] = useState(false);
+
+  // A dismissal only applies to the pause it was made for. Once the pause is
+  // lifted, clear it so a later pause is shown again on the same open page.
+  const isPaused = Boolean(status?.paused);
+  useEffect(() => {
+    if (!isPaused) setDismissed(false);
+  }, [isPaused]);
 
   if (loading || !status?.paused || dismissed) return null;
 

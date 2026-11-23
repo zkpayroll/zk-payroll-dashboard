@@ -1011,9 +1011,11 @@ npm test
 ## Proof Input Validation UI Behavior
 
 - `ProofReferenceInput` trims and lowercases pasted values before validating against `zkp_ref_YYYYMMDD_NNN`.
-- Errors surface only after the field is touched and non-empty, keeping empty states quiet.
-- Invalid input shows the expected format plus recovery guidance: re-copy the full reference from the proof receipt, or clear the field to start over.
+- Guidance is always visible under the field: the expected format `zkp_ref_YYYYMMDD_NNN`, the rule that only the reference is entered (no amounts or employee details), and the recovery step (re-copy the full reference from the proof receipt, or clear the field). It is exported as `PROOF_REFERENCE_GUIDANCE` from `lib/validation/proofReference.ts`.
+- Errors surface only after the field is touched and non-empty, keeping empty states quiet. Error messages never echo the entered value.
+- `validateProofReference` returns a `reason` of `empty` or `malformed` (or `null` when valid) so callers can branch without parsing messages.
 - Valid input shows inline confirmation and reports validity to the parent via `onValidityChange`.
+- `PayrollVerificationForm` blocks an invalid submit, shows the validation message in a `role="alert"` region, and clears it once the reference is edited. Valid submits show the verified toast.
 
 ## #762 — Inactive Company Payroll Run Warning
 
@@ -1047,3 +1049,221 @@ When a payroll run references an inactive or archived company, executing payouts
 - **Zero Compensation Leaks:** Warning banners and failure guidance never contain employee salary figures, compensation commitments, individual payout amounts, or cryptographic keys.
 - **Privacy-Safe Identifiers:** Only sanitized company identifiers and registered company display names are presented.
 - **Audit-Safe Serialization:** `sanitizeCompanyWarningForAudit` records only warning codes, company IDs, severity levels, and blocking flags, stripping any ambient payroll draft data.
+
+---
+
+## Payout Batch Retry Guidance
+
+**Goal:** Provide actionable, context-aware operator guidance for payout batch retries, ensuring operational clarity and preventing duplicate payouts while preserving privacy without exposing employee or salary data.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `lib/payroll/payoutBatchRetryGuidance.ts` | Pure evaluation engine classifying batch retry eligibility, attempt limits, pause flags, and actionable guidance. |
+| `src/payroll/payoutBatchRetryGuidance.ts` | Clean domain re-export for imports across src and lib. |
+| `components/features/payroll/PayoutBatchRetryGuidanceCard.tsx` | Accessible UI component (`role="status"`) presenting retry outcome badges, messages, next steps, and remediation links. |
+| `app/payroll/page.tsx` | Dashboard overview integrating retry decision tracking, sequential attempt increments, and actionable guidance in the retry log. |
+| `__tests__/payout-batch-retry-guidance.test.ts` | Unit tests covering success, blocking, boundary (attempt thresholds), and privacy guarantees. |
+| `__tests__/components/PayoutBatchRetryGuidanceCard.test.tsx` | Component unit tests covering allowed, blocked, and deferred guidance rendering. |
+| `__tests__/payroll-batch-retry-dashboard.test.tsx` | Integration tests verifying retry decision recording, settled run blocking, and attempt exhaustion. |
+
+### Evaluation States & Outcomes
+
+1. **`CONTRACT_PAUSED` (Blocked, `outcome: "blocked"`):**
+   - Triggered when smart contracts are paused (`isMutationDisabled: true`).
+   - Actionable message directs the operator to review pause status in Admin Settings (`/admin`).
+   - Prohibits mutation and retry actions while contracts are suspended.
+
+2. **`ALREADY_SETTLED` (Blocked, `outcome: "blocked"`):**
+   - Triggered when a payout batch has a settlement receipt (`receiptId`), verified on-chain execution (`status === "verified"`), or transaction hash.
+   - Prohibits retrying settled transactions to prevent duplicate disbursements.
+   - Provides direct link to Transaction History (`/history`).
+
+3. **`COMPANY_INACTIVE` (Blocked, `outcome: "blocked"`):**
+   - Triggered when a run references an inactive or archived company.
+   - Instructs the operator to reactivate the company in Company Settings or switch company context (`/company/switch`).
+
+4. **`RUN_CANCELLED` (Blocked, `outcome: "blocked"`):**
+   - Triggered when a run has been cancelled.
+   - Directs the operator to create a new draft batch (`/payroll/create`) instead of retrying a cancelled run.
+
+5. **`TREASURY_INSUFFICIENT`, `APPROVAL_REJECTED`, `COMPLIANCE_HOLD`, `EXPIRED_PROOF`, `DUPLICATE_BATCH` (Blocked):**
+   - Maps specific failure / cancellation reasons to targeted next steps and direct remediation links (`/treasury`, `/payroll/approvals`, `/compliance`, `/payroll/execute`, `/history`).
+
+6. **`MAX_ATTEMPTS_EXCEEDED` (Deferred, `outcome: "deferred"`):**
+   - Triggered when retry attempts exceed the maximum configured threshold (default 3).
+   - Defers automated retries to protect payroll integrity; directs the operator to investigate reconciliation logs (`/payroll/reconciliation`) and request approval for a new batch.
+
+7. **`RETRY_WITHIN_POLICY` / `RECONCILIATION_FAILED` / `DISCREPANCIES_FOUND` (Allowed, `outcome: "allowed"`):**
+   - Indicates the retry attempt is within safe operational limits.
+   - Displays remaining attempts count and recommended next steps for re-queuing the batch safely.
+
+### Privacy Guarantees
+
+- **Zero Compensation Leaks:** All guidance strings, titles, and recommended steps contain zero salary values, compensation commitments, dollar amounts, recipient identities, or wallet addresses.
+- **Privacy-Safe Serialization:** Logs and reports serialize only opaque run identifiers, attempt counters, outcome codes, and remediation links.
+
+---
+
+## Salary Commitment Version Recovery Flow (#899, #900, #962)
+
+**Goal:** Enable operators to inspect historical salary commitment versions for an employee and safely recover/restore a previous version (e.g. after a bad import, circuit mismatch, or rollbacked compensation adjustment), ensuring payroll correctness, operational clarity, and strict privacy preservation without exposing employee salary figures or private cryptographic inputs.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `lib/employees/salaryCommitmentVersionRecovery.ts` | Pure decision logic, version history reconstruction, validation rules, error codes, and privacy sanitization. |
+| `stores/employees.ts` | Zustand store actions (`recoverCommitmentVersion`, `confirmCommitmentReplacement`) and version-aware audit log entries. |
+| `components/features/employees/CommitmentVersionRecoveryDialog.tsx` | Confirmation dialog showing target/recovered version metadata, commitment hash previews, guidance, and privacy shield. |
+| `components/features/employees/EmployeeDetailPageContent.tsx` | Employee detail view surfacing version-aware Salary Commitment History table with status badges (`Active`, `Superseded`, `Restored`) and per-version recovery action buttons. |
+| `components/features/employees/EmployeeDetail.tsx` | Slide-over drawer surfacing version-aware history and status badges. |
+| `types/models.ts` | Public type definitions including `salaryCommitmentVersion` on `Employee`. |
+| `__tests__/salary-commitment-version-recovery.test.ts` | Domain unit tests for version derivation, recovery validation, boundary cases, and zero-leakage guarantees. |
+| `__tests__/components/CommitmentVersionRecoveryDialog.test.tsx` | Component tests for recovery review modal, validation errors, confirm actions, and privacy guarantees. |
+| `__tests__/employee-commitment-version-recovery-flow.test.tsx` | Integration tests for the full version recovery flow on the employee detail page. |
+
+### Expected Behavior & Version Lifecycle
+
+1. **Version History Reconstruction:**
+   - Every employee begins at **Version 1 (Active)** representing the baseline commitment hash established at onboarding.
+   - When a replacement is confirmed via `CommitmentReplacementDialog`, the existing version transitions to **Superseded** and a new monotonic version (e.g., **Version 2**) becomes **Active**.
+   - When a superseded version is recovered, the recovery evaluator validates the target version and generates a new active version (e.g., **Version 3 (Restored from v1)**), maintaining an immutable, append-only historical audit trail.
+
+2. **Recovery Validation Rules (`reviewCommitmentVersionRecovery`):**
+   - **`VERSION_ALREADY_ACTIVE`:** Blocks no-op recovery when the selected target version is currently active (`target.status === "active"` or commitment matches active hash).
+   - **`VERSION_NOT_FOUND`:** Rejects requests where the specified target version does not exist in the employee's history.
+   - **`COMMITMENT_EMPTY` / `COMMITMENT_MALFORMED`:** Rejects target versions containing empty or structurally invalid commitment hashes (less than minimum 8 characters).
+   - **`EMPLOYEE_NOT_FOUND`:** Rejects operations when the employee record is missing or unresolved.
+   - **Wallet Synchronization:** When a historical version had a distinct wallet address attached, the recovery review evaluates whether the wallet address also requires restoration and provides dual previews.
+
+3. **Privacy Guarantees:**
+   - **Zero Salary Leaks:** Raw salary figures and private blinding secrets are never passed to, handled by, or rendered in review objects or error states.
+   - **Truncated Previews:** All commitment hashes and Stellar addresses are displayed as truncated previews (e.g., `0x11111111…`).
+   - **Audit Provenance:** Recovery actions record the operator attribution, timestamp, target version reference, and privacy-safe explanation in `commitmentReplacementLog`.
+
+---
+
+## Pending-Settlement Retention Purge Safeguard (#859)
+
+**Goal:** Disable retention purge in the dashboard layer whenever payroll settlement is pending or unverified so operators cannot prematurely prune commitments, receipts, or reconciliation context needed for active disbursements, while keeping all feedback strictly free of private employee or salary data.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `src/audit/recordRetention.ts` | Settlement finality classification (`classifyRecordSettlementState`), per-record hold in `evaluateAuditRetention`, and batch-level `evaluateRetentionPurgeGuard`. |
+| `components/audit/RetentionSafeguardPanel.tsx` | Audit safeguard panel displaying pending-settlement hold banners and disabling purge triggers until settlements finalize. |
+| `stores/archive.ts` | Settlement-aware `ArchivedPayrollRun` metadata, `evaluateArchiveRetentionPurge`, and fail-closed `purgeExpiredRuns` action. |
+| `components/features/archive/PayrollArchiveCenter.tsx` | Archive center Retention Purge Safeguard region, disabled purge button with actionable remediation links, and per-run settlement finality badges. |
+| `app/archive/page.tsx` | Canonical `/archive` dashboard route rendering `PayrollArchiveCenter`. |
+| `__tests__/retention-purge-pending-settlement.test.tsx` | Focused tests covering settled purge success, pending/unverified settlement rejection, exact cutoff boundaries, and privacy invariants. |
+
+### Safeguard Outcomes
+
+1. **`SETTLEMENT_PENDING` (Blocked):**
+   - Triggered when one or more runs carry `settlementPending: true` or an in-flight status (`pending`, `in_progress`, `submitting`, `executing`, `awaiting_confirmation`, `unconfirmed`, `paused`).
+   - Disables the purge button and directs operators to `/payroll/reconciliation` to verify on-chain settlement finality.
+
+2. **`SETTLEMENT_UNVERIFIED` (Blocked, Fail-Closed):**
+   - Triggered when a record's settlement state is missing, empty, `unknown`, `failed`, or unrecognized.
+   - Fails closed without echoing raw unrecognized strings into the UI.
+
+3. **`IMMUTABLE_AUDIT_LOG` / `INVALID_POLICY` / `NO_EXPIRED_RECORDS` (Blocked):**
+   - Preserves existing append-only log, 30–3650 day policy validation, dispute holds, and retention window protections.
+
+4. **Eligible Purge (`purgeAllowed: true`):**
+   - Enabled only when policy validation passes, `immutableAuditLog` is `false`, zero runs have pending or unverified settlements, and at least one archived non-disputed run has aged past `retentionPeriodDays`.
+
+### Privacy Guarantees
+
+- **Zero Compensation or Identity Exposure:** Rejection reasons, safeguard banners, and toast notifications never include employee names, salary figures, disbursement totals, wallet addresses, or raw input strings.
+
+---
+
+## #886 — Payroll Period Boundary Guidance
+
+The **Draft a settlement window** form in `PayrollScheduleEditor`
+(`/payroll/schedule`) explains how its start and end dates define a payroll
+period.
+
+### Boundary and validation behavior
+
+- Both date fields are inclusive calendar days. A start and end on the same
+  date is a valid one-day window.
+- A following window should start on the day after the previous window ends.
+  Windows that share even one date overlap and cannot be saved.
+- Invalid start or end dates are rejected with a field-specific corrective
+  message. An end date before the start is rejected with guidance to place the
+  end on or after the start.
+- Overlap errors identify the number of conflicting draft windows; cross-
+  template conflicts also identify the conflicting schedule name.
+- The boundary explanation is associated with both date inputs for assistive
+  technology and remains associated when a validation error is displayed.
+- Saving creates a draft only. The success notice reminds operators to submit
+  the policy to apply the window.
+
+### Privacy
+
+Boundary guidance and validation feedback use date and schedule metadata only;
+they do not expose employee records or salary values.
+
+---
+
+## Treasury Reservation Guidance (#887)
+
+**Goal:** Provide operators with deterministic, privacy-safe guidance across every treasury reservation lifecycle state (unconfigured assets, malformed data, insufficient balance, cumulative over-reservation, locked/recoverable expired holds, 5-minute expiry warning window, tight capacity, setup guidance, and active coverage) without exposing employee or salary data.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `types/treasury.ts` | Public reservation guidance domain types re-exported through `types/index.ts`. |
+| `lib/treasury/reservationGuidance.ts` | Pure 7-decimal `BigInt` evaluator (`evaluateTreasuryReservationGuidance`), per-lock helper (`describeSingleReservationGuidance`), and bounded $O(n)$ PII sanitizer (`sanitizeReservationIdentifier`). |
+| `src/treasury/reservationGuidance.ts` | Domain module re-export matching repository conventions. |
+| `components/features/treasury/TreasuryReservationGuidanceCard.tsx` | Accessible guidance card surfacing status badges, aggregate lock metrics, ordered next steps, controls reference, and remediation links. |
+| `components/features/treasury/ReservationExpiryWarning.tsx` | Hardened expiry list with warning banner, locked-expired fallback copy, per-item guidance, corrupt-entry fail-closed alerts, and sanitized `title`/text fields. |
+| `components/features/treasury/TreasuryView.tsx` | Integrates `TreasuryReservationGuidanceCard` and cumulative `BigInt` over-reservation protection alongside reservation amount validation. |
+| `docs/TREASURY_RESERVATIONS.md` | Detailed architecture table, reason code matrix, and security invariants. |
+| `__tests__/treasury-reservation-guidance.test.ts` | Unit tests covering all 10 reason codes, `BigInt` precision, fail-closed timestamps, and ReDoS/PII sanitization. |
+| `__tests__/components/TreasuryReservationGuidanceCard.test.tsx` | Isolated component unit tests covering tone roles, store isolation, override props, and remediation links. |
+| `__tests__/treasury-reservations.test.tsx` | End-to-end `TreasuryView` and `TreasuryPage` integration and privacy tests. |
+
+---
+
+## #906 — Beneficiary Changes UI Behavior
+
+**Goal:** Provide operators with clear, accessible, and privacy-preserving UI guidance and validation for employee beneficiary (payout destination) changes without exposing employee identities or salary amounts.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `types/beneficiary.ts` | Centralized domain, guidance, status, and validation types re-exported in `types/index.ts`. |
+| `lib/beneficiary-validation.ts` | Pure validation functions for Stellar public key format (`isValidStellarAddress`), change parameters, confirmations, and 24h recovery codes. |
+| `src/payroll/beneficiaryChangeVerificationWorkflow.ts` | Multi-stage verification workflow engine governing requests, verification steps, cooling-off windows, and active payroll cycle locks. |
+| `lib/employees/beneficiaryChangeGuidance.ts` | Pure guidance evaluator mapping workflow decisions to status tones, plain descriptions, and ordered next steps. |
+| `lib/payroll/beneficiaryVerificationStatus.ts` | Aggregate status evaluator summarizing pending, ready, and blocked requests for dashboard views. |
+| `components/features/employees/BeneficiaryChangeGuidance.tsx` | Accessible guidance card displaying tone-based alert and actionable steps list. |
+| `components/features/dashboard/DashboardBeneficiaryVerificationStatusCheck.tsx` | Summary status check component displaying aggregate counts without exposing employee records. |
+| `components/features/beneficiaries/BeneficiaryChangesView.tsx` | Dedicated beneficiary management view rendering request queues, validation form, step sign-offs, and 24h recovery undo. |
+| `app/beneficiaries/page.tsx` | Dedicated `/beneficiaries` route wrapped in `DashboardLayout`. |
+| `docs/BENEFICIARY_CHANGES.md` | Comprehensive operational guide and security invariants. |
+| `__tests__/beneficiary-changes.test.ts` | Unit tests for format validation, confirmation checks, and recovery code verification. |
+| `__tests__/beneficiary-change-guidance.test.ts` | Unit tests for guidance evaluation, cooling-off formatting, and next steps. |
+| `__tests__/beneficiary-change-verification-workflow.test.ts` | Workflow state machine tests including active payroll lock and TTL expiration. |
+| `__tests__/beneficiary-ui-behavior.test.tsx` | Integration and component tests covering rendering, validation errors, accessibility, and privacy boundaries. |
+
+### How It Works
+
+1. **Request Submission**: An operator submits a proposed Stellar public key at `/beneficiaries`. The input is verified via `isValidStellarAddress` (`^G[A-Z2-7]{55}$`), requiring explicit confirmation of the destination switch and version increment.
+2. **Multi-Party Verification**: Requests enter `pending_verification` status and require `contributor_confirmation`, `two_factor_auth`, and `dual_operator_signoff`. Self-signoff by the requesting operator is rejected.
+3. **Cooling-Off Window**: Once all verification steps pass, the request enters `cooling_off` (default 24 hours). The UI displays the remaining time formatted as hours or days.
+4. **Active Payroll Lock**: If `isPayrollInProgress` is true, all beneficiary changes are blocked to prevent state conflicts during ongoing payroll disbursement.
+5. **24-Hour Administrative Undo**: Administrators can revert changes within 24 hours using a 32-character recovery code and explicit confirmation.
+
+### Privacy and Zero-Knowledge Guarantees
+
+- **Address Masking**: Destination addresses are always masked as `GA7Q...VSGZ` (`maskAddress`). Raw full addresses are omitted from all general UI displays.
+- **Zero Salary Disclosure**: Beneficiary forms and cards strictly omit salary values, payout amounts, and employee PII.

@@ -10,6 +10,8 @@ export interface CompanySwitchGuardResult {
   allowed: boolean;
   reason: CompanySwitchBlockReason | null;
   message: string | null;
+  /** Actionable next step for the user. Never includes payroll or employee data. */
+  guidance: string | null;
 }
 
 function isStellarAddress(value: string): boolean {
@@ -21,6 +23,9 @@ function isStellarAddress(value: string): boolean {
  * context (#223). Prevents switching into a company that is inactive,
  * misconfigured, or that the connected wallet is not authorized to
  * administer.
+ *
+ * Messages and guidance are written so they never echo wallet addresses,
+ * salary values, or employee identities.
  *
  * @param target The company being switched into.
  * @param currentRole The role of the user attempting the switch.
@@ -39,6 +44,8 @@ export function evaluateCompanySwitch(
       allowed: false,
       reason: "not-admin",
       message: "Only admins can switch the active company context.",
+      guidance:
+        "Ask an admin to switch the company, or sign in with an admin account.",
     };
   }
 
@@ -47,6 +54,8 @@ export function evaluateCompanySwitch(
       allowed: false,
       reason: "company-inactive",
       message: `${target.name} is inactive and cannot be switched into.`,
+      guidance:
+        "Ask an admin to reactivate this company, or switch to an active company.",
     };
   }
 
@@ -55,6 +64,8 @@ export function evaluateCompanySwitch(
       allowed: false,
       reason: "invalid-admin-address",
       message: `${target.name} has an invalid or missing admin address. Fix its configuration before switching.`,
+      guidance:
+        "Update the company's admin wallet address in company settings, then try again.",
     };
   }
 
@@ -63,8 +74,10 @@ export function evaluateCompanySwitch(
       allowed: false,
       reason: "unauthorized-admin",
       message: `Your connected wallet is not the configured admin for ${target.name}.`,
+      guidance:
+        "Connect the wallet registered as this company's admin, then switch again. Do not share wallet keys to resolve this.",
     };
   }
 
-  return { allowed: true, reason: null, message: null };
+  return { allowed: true, reason: null, message: null, guidance: null };
 }

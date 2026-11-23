@@ -67,6 +67,7 @@ function ComplianceManager() {
   });
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [preparingId, setPreparingId] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Compliance holds state
   const [holds, setHolds] = useState<
@@ -156,9 +157,15 @@ function ComplianceManager() {
       ? new Date(`${form.requestedExpiresAt}T00:00:00.000Z`).toISOString()
       : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
 
+    if (Number.isNaN(Date.parse(normalizedExpiration)) || Date.parse(normalizedExpiration) <= Date.now()) {
+      setFormError("Choose an expiration date in the future so the auditor can use the grant.");
+      return;
+    }
+
     if (!normalizedName || !normalizedOrg || !normalizedRationale || !form.requestedExpiresAt) {
       return;
     }
+    setFormError(null);
 
     const keyId = generateKeyId();
     const newKey: ViewKey = {
@@ -648,11 +655,15 @@ function ComplianceManager() {
                     type="date"
                     min={new Date().toISOString().slice(0, 10)}
                     value={form.requestedExpiresAt}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      setFormError(null);
                       setForm((f) => ({ ...f, requestedExpiresAt: e.target.value }))
-                    }
+                    }}
                     className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />
+                  {formError && (
+                    <p role="alert" className="mt-1 text-xs text-red-700">{formError}</p>
+                  )}
                 </div>
               </div>
 

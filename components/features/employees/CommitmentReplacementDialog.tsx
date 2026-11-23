@@ -66,6 +66,10 @@ export function CommitmentReplacementDialog({
         changeKind: result.review.changeKind,
         previousCommitmentPreview: result.review.previousCommitmentPreview,
         nextCommitmentPreview: result.review.nextCommitmentPreview,
+        previousCommitment: employee?.salaryCommitment,
+        nextCommitment: nextCommitment.trim(),
+        previousAddress: employee?.address,
+        nextAddress: result.review.walletChanged ? nextAddress : employee?.address,
         confirmedBy,
       },
       {
@@ -121,6 +125,11 @@ export function CommitmentReplacementDialog({
               <div>
                 <p className="text-xs font-semibold text-red-800">{result.error.code}</p>
                 <p className="text-sm text-red-700 mt-0.5">{result.error.message}</p>
+                {result.error.code === "COMMITMENT_UNCHANGED" && (
+                  <p className="text-xs text-red-600 mt-1">
+                    Tip: To restore an earlier salary commitment version, use the recovery action in Salary Commitment History.
+                  </p>
+                )}
               </div>
             </div>
           ) : (

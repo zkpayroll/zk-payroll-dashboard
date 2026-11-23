@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Treasury Reservation Recovery Flow (#889)**: Expired or expiring funding reservations now get a clear recovery path.
+  - `lib/treasury/reservationRecovery.ts` picks the recommended action (Refresh → Revalidate → Cancel → escalate to an administrator) and explains why any action is disabled. It never offers renewal for a lock with a corrupt amount or asset.
+  - Store actions `refreshReservation`, `revalidateReservation`, and `cancelReservation` now return a `ReservationActionResult` (`invalid_id`, `not_found`, `not_permitted`, `invalid_data`) instead of silently doing nothing.
+  - `ReservationExpiryWarning` highlights the recommended action, shows recovery progress, explains disabled actions, and announces each outcome with an actionable, privacy-safe message. Successful actions are recorded on the reservation timeline.
+
+- **Auditor Views of Archived Payroll Periods (#858)**: Auditors can review archived payroll periods at `/audit/archived-periods` (linked from `/audit`) in a read-only, redacted view.
+  - Pure module `lib/audit/auditorArchivedPeriods.ts` (`evaluateAuditorArchivedPeriodAccess`, `groupArchivedPeriodsForAuditor`). It builds the view from an allow list, so `totalAmount`, `employeeCount`, `notes`, `disputeReason` and `archivedBy` never reach the view. Only `isArchived` runs are listed, and malformed records are skipped and counted.
+  - The role is read from `GET /api/auth/session`. Admins, operators, expired sessions, failed session checks and invalid or non-archived periods each get a coded, actionable message that holds no payroll data.
+  - Component `components/features/audit/AuditorArchivedPeriodsView.tsx` and page `app/audit/archived-periods/page.tsx`
+  - Feature notes in `docs/AUDITOR_ARCHIVED_PERIODS.md`
+  - Focused test suite `__tests__/auditor-archived-periods-view.test.tsx` covering success, rejection, retry, privacy and boundary cases
+
+- **Rejected Correction Events in Payroll History (#844)**: The History page now lists runs that were rejected after being sent back for corrections.
+  - Pure derivation `lib/payroll/rejectedCorrections.ts` (`getRejectedCorrectionEvents`) over each approval draft's `approvalHistory`. It orders entries by timestamp, skips unparseable timestamps, ignores rejections with no prior correction request, and reports correction rounds and whether the drafter resubmitted. Rejections recorded before this change appear too, with no backfill.
+  - Privacy: it never reads amounts, headcount, employee ids, or draft notes. A reviewer's reason is shown only if it passes the run-note sensitive-content scan. Otherwise the whole reason is withheld and static, actionable copy is shown instead.
+  - Panel `components/features/payroll/RejectedCorrectionHistory.tsx`, mounted on `app/history`
+  - Operator notes in `docs/OPERATOR_HANDBOOK.md` (Rejected Corrections)
+  - Focused test suite `__tests__/rejected-correction-history.test.tsx` covering success, gate-refused rejection, boundary (multiple rounds, out-of-order and invalid timestamps, blank reasons), privacy, and an end-to-end flow through the approval queue store
+
 - **Dashboard Import Duplicate Salary Commitments (#749)**: Highlights duplicate salary commitments while an employee CSV import is being previewed, and blocks the import until every duplicate is resolved.
   - Pure domain module `src/payroll/importSalaryCommitmentDuplicates.ts` (re-exported from `lib/payroll/importSalaryCommitmentDuplicates.ts`) detecting rows that bind the same salary amount to the same wallet (`duplicate_salary_commitment`) and rows carrying the same commitment value (`identical_commitment_value`); both kinds are blocking, while the same salary on different wallets and the same wallet with different salaries stay out of scope
   - Privacy-safe findings: raw salary amounts and full wallet addresses never reach a message, a group identifier, or a rendered field — groups only carry masked addresses (`GDQP2K…4W37`), truncated commitment values, and source row numbers
@@ -138,6 +157,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Company switcher access check on session-service errors (#895)**: `CompanySwitcher` now offers "Retry access check" when `/api/auth/session` answers 5xx, instead of telling the employer to sign in again; 401 and other 4xx responses still route to sign-in.
+
+- **Pause status refresh on long-lived audit pages (#842)**: `PauseStatusBanner` (mounted in the root layout, so on every audit page) no longer goes stale when a page stays open for hours.
+  - Re-syncs immediately when the tab becomes visible or the window regains focus, and when another tab changes the persisted company pause state
+  - A dismissal now applies only to the pause it was made for, so a later pause is shown again without a reload
+  - A failed refresh keeps the last known pause status instead of hiding an active pause
+  - Regression tests in `__tests__/components/status/PauseStatusBanner.test.tsx`
 - **Dashboard home compile errors**: `DashboardHome` no longer fails to parse (unterminated `"USDC` string, `lucide/react` import, two malformed class names) and no longer imports three dashboard panels and two `lib/payroll` evaluators that were never added to the repository.
 - **Blocked-execution test mocks** (#605): Corrected all five `PayrollRun` object literals in `__tests__/blocked-execution-diagnostics.test.ts` that would have failed `tsc --noEmit` under `strict: true`:
   - Added missing required `PayrollTransaction` fields (`companyId`, `timestamp`, `createdAt`) to every mock.
@@ -232,6 +258,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Testing
 
+- `__tests__/company-switcher-role-changes.test.tsx`: Component tests for employer role changes in the company switcher (#895): admin switch success and same-company no-op, demotion/promotion picked up by the access-check retry, auditor/operator blocking, revoked (401) vs failed (5xx) sessions, malformed and unrecognised session roles, pending and unmount boundaries, wallet/admin-address guard messages, and privacy assertions that no employee, salary, or wallet data from the session response is rendered
 - `__tests__/instruction-version-rule.test.ts`: Unit tests for version sanitization (fractional, zero, negative, NaN), draft snapshotting, current/stale/unconfigured derivation (including draft-newer-than-saved), the wizard store delegation, and a privacy assertion that no amount, address, or employee id survives into a label or detail
 - `__tests__/instruction-version-badge.test.tsx`: Component tests for the current and stale pill states (including the "drafted" marker and aria-label), hidden unconfigured state, snapshot/clear store behaviour, and agreement between the shared derivation and the badge
 - `__tests__/inactive-employees-rule.test.ts`: 16 unit tests for eligibility reasons (active, pending, inactive, suspended, offboarded), draft-order flagging, stale-id detection, de-duplication, severity escalation, and a privacy assertion that no salary, commitment, or wallet value survives into a warning

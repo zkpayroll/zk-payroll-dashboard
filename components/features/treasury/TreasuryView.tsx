@@ -8,22 +8,47 @@ import ReservationTimeline from "./ReservationTimeline";
 import StatusBadge from "@/components/ui/StatusBadge";
 import TreasuryReadinessChecklist from "./TreasuryReadinessChecklist";
 import TreasuryDrainWarning from "./TreasuryDrainWarning";
+import TreasuryReservation from "./TreasuryReservation";
 import FundingImbalanceDashboard from "./FundingImbalanceDashboard";
 import ReservationExpiryWarning from "./ReservationExpiryWarning";
+import TreasuryReservationGuidanceCard from "./TreasuryReservationGuidanceCard";
 import ReservationToastListener from "./ReservationToastListener";
 import AssetReadinessTable from "./AssetReadinessTable";
 import TreasuryReplenishmentReadinessCard from "./TreasuryReplenishmentReadinessCard";
-import { createFundingReservation } from "@/lib/events/reservationEvents";
+import { createFundingReservation, type FundingReservationEvent } from "@/lib/events/reservationEvents";
+import {
+  evaluateTreasuryReservationGuidance,
+  formatReservationUnits,
+  parseReservationAmountUnits,
+} from "@/lib/treasury/reservationGuidance";
 import PartialReleaseFailureAlert from "./PartialReleaseFailureAlert";
 import type { PartialReleaseFailure } from "@/lib/treasury/partialRelease";
 import SupportedAssetsEmptyState from "@/components/features/assets/SupportedAssetsEmptyState";
 import { hasSupportedPayrollAssets } from "@/lib/assets/supportedAssets";
+import {
+  useReservationsStore,
+  RESERVATION_TTL_MS,
+  type FundingReservation,
+} from "@/stores/reservations";
+
+export interface TreasuryViewProps {
+  configuredAssets?: Array<{ code: string; issuer?: string }>;
+  releaseFailures?: PartialReleaseFailure[];
+  initialReservations?: FundingReservation[];
+  initialTimelineEvents?: FundingReservationEvent[];
+}
 
 function TreasuryView({
   configuredAssets,
   releaseFailures = [],
-}: { configuredAssets?: Array<{ code: string; issuer?: string }>; releaseFailures?: PartialReleaseFailure[] } = {}) {
+  initialReservations,
+  initialTimelineEvents,
+}: TreasuryViewProps = {}) {
   const [toastVisible, setToastVisible] = useState(false);
+  const [reservationError, setReservationError] = useState<string | null>(null);
+  const [reservationAmount, setReservationAmount] = useState("15000.00");
+  const storeReservations = useReservationsStore((s) => s.reservations);
+  const activeReservations = initialReservations ?? storeReservations;
 
   // Demo wiring: if no assets passed, treat treasury address presence as "configured"
   // When MOCK_COMPANIES has treasury but assets list is empty, show empty state for QA.
@@ -31,14 +56,91 @@ function TreasuryView({
   const effectiveAssets = configuredAssets ?? (MOCK_COMPANIES[0]?.treasury ? [{ code: "USDC" }, { code: "XLM" }] : []);
   const assetsMissing = !hasSupportedPayrollAssets(effectiveAssets);
 
-  const handleReserveFunds = () => {
-    createFundingReservation();
-  };
-
   const { balance, projectedPayroll, lastFunded } = MOCK_TREASURY_BALANCE;
   const company = MOCK_COMPANIES[0];
   const isLowBalance = projectedPayroll > balance;
   const remaining = balance - projectedPayroll;
+
+  const handleReserveFunds = () => {
+    if (isLowBalance) {
+      setReservationError(
+        "Cannot create treasury reservation: available balance is insufficient to cover projected payroll obligations. Fund the treasury before reserving."
+      );
+      return;
+    }
+    const amount = Number(reservationAmount);
+    if (
+      !Number.isFinite(amount) ||
+      amount <= 0 ||
+      Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-7
+    ) {
+      setReservationError(
+        "Enter a valid reservation amount greater than zero. Use no more than two decimal places.",
+      );
+      return;
+    }
+    if (amount > remaining) {
+      setReservationError(
+        "Reservation exceeds funds available after projected payroll obligations. Reduce the amount or fund the treasury before reserving.",
+      );
+      return;
+    }
+    const requestedAmountText = amount.toFixed(2);
+    const currentReservations =
+      initialReservations ?? useReservationsStore.getState().reservations;
+    const precheckGuidance = evaluateTreasuryReservationGuidance({
+      reservations: currentReservations,
+      availableBalance: balance,
+      projectedPayroll,
+      assetCode: "USDC",
+      hasConfiguredAssets: !assetsMissing,
+      newReservationAmount: requestedAmountText,
+    });
+    if (!precheckGuidance.canCreateReservation) {
+      const parsedRequest = parseReservationAmountUnits(requestedAmountText);
+      const formattedRequest = parsedRequest.ok
+        ? formatReservationUnits(parsedRequest.units)
+        : requestedAmountText;
+      if (precheckGuidance.reasonCode === "ASSETS_UNCONFIGURED") {
+        setReservationError(
+          "Cannot create treasury reservation: configure at least one supported Stellar payroll asset in Asset Settings before reserving.",
+        );
+      } else if (precheckGuidance.reasonCode === "INVALID_TREASURY_DATA") {
+        setReservationError(
+          "Cannot create treasury reservation: treasury balance or existing reservation data is invalid and fails closed. Refresh balances or clear malformed locks first.",
+        );
+      } else if (precheckGuidance.reasonCode === "OVER_RESERVATION_BLOCKED") {
+        setReservationError(
+          "Cannot create treasury reservation: existing active reservations already exceed available treasury liquidity. Cancel stale reservations or add funds before reserving.",
+        );
+      } else if (
+        precheckGuidance.counts.healthy + precheckGuidance.counts.warning >
+        0
+      ) {
+        setReservationError(
+          `Cannot create treasury reservation: existing active reservations leave insufficient unreserved liquidity for an additional ${formattedRequest} USDC lock. Release or cancel stale reservations, or add funds before reserving.`,
+        );
+      } else {
+        setReservationError(
+          `Cannot create treasury reservation: available unreserved balance cannot cover a ${formattedRequest} USDC lock. Reduce the amount or add funds before reserving.`,
+        );
+      }
+      return;
+    }
+    setReservationError(null);
+    const event = createFundingReservation();
+    useReservationsStore.getState().addReservation({
+      id: event.reservationId,
+      batchId: event.payrollRunId || `BATCH-${event.reservationId.slice(-4).toUpperCase()}`,
+      asset: "USDC",
+      amount: amount.toFixed(2),
+      reservedAt: event.createdAt,
+      expiresAt: new Date(Date.now() + RESERVATION_TTL_MS).toISOString(),
+      canRefresh: true,
+      canCancel: true,
+      canRevalidate: true,
+    });
+  };
 
   const fundingHistory = MOCK_TRANSACTIONS.filter((t) => t.status === "verified");
 
@@ -57,6 +159,30 @@ function TreasuryView({
       {releaseFailures.map((failure) => (
         <PartialReleaseFailureAlert key={failure.releaseId} failure={failure} />
       ))}
+
+      {reservationError && (
+        <div
+          role="alert"
+          data-testid="reservation-error-alert"
+          className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start justify-between gap-3"
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" aria-hidden="true" />
+            <div>
+              <p className="text-sm font-medium text-red-800">Reservation Failed</p>
+              <p className="text-sm text-red-700 mt-0.5">{reservationError}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setReservationError(null)}
+            className="text-xs text-red-700 hover:text-red-900 font-medium shrink-0"
+            aria-label="Dismiss reservation error"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {assetsMissing && (
         <SupportedAssetsEmptyState configuredAssets={effectiveAssets} variant="treasury" compact={false} />
@@ -156,11 +282,21 @@ function TreasuryView({
 
       <TreasuryReadinessChecklist />
 
-      <ReservationExpiryWarning />
+      <TreasuryReservation balance={balance} projectedPayroll={projectedPayroll} />
+      <TreasuryReservationGuidanceCard
+        reservations={activeReservations}
+        availableBalance={balance}
+        projectedPayroll={projectedPayroll}
+        newReservationAmount={reservationAmount}
+        assetCode="USDC"
+        hasConfiguredAssets={!assetsMissing}
+      />
+
+      <ReservationExpiryWarning reservations={initialReservations} />
 
       <FundingForecast />
 
-      <ReservationTimeline />
+      <ReservationTimeline initialEvents={initialTimelineEvents} />
 
       {company && (
         <div className="bg-white rounded-lg shadow-sm p-6">
@@ -173,9 +309,25 @@ function TreasuryView({
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <h3 className="text-base font-medium text-gray-900">Funding history</h3>
           <div className="relative flex items-center gap-2">
+            <label htmlFor="treasury-reservation-amount" className="sr-only">
+              Reservation amount
+            </label>
+            <input
+              id="treasury-reservation-amount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              inputMode="decimal"
+              value={reservationAmount}
+              onChange={(event) => setReservationAmount(event.target.value)}
+              aria-describedby="treasury-reservation-amount-help"
+              className="w-32 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+              data-testid="reservation-amount-input"
+            />
             <button
               type="button"
               onClick={handleReserveFunds}
+              data-testid="reserve-funds-button"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
             >
               <Lock className="w-3.5 h-3.5" aria-hidden="true" />
@@ -200,6 +352,9 @@ function TreasuryView({
             )}
           </div>
         </div>
+        <p id="treasury-reservation-amount-help" className="px-6 pb-3 text-xs text-gray-500">
+          Enter a positive amount that fits available funds after projected payroll obligations.
+        </p>
 
         {fundingHistory.length === 0 ? (
           <div className="px-6 py-8 text-center text-sm text-gray-500">

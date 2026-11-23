@@ -10,6 +10,7 @@ import {
   findMissedOccurrences,
   rangesOverlap,
   toDateKey,
+  validatePayrollPeriodBoundaries,
 } from "@/lib/date/scheduleWindows";
 import { useDraftScheduleWindowStore } from "@/stores/draftScheduleWindows";
 import EmptyState from "@/components/ui/EmptyState";
@@ -37,8 +38,9 @@ function DraftWindowForm({ templates }: { templates: PayrollTemplate[] }) {
     e.preventDefault();
     if (!isSubmittable) return;
 
-    if (windowStart > windowEnd) {
-      setError("Window start must be on or before window end.");
+    const boundaryValidation = validatePayrollPeriodBoundaries(windowStart, windowEnd);
+    if (!boundaryValidation.valid) {
+      setError(boundaryValidation.error);
       return;
     }
 
@@ -102,6 +104,10 @@ function DraftWindowForm({ templates }: { templates: PayrollTemplate[] }) {
       aria-label="Add settlement window"
     >
       <h3 className="text-sm font-semibold text-gray-900">Draft a settlement window</h3>
+      <p id="payroll-window-guidance" className="text-xs leading-5 text-gray-600">
+        Start and end dates are inclusive calendar days. The next window should begin the day
+        after this one ends; windows that share a date overlap.
+      </p>
 
       <div>
         <label htmlFor="schedule-template" className="block text-xs font-medium text-gray-700 mb-1">
@@ -130,7 +136,12 @@ function DraftWindowForm({ templates }: { templates: PayrollTemplate[] }) {
             id="window-start"
             type="date"
             value={windowStart}
-            onChange={(e) => setWindowStart(e.target.value)}
+            onChange={(e) => {
+              setWindowStart(e.target.value);
+              setError(null);
+            }}
+            aria-invalid={Boolean(error) || undefined}
+            aria-describedby={`payroll-window-guidance${error ? " payroll-window-error" : ""}`}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             required
           />
@@ -143,7 +154,12 @@ function DraftWindowForm({ templates }: { templates: PayrollTemplate[] }) {
             id="window-end"
             type="date"
             value={windowEnd}
-            onChange={(e) => setWindowEnd(e.target.value)}
+            onChange={(e) => {
+              setWindowEnd(e.target.value);
+              setError(null);
+            }}
+            aria-invalid={Boolean(error) || undefined}
+            aria-describedby={`payroll-window-guidance${error ? " payroll-window-error" : ""}`}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             required
           />
@@ -151,7 +167,7 @@ function DraftWindowForm({ templates }: { templates: PayrollTemplate[] }) {
       </div>
 
       {error && (
-        <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+        <div id="payroll-window-error" role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
           <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
           {error}
         </div>

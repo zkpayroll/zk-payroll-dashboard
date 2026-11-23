@@ -14,21 +14,37 @@ import {
   CheckCircle2,
   Clock,
   Copy,
-  ExternalLink,
   Filter,
-  RefreshCw,
   X,
-  FileCheck,
   Building2,
   Receipt,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useArchiveStore } from "@/stores/archive";
-import type { ArchivedPayrollRun, ArchivedRunStatus, AuditAvailability } from "@/stores/archive";
+import {
+  evaluateArchiveRetentionPurge,
+  useArchiveStore,
+} from "@/stores/archive";
+import type {
+  ArchivedPayrollRun,
+  ArchivedRunStatus,
+  AuditAvailability,
+} from "@/stores/archive";
+import { usePayrollPolicyStore } from "@/stores/payrollPolicy";
+import type { AuditRetentionPolicy } from "@/types/policy";
+import { classifyRecordSettlementState } from "@/src/audit/recordRetention";
 import { Button } from "@/components/ui/button";
 import EmptyState from "@/components/ui/EmptyState";
 
-export default function PayrollArchiveCenter() {
+export interface PayrollArchiveCenterProps {
+  retentionPolicy?: AuditRetentionPolicy;
+  now?: number;
+}
+
+export default function PayrollArchiveCenter({
+  retentionPolicy,
+  now,
+}: PayrollArchiveCenterProps = {}) {
   const {
     runs,
     searchQuery,
@@ -47,13 +63,46 @@ export default function PayrollArchiveCenter() {
     toggleHidePrivateData,
     archiveRun,
     unarchiveRun,
+    purgeExpiredRuns,
     getFilteredRuns,
     resetFilters,
   } = useArchiveStore();
 
+  const storeRetentionPolicy = usePayrollPolicyStore(
+    (state) => state.policy.auditRetention,
+  );
+  const effectivePolicy = retentionPolicy ?? storeRetentionPolicy;
+  const effectiveNow = now ?? Date.now();
+
   const [copiedTxHash, setCopiedTxHash] = useState<string | null>(null);
+  const [purgeFeedback, setPurgeFeedback] = useState<{
+    allowed: boolean;
+    message: string;
+  } | null>(null);
 
   const filteredRuns = getFilteredRuns();
+
+  const purgeGuard = useMemo(
+    () => evaluateArchiveRetentionPurge(runs, effectivePolicy, effectiveNow),
+    [runs, effectivePolicy, effectiveNow],
+  );
+
+  const handleRetentionPurge = () => {
+    const result = purgeExpiredRuns({
+      policy: effectivePolicy,
+      now: effectiveNow,
+    });
+    setPurgeFeedback({ allowed: result.allowed, message: result.reason });
+    if (result.allowed) {
+      toast.success("Retention Purge Completed", {
+        description: result.reason,
+      });
+    } else {
+      toast.error("Retention Purge Blocked", {
+        description: result.reason,
+      });
+    }
+  };
 
 
 
@@ -308,6 +357,154 @@ export default function PayrollArchiveCenter() {
         </div>
       </div>
 
+      {/* Retention Purge Safeguard (#859) */}
+      <div
+        role="note"
+        data-testid="archive-retention-migration-guidance"
+        className="rounded-lg border border-indigo-100 bg-indigo-50/70 px-4 py-3 text-xs leading-relaxed text-indigo-950"
+      >
+        <p className="font-semibold">How retention policy changes affect archived runs</p>
+        <p className="mt-1">
+          The current policy retains records for {effectivePolicy.retentionPeriodDays} days. If the retention period changes, expiration is recalculated from each run’s execution date; shortening it can make older archived runs eligible for purge, while extending it can keep them longer. A policy change does not delete records by itself. Purging remains a separate action and is blocked when settlement is pending or unverified, or when policy safeguards prevent removal.
+        </p>
+      </div>
+      <section
+        aria-labelledby="archive-retention-purge-heading"
+        data-testid="archive-retention-purge-bar"
+        data-purge-allowed={purgeGuard.purgeAllowed ? "true" : "false"}
+        data-blocker-code={purgeGuard.blockerCode ?? "NONE"}
+        className={`rounded-xl border p-4 shadow-sm space-y-3 ${
+          purgeGuard.blockerCode === "SETTLEMENT_PENDING" ||
+          purgeGuard.blockerCode === "SETTLEMENT_UNVERIFIED"
+            ? "bg-amber-50/70 border-amber-200"
+            : purgeGuard.blockerCode === "INVALID_POLICY"
+              ? "bg-red-50/70 border-red-200"
+              : "bg-white border-gray-200"
+        }`}
+      >
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3
+                id="archive-retention-purge-heading"
+                className="text-sm font-bold text-gray-900 flex items-center gap-1.5"
+              >
+                <ShieldCheck
+                  className="w-4 h-4 text-indigo-600 shrink-0"
+                  aria-hidden="true"
+                />
+                Retention Purge Safeguard
+              </h3>
+              <span
+                data-testid="archive-retention-purge-status"
+                className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
+                  purgeGuard.blockerCode === "SETTLEMENT_PENDING" ||
+                  purgeGuard.blockerCode === "SETTLEMENT_UNVERIFIED"
+                    ? "bg-amber-100 text-amber-800 border-amber-300"
+                    : purgeGuard.blockerCode === "INVALID_POLICY"
+                      ? "bg-red-100 text-red-800 border-red-300"
+                      : purgeGuard.purgeAllowed
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : "bg-slate-100 text-slate-700 border-slate-200"
+                }`}
+              >
+                {purgeGuard.blockerCode === "SETTLEMENT_PENDING"
+                  ? "Disabled — Settlement Pending"
+                  : purgeGuard.blockerCode === "SETTLEMENT_UNVERIFIED"
+                    ? "Disabled — Settlement Unverified"
+                    : purgeGuard.blockerCode === "IMMUTABLE_AUDIT_LOG"
+                      ? "Disabled — Append-Only Policy"
+                      : purgeGuard.blockerCode === "INVALID_POLICY"
+                        ? "Disabled — Invalid Policy"
+                        : purgeGuard.purgeAllowed
+                          ? `Ready (${purgeGuard.purgableRecordIds.length} Expired)`
+                          : "No Expired Runs"}
+              </span>
+            </div>
+            <p
+              id="archive-retention-purge-reason"
+              data-testid="archive-retention-purge-reason"
+              className="text-xs text-gray-700 leading-relaxed"
+            >
+              {purgeGuard.primaryReason}
+            </p>
+            {purgeGuard.reasons.slice(1).map((note, idx) => (
+              <p key={idx} className="text-[11px] text-gray-500">
+                {note}
+              </p>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            {(purgeGuard.blockerCode === "SETTLEMENT_PENDING" ||
+              purgeGuard.blockerCode === "SETTLEMENT_UNVERIFIED") && (
+              <Link
+                href="/payroll/reconciliation"
+                data-testid="archive-purge-remediation-link"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-amber-800 bg-white hover:bg-amber-100/70 px-3 py-1.5 rounded-lg border border-amber-300 transition-colors"
+              >
+                <Clock className="w-3.5 h-3.5" aria-hidden="true" />
+                Review Settlement Status
+              </Link>
+            )}
+            {(purgeGuard.blockerCode === "IMMUTABLE_AUDIT_LOG" ||
+              purgeGuard.blockerCode === "INVALID_POLICY") && (
+              <Link
+                href="/settings/payroll-policy"
+                data-testid="archive-purge-remediation-link"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-300 transition-colors"
+              >
+                Retention Policy Settings
+              </Link>
+            )}
+            <Button
+              type="button"
+              onClick={handleRetentionPurge}
+              disabled={!purgeGuard.purgeAllowed}
+              variant={purgeGuard.purgeAllowed ? "default" : "outline"}
+              data-testid="archive-retention-purge-button"
+              aria-describedby="archive-retention-purge-reason"
+              title={purgeGuard.primaryReason}
+              className={`text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5 ${
+                purgeGuard.purgeAllowed
+                  ? "bg-amber-600 text-white hover:bg-amber-700"
+                  : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+              }`}
+            >
+              <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+              {purgeGuard.purgeAllowed
+                ? `Purge Expired Runs (${purgeGuard.purgableRecordIds.length})`
+                : "Purge Expired Runs"}
+            </Button>
+          </div>
+        </div>
+
+        {purgeFeedback && (
+          <div
+            role={purgeFeedback.allowed ? "status" : "alert"}
+            data-testid="archive-retention-purge-feedback"
+            className={`rounded-lg border px-3 py-2 text-xs flex items-center gap-2 ${
+              purgeFeedback.allowed
+                ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                : "bg-amber-50 border-amber-200 text-amber-900"
+            }`}
+          >
+            {purgeFeedback.allowed ? (
+              <CheckCircle2
+                className="w-4 h-4 text-emerald-600 shrink-0"
+                aria-hidden="true"
+              />
+            ) : (
+              <AlertTriangle
+                className="w-4 h-4 text-amber-600 shrink-0"
+                aria-hidden="true"
+              />
+            )}
+            <span>{purgeFeedback.message}</span>
+          </div>
+        )}
+      </section>
+
       {/* Filters and Controls */}
       <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
@@ -527,14 +724,47 @@ export default function PayrollArchiveCenter() {
                   </div>
 
                   {/* Status Badges */}
-                  <div className="flex items-center gap-2 shrink-0">
-                                        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
                       {run.isDisputed
                         ? "Blocked by dispute"
                         : run.isArchived
                           ? "Archived"
                           : "Ready to archive"}
                     </span>
+                    {(() => {
+                      const settlementState = classifyRecordSettlementState(
+                        {
+                          settlementPending: run.settlementPending,
+                          settlementStatus: run.settlementStatus ?? "unknown",
+                        },
+                        true,
+                      );
+                      return (
+                        <span
+                          data-testid={`settlement-status-badge-${run.id}`}
+                          className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border flex items-center gap-1 ${
+                            settlementState === "settled"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                          }`}
+                        >
+                          {settlementState === "settled" ? (
+                            <CheckCircle2
+                              className="w-3 h-3"
+                              aria-hidden="true"
+                            />
+                          ) : (
+                            <Clock className="w-3 h-3" aria-hidden="true" />
+                          )}
+                          {settlementState === "settled"
+                            ? "Settlement finalized"
+                            : settlementState === "pending"
+                              ? "Settlement pending"
+                              : "Settlement unverified"}
+                        </span>
+                      );
+                    })()}
                     {run.isArchived && (
                       <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full border bg-slate-100 text-slate-600 border-slate-200">Read only</span>
                     )}

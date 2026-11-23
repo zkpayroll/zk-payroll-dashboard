@@ -59,6 +59,13 @@ Use these exact labels consistently across the app.
 | Unknown error | "An unexpected error occurred. Please try again." |
 | Empty search results | "No results match the current filters." |
 | Missing wallet | "Freighter not detected. Install the extension and refresh." |
+| Treasury reservation amount invalid | "Enter a valid amount greater than zero. No funds were reserved." |
+| Treasury reservation exceeds balance | "Reservation failed: the amount exceeds the available treasury balance. Reduce the amount or add funds, then retry." |
+| Beneficiary address invalid format | "Invalid Stellar address format." |
+| Beneficiary address identical | "New beneficiary must differ from current beneficiary." |
+| Beneficiary address null/zero | "Cannot use null/zero address as beneficiary." |
+| Beneficiary change during active payroll | "Beneficiary changes cannot be applied while an active payroll cycle is in progress." |
+| Beneficiary recovery unconfirmed | "Administrator confirmation is required." |
 
 ### Error Tone Rules
 
@@ -100,6 +107,10 @@ Use these terms consistently throughout the dashboard.
 | **View key** | A cryptographic key granting auditor read access | Not "audit key" or "disclosure key" |
 | **Auditor** | An external party reviewing payroll records | |
 | **Treasury** | The Stellar account holding payroll funds | |
+| **Reservation** | A local aggregate hold for the next payroll run | Never show employee or salary data |
+| **Beneficiary** | The designated Stellar address receiving payroll disbursements for an employee/contributor | Never expose in full in unmasked views |
+| **Beneficiary change** | The multi-stage verification workflow to update a payout destination | Requires 2FA, dual-operator sign-off, and cooling-off |
+| **Cooling-off period** | A mandatory delay before a verified beneficiary change becomes active | Protects against rushed or unauthorized updates |
 | **Commitment** | A cryptographic commitment hiding a salary amount | |
 | **Testnet** | The Stellar test network for development | Always capitalize "Testnet" |
 | **Freighter** | The Stellar wallet browser extension | Always capitalize "Freighter" |
