@@ -58,6 +58,17 @@ describe("validateProofReference", () => {
       expect(result.message).not.toContain("12345");
       expect(result.message).not.toContain("EMP-77");
     });
+
+    it("explains an unsupported proof format without exposing payroll data", () => {
+      const submitted = "proof:groth16:salary=98000:EMP-42";
+      const result = validateProofReference(submitted);
+      expect(result.isValid).toBe(false);
+      expect(result.reason).toBe("malformed");
+      expect(result.message).toContain("zkp_ref_YYYYMMDD_NNN");
+      expect(result.message).not.toContain("98000");
+      expect(result.message).not.toContain("EMP-42");
+      expect(result.message).not.toContain("groth16");
+    });
   });
 
   describe("boundaries", () => {

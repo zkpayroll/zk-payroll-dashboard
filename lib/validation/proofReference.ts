@@ -21,7 +21,7 @@ export const PROOF_REFERENCE_GUIDANCE =
   "Enter only the proof reference, not payroll amounts or employee details. " +
   PROOF_REFERENCE_RECOVERY_HINT;
 
-export type ProofReferenceFailureReason = "empty" | "malformed";
+export type ProofReferenceFailureReason = "empty" | "malformed" | "unsupported_format";
 
 export interface ProofReferenceValidationResult {
   isValid: boolean;
@@ -29,6 +29,14 @@ export interface ProofReferenceValidationResult {
   message: string | null;
   reason: ProofReferenceFailureReason | null;
 }
+
+/**
+ * Heuristic detection of references that look like a known-but-unsupported
+ * proof format (e.g. a legacy `zkp_proof_` or `proof-` identifier). Lets the UI
+ * tell operators the format itself is unsupported rather than a typo.
+ * Only the shape of the prefix is inspected; the value is never echoed.
+ */
+const UNSUPPORTED_PROOF_PREFIX_PATTERN = /^(zkp_proof_|zkp_v1_|proof[-_])/;
 
 /**
  * Normalize a pasted or typed proof reference value: trims surrounding
@@ -52,6 +60,17 @@ export function validateProofReference(raw: string): ProofReferenceValidationRes
   }
 
   if (!PROOF_REFERENCE_PATTERN.test(normalized)) {
+    if (UNSUPPORTED_PROOF_PREFIX_PATTERN.test(normalized)) {
+      return {
+        isValid: false,
+        normalized,
+        message:
+          "This proof format is not supported by this dashboard. Only zkp_ref_ references are accepted. " +
+          PROOF_REFERENCE_FORMAT_HINT +
+          ". Generate a new proof with the current pipeline to get a supported reference.",
+        reason: "unsupported_format",
+      };
+    }
     return {
       isValid: false,
       normalized,
