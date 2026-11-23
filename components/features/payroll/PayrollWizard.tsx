@@ -183,6 +183,9 @@ function PayrollWizard(_props: PayrollWizardProps = {}) {
   const markCheckpointCompleted = usePayrollUploadCheckpointStore((s) => s.markCompleted);
   const clearCheckpoint = usePayrollUploadCheckpointStore((s) => s.clearCheckpoint);
   const evictStaleCheckpoint = usePayrollUploadCheckpointStore((s) => s.evictStaleCheckpoint);
+  const [uploadRecoveryRunId, setUploadRecoveryRunId] = useState<string | null>(
+    null,
+  );
 
   // #534 — the saved policy governs the run; the wizard reads the saved
   // policy (not unsaved edits), mirroring the payout limit indicator.
@@ -199,18 +202,20 @@ function PayrollWizard(_props: PayrollWizardProps = {}) {
     }
   }, [employeeIds.length, hasDraft, submissionStatus]);
 
-<<<<<<< Updated upstream
   useEffect(() => {
     if (!draftResolvedRef.current && wasInterrupted()) {
       setShowInterruptedBanner(true);
     }
   }, [wasInterrupted]);
-=======
+
   // Evict checkpoints older than 24 h so stale recovery banners never linger.
   useEffect(() => {
     evictStaleCheckpoint();
+    const checkpointStore = usePayrollUploadCheckpointStore.getState();
+    if (checkpointStore.hasRecoverableCheckpoint()) {
+      setUploadRecoveryRunId(checkpointStore.checkpoint?.runId ?? null);
+    }
   }, [evictStaleCheckpoint]);
->>>>>>> Stashed changes
 
   const { sessionState } = useSession();
   const network = useWalletStore((s) => s.network);
@@ -606,7 +611,6 @@ function PayrollWizard(_props: PayrollWizardProps = {}) {
       {/* Wallet Reconnect Recovery Banner */}
       <WalletReconnectRecoveryBanner />
 
-<<<<<<< Updated upstream
       {/* Interrupted Settlement Recovery Banner (#755) */}
       {showInterruptedBanner && (
         <div
@@ -681,27 +685,28 @@ function PayrollWizard(_props: PayrollWizardProps = {}) {
         </div>
       )}
 
-      {!showInterruptedBanner && showDraftBanner && (
-=======
       {/* Upload Recovery Banner — shown when a previous upload was interrupted */}
-      <UploadRecoveryBanner
-        runId={payrollRunId ?? undefined}
-        onResume={() => {
-          restoreDraft();
-          setShowDraftBanner(false);
-          draftResolvedRef.current = true;
-        }}
-        onDiscard={() => {
-          clearDraft();
-          clearCheckpoint();
-          clearApprovalHistory();
-          setShowDraftBanner(false);
-          draftResolvedRef.current = true;
-        }}
-      />
+      {uploadRecoveryRunId && (
+        <UploadRecoveryBanner
+          runId={uploadRecoveryRunId}
+          onResume={() => {
+            restoreDraft();
+            setPayrollRunId(uploadRecoveryRunId);
+            setUploadRecoveryRunId(null);
+            setShowDraftBanner(false);
+            draftResolvedRef.current = true;
+          }}
+          onDiscard={() => {
+            clearDraft();
+            clearApprovalHistory();
+            setUploadRecoveryRunId(null);
+            setShowDraftBanner(false);
+            draftResolvedRef.current = true;
+          }}
+        />
+      )}
 
-      {showDraftBanner && (
->>>>>>> Stashed changes
+      {!showInterruptedBanner && showDraftBanner && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
           <Save className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
           <div className="flex-1">

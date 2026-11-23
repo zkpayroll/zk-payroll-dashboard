@@ -37,6 +37,10 @@ export interface SalaryCommitmentAmendment {
   approvalStatus: AmendmentStatus;
   createdAt: string;
   updatedAt: string;
+  /** SDK timestamp for submission of the pending amendment, when available. */
+  submittedAt?: string;
+  /** Number of post-submission approval attempts already made. */
+  adjustmentAttempts?: number;
   requestedBy: string;
   /** Operator-provided rationale — privacy-safe copy, no salary values */
   reason?: string;

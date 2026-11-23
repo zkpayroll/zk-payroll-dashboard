@@ -41,6 +41,8 @@ export interface AuditGrantDetail {
   grantedBy: string;
   createdAt: string;
   expiresAt: string;
+  /** Ledger sequence at which this grant reaches its expiry boundary. */
+  expiresAtLedger?: number | null;
   status: "active" | "expiring_soon" | "expired" | "revoked";
   maskingTier: "ANONYMIZED_ONLY" | "PARTIALLY_MASKED" | "FULL_ZERO_KNOWLEDGE";
   accessibleScopes: AuditGrantScopeItem[];
@@ -132,6 +134,16 @@ const DEFAULT_GRANT: AuditGrantDetail = {
   ],
 };
 
+export function formatGrantLedgerExpiry(
+  expiresAtLedger?: number | null,
+): string | null {
+  if (expiresAtLedger == null) return null;
+  if (!Number.isSafeInteger(expiresAtLedger) || expiresAtLedger < 1) {
+    return "Ledger expiry unavailable. Verify grant metadata.";
+  }
+  return `Expires at ledger #${expiresAtLedger}`;
+}
+
 export function AuditGrantScopeDetailsDrawer({
   isOpen,
   grant = DEFAULT_GRANT,
@@ -144,6 +156,7 @@ export function AuditGrantScopeDetailsDrawer({
   if (!isOpen) return null;
 
   const isRevoked = isAuditGrantRevoked(grant);
+  const ledgerExpiry = formatGrantLedgerExpiry(grant.expiresAtLedger);
   const isExpired = !isRevoked && evaluateAuditorAccessExpiry(grant).state === "expired";
 
   const getStatusBadge = (status: string) => {
@@ -284,6 +297,15 @@ export function AuditGrantScopeDetailsDrawer({
                 <Clock className="w-3.5 h-3.5 text-gray-400" />
                 <span>Expires: {new Date(grant.expiresAt).toLocaleDateString()}</span>
               </div>
+              {ledgerExpiry && (
+                <div
+                  data-testid="grant-ledger-expiry"
+                  className="flex items-center gap-1.5"
+                >
+                  <Clock className="w-3.5 h-3.5 text-gray-400" aria-hidden="true" />
+                  <span>{ledgerExpiry}</span>
+                </div>
+              )}
               {isRevoked && (
                 <div className="flex items-center gap-1.5 col-span-1 sm:col-span-2 text-red-700">
                   <Ban className="w-3.5 h-3.5 text-red-500 shrink-0" />
@@ -387,7 +409,7 @@ export function AuditGrantScopeDetailsDrawer({
               <button
                 type="button"
                 onClick={() => {
-                if (!isRevoked) {
+                  if (!isRevoked) {
                     onExtendGrant(grant.id);
                   }
                 }}

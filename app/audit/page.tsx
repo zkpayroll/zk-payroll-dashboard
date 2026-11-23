@@ -21,6 +21,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
   AuditGrantScopeDetailsDrawer,
   type AuditGrantDetail,
+  formatGrantLedgerExpiry,
 } from "@/components/features/audit/AuditGrantScopeDetailsDrawer";
 import {
   AuditGrantRevocationStatus,
@@ -38,6 +39,7 @@ export const MOCK_AUDIT_GRANTS: AuditGrantDetail[] = [
     grantedBy: "Operator Admin (0x8920...)",
     createdAt: "2026-09-01T10:00:00Z",
     expiresAt: "2026-12-01T10:00:00Z",
+    expiresAtLedger: 5_200_000,
     status: "active",
     maskingTier: "FULL_ZERO_KNOWLEDGE",
     accessibleScopes: [
@@ -166,6 +168,7 @@ export const MOCK_AUDIT_GRANTS: AuditGrantDetail[] = [
     grantedBy: "Operator Admin (0x8920...)",
     createdAt: "2026-10-01T09:00:00Z",
     expiresAt: "2026-11-25T09:00:00Z",
+    expiresAtLedger: 5_100_000,
     status: "expiring_soon",
     maskingTier: "FULL_ZERO_KNOWLEDGE",
     accessibleScopes: [
@@ -474,6 +477,7 @@ export default function AuditGrantsPage() {
                 ) : (
                   filteredGrants.map((grant) => {
                     const isRevoked = grant.status === "revoked" || Boolean(grant.revokedAt);
+                    const ledgerExpiry = formatGrantLedgerExpiry(grant.expiresAtLedger);
 
                     return (
                       <tr
@@ -530,6 +534,14 @@ export default function AuditGrantsPage() {
                                 <Clock className="w-3 h-3" />
                                 <span>Expires: {new Date(grant.expiresAt).toLocaleDateString()}</span>
                               </div>
+                              {ledgerExpiry && (
+                                <p
+                                  data-testid={`grant-list-ledger-expiry-${grant.id}`}
+                                  className="text-[11px] text-gray-500"
+                                >
+                                  {ledgerExpiry}
+                                </p>
+                              )}
                               <p className="text-[11px] text-gray-400">
                                 Issued: {new Date(grant.createdAt).toLocaleDateString()}
                               </p>

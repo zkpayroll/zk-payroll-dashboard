@@ -4,6 +4,21 @@ Developer reference for the UX reliability patterns introduced in issues #455, #
 
 ---
 
+## Auditor grant ledger expiry
+
+The audit grants dashboard and scope drawer display `expiresAtLedger` as an
+explicit ledger-sequence expiry boundary when one is available. The boundary
+must be a positive safe integer; malformed values are shown as unavailable,
+and older grants without the optional field continue to show their timestamp
+expiry only.
+
+The dashboard currently has no current-ledger source, so this metadata does
+not independently change the grant's active/expired status. Status continues
+to come from the grant lifecycle data until a current-ledger source is
+integrated.
+
+---
+
 ## #470 — Payroll Run Progress Persistence
 
 **Goal:** Restore visible batch progress after a refresh without exposing
