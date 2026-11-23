@@ -872,3 +872,17 @@ Run with:
 ```bash
 npm test
 ```
+
+---
+
+## #896 — Employer Role Changes
+
+When an employer account's role changes, `EmployerRoleChangeNotice` explains what was gained or lost and redirects to the dashboard if the current page is no longer accessible. See [EMPLOYER_ROLE_CHANGES.md](./EMPLOYER_ROLE_CHANGES.md) for the full behavior, transition matrix, and failure states.
+
+---
+
+## #885 — Payroll Period Boundaries
+
+Period labels (`lib/date/periodLabel.ts`) are UTC-normalized, so a run at `2025-12-31T23:59:59Z` is December 2025 and one at `2026-01-01T00:00:00Z` is January 2026, regardless of the viewer's timezone. Impossible calendar dates such as `2026-02-30` or `2026-02-29` (non-leap year) are rejected and render the "Unassigned period" fallback instead of rolling into the next month.
+
+Component tests in `__tests__/payroll-period-boundaries.test.tsx` cover month and year edges, timezone offsets that cross a UTC month boundary, leap days, quarter edges, and empty or single-item period lists in `PeriodLabelBadge`, `PeriodSummaryCard`, and `PeriodStatusFilter`.
