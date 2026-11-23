@@ -11,7 +11,9 @@ import { validateDraftDescription } from "@/lib/validation/draftDescription";
 import { MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import { Coins, Shield, UserCheck, AlertTriangle, RotateCcw } from "lucide-react";
 import Link from "next/link";
-import { useContractPauseGuard } from "@hooks/useContractPauseGuard";
+import { useContractPauseGuard } from "@/hooks/useContractPauseGuard";
+import type { UserRole } from "@/types";
+import { checkRoleForSubmission, refreshEmployerRole } from "@/lib/auth/refreshEmployerRole";
 import {
   RetryPolicyDecisionLog,
   type RetryPolicyDecisionEntry,
@@ -191,6 +193,16 @@ export function validateAdjustmentLimit(raw: string): AdjustmentLimitValidationR
   return { isValid: true, normalized: String(parsed), message: "Adjustment limit is valid." };
 }
 
+/** Session roles map onto the create page's operator roles; auditors are read-only. */
+export function toPayrollOperatorRole(role: UserRole): PayrollOperatorRole {
+  return role === "auditor" ? "viewer" : role;
+}
+
+function toSessionRole(role: PayrollOperatorRole): UserRole | null {
+  if (role === "viewer") return "auditor";
+  return role === "admin" || role === "operator" ? role : null;
+}
+
 export default function PayrollCreatePage() {
   const [assetRaw, setAssetRaw] = useState("");
   const [batchRef, setBatchRef] = useState("");
@@ -203,8 +215,12 @@ export default function PayrollCreatePage() {
   const [lastRetryDecision, setLastRetryDecision] = useState<RetryPolicyDecisionEntry | null>(null);
 
   // The operator driving this dashboard session. In a live app this would
-  // come from the auth context; the default keeps the demo flow working.
-  const operator = DEFAULT_PAYROLL_OPERATOR;
+  // come from the auth context; the default keeps the demo flow working. The
+  // role is re-read from the server on every submit (#856), so a stale role
+  // cannot authorize a submission.
+  const [operator, setOperator] = useState<PayrollOperator>(DEFAULT_PAYROLL_OPERATOR);
+  const [isRefreshingRole, setIsRefreshingRole] = useState(false);
+  const [roleNotice, setRoleNotice] = useState<string | null>(null);
 
   const { isMutationDisabled, checkAction } = useContractPauseGuard();
 
@@ -251,8 +267,9 @@ export default function PayrollCreatePage() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isRefreshingRole) return;
 
     // Contract pause gate: deny mutation actions when contracts are paused
     const pauseCheck = checkAction("create_payroll_draft");
@@ -263,11 +280,37 @@ export default function PayrollCreatePage() {
       return;
     }
 
-    // Permission gate first: deny before any field work is done.
-    if (!permissionCheck.allowed) {
-      setError(permissionCheck.message);
+    // Refresh the employer role before anything else: the role on screen may
+    // be stale. If it cannot be confirmed, nothing is submitted.
+    setIsRefreshingRole(true);
+    const refresh = await refreshEmployerRole().finally(() => setIsRefreshingRole(false));
+    const roleCheck = checkRoleForSubmission(refresh, toSessionRole(operator.role));
+    if (!roleCheck.ok) {
+      setError(roleCheck.message);
       setSubmitted(null);
-      recordRetryDecision("permission_denied", false, permissionCheck.message, batchRef);
+      recordRetryDecision("role_refresh_failed", roleCheck.retryable, roleCheck.message, batchRef);
+      return;
+    }
+
+    const activeOperator: PayrollOperator =
+      toPayrollOperatorRole(roleCheck.role) === operator.role
+        ? operator
+        : { ...operator, role: toPayrollOperatorRole(roleCheck.role) };
+    if (roleCheck.changed) {
+      setOperator(activeOperator);
+      setRoleNotice(
+        `Your employer role was refreshed and is now "${activeOperator.role}". It was applied to this submission.`,
+      );
+    } else {
+      setRoleNotice(null);
+    }
+
+    // Permission gate: deny before any field work is done, using the fresh role.
+    const freshPermission = validatePayrollOperatorPermission(activeOperator, "create:payroll");
+    if (!freshPermission.allowed) {
+      setError(freshPermission.message);
+      setSubmitted(null);
+      recordRetryDecision("permission_denied", false, freshPermission.message, batchRef);
       return;
     }
 
@@ -369,6 +412,16 @@ export default function PayrollCreatePage() {
           </div>
         </div>
 
+        {roleNotice && (
+          <div
+            role="status"
+            data-testid="payroll-role-refreshed"
+            className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900"
+          >
+            {roleNotice}
+          </div>
+        )}
+
         {isMutationDisabled && (
           <div
             role="alert"
@@ -446,7 +499,11 @@ export default function PayrollCreatePage() {
           </div>
 
           {error && (
-            <div role="alert" className="bg-red-50 border border-red-300 rounded-lg p-3 text-sm text-red-700">
+            <div
+              role="alert"
+              data-testid="payroll-create-error"
+              className="bg-red-50 border border-red-300 rounded-lg p-3 text-sm text-red-700"
+            >
               {error}
             </div>
           )}
@@ -491,13 +548,13 @@ export default function PayrollCreatePage() {
           <div className="flex gap-3">
             <button
               type="submit"
-              disabled={!permissionCheck.allowed || isMutationDisabled}
-              aria-disabled={!permissionCheck.allowed || isMutationDisabled}
+              disabled={!permissionCheck.allowed || isMutationDisabled || isRefreshingRole}
+              aria-disabled={!permissionCheck.allowed || isMutationDisabled || isRefreshingRole}
               title={isMutationDisabled ? "Disabled: Payroll contracts are paused" : undefined}
               className="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="payroll-create-submit"
             >
-              Create draft batch
+              {isRefreshingRole ? "Checking your role…" : "Create draft batch"}
             </button>
             <Link
               href="/payroll/drafts"
