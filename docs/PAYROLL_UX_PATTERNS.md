@@ -1252,3 +1252,44 @@ they do not expose employee records or salary values.
 
 - **Address Masking**: Destination addresses are always masked as `GA7Q...VSGZ` (`maskAddress`). Raw full addresses are omitted from all general UI displays.
 - **Zero Salary Disclosure**: Beneficiary forms and cards strictly omit salary values, payout amounts, and employee PII.
+
+---
+
+## #884 — Payroll Period Boundary Recovery Flow
+
+**Goal:** Provide operators with deterministic, privacy-safe recovery actions and guidance whenever payroll period boundaries (settlement windows) are inverted, invalid, or conflicting across templates or draft schedules, without exposing employee identities or salary amounts.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `types/periodBoundary.ts` | Centralized domain and recovery types (`PeriodBoundaryStatus`, `PeriodBoundaryRecoveryAction`, `PeriodBoundaryRecoveryPlan`, `PeriodBoundaryRecoveryResult`) re-exported via `types/index.ts`. |
+| `lib/payroll/periodBoundaryRecovery.ts` | Pure decision logic for evaluating boundary recovery proposals, calculating the next non-overlapping window, and applying recovery mutations. |
+| `stores/draftScheduleWindows.ts` | Extended Zustand store with `getRecoveryPlan`, `applyRecovery`, and `recoverAndUpsertDraft` actions. |
+| `components/features/schedule/PayrollScheduleEditor.tsx` | Settlement window draft form updated with interactive boundary recovery controls, one-click date swapping and window shifting, and polite screen reader announcements. |
+| `components/features/payroll/PayrollScheduleCollisionDetector.tsx` | Schedule boundary collision detector and recovery panel mounted on `/payroll/schedule`. |
+| `app/payroll/schedule/page.tsx` | Payroll schedule route rendering `PayrollScheduleCollisionDetector` with full boundary recovery capabilities. |
+| `__tests__/lib/payroll/period-boundary-recovery.test.ts` | Comprehensive unit tests for boundary evaluation, next-available window arithmetic, date swapping, and zero-PII guarantees. |
+| `__tests__/components/PeriodBoundaryRecovery.test.tsx` | Component tests verifying UI recovery controls, date swap, shifting past conflicts, and clearing conflicting drafts. |
+| `__tests__/payroll-schedule-collision-recovery.test.tsx` | Integration tests for the collision detector and auto-recovery flow. |
+
+### Recovery Actions & Outcomes
+
+1. **Inverted Window (`start > end`):**
+   - **Recommended Action:** `swap_dates` (or `expand_standard_window` to set a single-day period).
+   - Re-aligns start and end chronologically in a single click.
+
+2. **Boundary Collision / Overlap:**
+   - **Recommended Action:** `shift_next_available` (or `clear_conflicts`).
+   - Automatically computes the earliest non-overlapping date range starting after all conflicting windows conclude, preserving the requested period duration.
+
+3. **Invalid Calendar Date (`invalid_start` / `invalid_end`):**
+   - Recommends resetting start to today or expanding end to standard frequency duration (e.g. 7 days weekly, 14 days biweekly, calendar month monthly).
+
+4. **Timezone Day Spillover (`timezone_spillover`):**
+   - Explains date boundary shifts in the target local timezone while preserving UTC timestamps intact.
+
+### Privacy Invariants
+
+- **Zero Compensation or Employee Exposure:** Boundary recovery messages, alert banners, and live region announcements use calendar dates (YYYY-MM-DD), template names, and day counts only; they never handle or expose individual employee records, names, wallet keys, or salary values.
+

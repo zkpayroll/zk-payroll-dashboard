@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, AlertTriangle, Lock, CalendarClock, Save } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle, Lock, CalendarClock, Save, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { MOCK_PAYROLL_TEMPLATES, MOCK_PAYROLL_LOCKS, MOCK_PAYROLL_RUNS } from "@/lib/api/mockData";
 import { getCalendarMonthDays, formatPayrollMonthYear } from "@/lib/payroll/scheduleUtils";
@@ -13,6 +13,11 @@ import {
   validatePayrollPeriodBoundaries,
 } from "@/lib/date/scheduleWindows";
 import { useDraftScheduleWindowStore } from "@/stores/draftScheduleWindows";
+import {
+  evaluatePeriodBoundaryRecovery,
+  applyPeriodBoundaryRecoveryAction,
+} from "@/lib/payroll/periodBoundaryRecovery";
+import type { PeriodBoundaryRecoveryAction } from "@/types/periodBoundary";
 import EmptyState from "@/components/ui/EmptyState";
 import type { PayrollTemplate } from "@/types/models";
 
@@ -25,14 +30,76 @@ interface DayEntry {
 
 function DraftWindowForm({ templates }: { templates: PayrollTemplate[] }) {
   const upsertDraft = useDraftScheduleWindowStore((s) => s.upsertDraft);
+  const removeDraft = useDraftScheduleWindowStore((s) => s.removeDraft);
   const drafts = useDraftScheduleWindowStore((s) => s.drafts);
 
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? "");
   const [windowStart, setWindowStart] = useState("");
   const [windowEnd, setWindowEnd] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [recoveryAnnouncement, setRecoveryAnnouncement] = useState<string | null>(null);
 
   const isSubmittable = templateId && windowStart && windowEnd;
+
+  const recoveryPlan = useMemo(() => {
+    if (!windowStart && !windowEnd) return null;
+    return evaluatePeriodBoundaryRecovery({
+      start: windowStart,
+      end: windowEnd,
+      templateId,
+      templateFrequency: templates.find((t) => t.id === templateId)?.frequency,
+      existingWindows: drafts.map((d) => ({
+        id: d.id,
+        templateId: d.templateId,
+        templateName: templates.find((t) => t.id === d.templateId)?.name,
+        start: d.windowStart,
+        end: d.windowEnd,
+      })),
+    });
+  }, [windowStart, windowEnd, templateId, templates, drafts]);
+
+  const handleApplyRecovery = (action: PeriodBoundaryRecoveryAction) => {
+    if (!recoveryPlan) return;
+
+    if (action === "clear_conflicts") {
+      const conflictIds = new Set(recoveryPlan.conflictingWindows.map((w) => w.id));
+      for (const id of conflictIds) {
+        removeDraft(id);
+      }
+      setError(null);
+      const announcement = "Cleared conflicting draft settlement windows.";
+      setRecoveryAnnouncement(announcement);
+      toast.success("Conflicting drafts cleared", {
+        description: "You can now save this settlement window.",
+      });
+      return;
+    }
+
+    const result = applyPeriodBoundaryRecoveryAction(action, {
+      start: windowStart,
+      end: windowEnd,
+      templateId,
+      templateFrequency: templates.find((t) => t.id === templateId)?.frequency,
+      existingWindows: drafts.map((d) => ({
+        id: d.id,
+        templateId: d.templateId,
+        templateName: templates.find((t) => t.id === d.templateId)?.name,
+        start: d.windowStart,
+        end: d.windowEnd,
+      })),
+    });
+
+    if (result.ok && result.recoveredWindow) {
+      setWindowStart(result.recoveredWindow.start);
+      setWindowEnd(result.recoveredWindow.end);
+      setError(null);
+      const announcement = `Applied recovery: window boundaries updated to ${result.recoveredWindow.start} through ${result.recoveredWindow.end}.`;
+      setRecoveryAnnouncement(announcement);
+      toast.success("Period boundary recovered", {
+        description: `Window updated to ${result.recoveredWindow.start} → ${result.recoveredWindow.end}.`,
+      });
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,6 +157,7 @@ function DraftWindowForm({ templates }: { templates: PayrollTemplate[] }) {
     }
 
     setError(null);
+    setRecoveryAnnouncement(null);
     setWindowStart("");
     setWindowEnd("");
     toast.success("Draft settlement window saved", {
@@ -167,9 +235,54 @@ function DraftWindowForm({ templates }: { templates: PayrollTemplate[] }) {
       </div>
 
       {error && (
-        <div id="payroll-window-error" role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-          <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
-          {error}
+        <div className="space-y-3">
+          <div id="payroll-window-error" role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+            <span>{error}</span>
+          </div>
+
+          {recoveryPlan && recoveryPlan.actions.length > 0 && (
+            <div
+              data-testid="period-boundary-recovery-controls"
+              className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 space-y-2"
+            >
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="font-semibold uppercase tracking-wide text-amber-800 text-[11px] flex items-center gap-1.5">
+                  <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+                  Boundary Recovery
+                </span>
+                {recoveryPlan.recommendedAction !== "none" && (
+                  <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
+                    Recommended: {recoveryPlan.actions.find((a) => a.action === recoveryPlan.recommendedAction)?.label}
+                  </span>
+                )}
+              </div>
+              <p className="text-amber-800">{recoveryPlan.actionableMessage}</p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {recoveryPlan.actions.map((act) => (
+                  <button
+                    key={act.action}
+                    type="button"
+                    data-testid={`recovery-action-${act.action}`}
+                    onClick={() => handleApplyRecovery(act.action)}
+                    className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 font-medium transition-colors ${
+                      act.action === recoveryPlan.recommendedAction
+                        ? "bg-amber-600 text-white hover:bg-amber-700 shadow-xs"
+                        : "bg-white border border-amber-300 text-amber-900 hover:bg-amber-100"
+                    }`}
+                  >
+                    {act.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {recoveryAnnouncement && (
+        <div className="sr-only" role="status" aria-live="polite">
+          {recoveryAnnouncement}
         </div>
       )}
 

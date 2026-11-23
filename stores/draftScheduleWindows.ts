@@ -1,6 +1,15 @@
 import { create } from "zustand";
 import type { DraftSettlementWindow } from "@/types/models";
 import { findOverlappingWindows, type DateRange } from "@/lib/date/scheduleWindows";
+import {
+  evaluatePeriodBoundaryRecovery,
+  applyPeriodBoundaryRecoveryAction,
+} from "@/lib/payroll/periodBoundaryRecovery";
+import type {
+  PeriodBoundaryRecoveryAction,
+  PeriodBoundaryRecoveryPlan,
+  PeriodBoundaryRecoveryResult,
+} from "@/types/periodBoundary";
 
 export interface UpsertDraftWindowInput {
   id?: string;
@@ -13,6 +22,7 @@ export interface UpsertDraftWindowResult {
   success: boolean;
   window: DraftSettlementWindow;
   conflictsWith: string[];
+  recoveryPlan?: PeriodBoundaryRecoveryPlan;
 }
 
 function generateDraftId(): string {
@@ -26,12 +36,87 @@ interface DraftScheduleWindowStore {
   removeDraft: (id: string) => void;
   clearDrafts: () => void;
   getDraftsForTemplate: (templateId: string) => DraftSettlementWindow[];
+  getRecoveryPlan: (input: UpsertDraftWindowInput) => PeriodBoundaryRecoveryPlan;
+  applyRecovery: (
+    action: PeriodBoundaryRecoveryAction,
+    input: UpsertDraftWindowInput,
+  ) => PeriodBoundaryRecoveryResult;
+  recoverAndUpsertDraft: (
+    input: UpsertDraftWindowInput,
+    action?: PeriodBoundaryRecoveryAction,
+  ) => UpsertDraftWindowResult;
 }
 
 export const useDraftScheduleWindowStore = create<DraftScheduleWindowStore>((set, get) => ({
   drafts: [],
 
   setDrafts: (drafts) => set({ drafts }),
+
+  getRecoveryPlan: (input) => {
+    return evaluatePeriodBoundaryRecovery({
+      start: input.windowStart,
+      end: input.windowEnd,
+      templateId: input.templateId,
+      existingWindows: get().drafts.map((d) => ({
+        id: d.id,
+        templateId: d.templateId,
+        start: d.windowStart,
+        end: d.windowEnd,
+      })),
+      excludeId: input.id,
+    });
+  },
+
+  applyRecovery: (action, input) => {
+    return applyPeriodBoundaryRecoveryAction(action, {
+      start: input.windowStart,
+      end: input.windowEnd,
+      templateId: input.templateId,
+      existingWindows: get().drafts.map((d) => ({
+        id: d.id,
+        templateId: d.templateId,
+        start: d.windowStart,
+        end: d.windowEnd,
+      })),
+      excludeId: input.id,
+    });
+  },
+
+  recoverAndUpsertDraft: (input, action) => {
+    const plan = get().getRecoveryPlan(input);
+    const chosenAction = action ?? plan.recommendedAction;
+
+    if (chosenAction === "clear_conflicts") {
+      const conflictIds = new Set(plan.conflictingWindows?.map((w) => w.id) ?? []);
+      set((state) => ({
+        drafts: state.drafts.filter((d) => !conflictIds.has(d.id)),
+      }));
+      return get().upsertDraft(input);
+    }
+
+    const recoveryResult = get().applyRecovery(chosenAction, input);
+    if (!recoveryResult.ok || !recoveryResult.recoveredWindow) {
+      return {
+        success: false,
+        window: {
+          id: input.id ?? generateDraftId(),
+          templateId: input.templateId,
+          windowStart: input.windowStart,
+          windowEnd: input.windowEnd,
+          createdAt: new Date().toISOString(),
+        },
+        conflictsWith: plan.conflictingWindows?.map((w) => w.id) ?? [],
+        recoveryPlan: plan,
+      };
+    }
+
+    return get().upsertDraft({
+      id: input.id,
+      templateId: input.templateId,
+      windowStart: recoveryResult.recoveredWindow.start,
+      windowEnd: recoveryResult.recoveredWindow.end,
+    });
+  },
 
   upsertDraft: (input) => {
     const window: DraftSettlementWindow = {
@@ -44,7 +129,8 @@ export const useDraftScheduleWindowStore = create<DraftScheduleWindowStore>((set
 
     // A window whose start falls after its end is not a valid range.
     if (input.windowStart > input.windowEnd) {
-      return { success: false, window, conflictsWith: [] };
+      const plan = get().getRecoveryPlan(input);
+      return { success: false, window, conflictsWith: [], recoveryPlan: plan };
     }
 
     // Only windows belonging to the *same* template are hard conflicts:
@@ -62,7 +148,8 @@ export const useDraftScheduleWindowStore = create<DraftScheduleWindowStore>((set
     const overlapCheck = findOverlappingWindows(candidate, existingRanges, input.id);
 
     if (overlapCheck.hasOverlap) {
-      return { success: false, window, conflictsWith: overlapCheck.conflictsWith };
+      const plan = get().getRecoveryPlan(input);
+      return { success: false, window, conflictsWith: overlapCheck.conflictsWith, recoveryPlan: plan };
     }
 
     set((state) => {
@@ -83,3 +170,4 @@ export const useDraftScheduleWindowStore = create<DraftScheduleWindowStore>((set
     return get().drafts.filter((d) => d.templateId === templateId);
   },
 }));
+
