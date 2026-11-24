@@ -39,6 +39,7 @@ current treasury balance.
 | -------- | ------------------- |
 | Empty, zero, negative, or non-finite amount | `Enter a valid amount greater than zero. No funds were reserved.` |
 | Amount exceeds treasury balance | `Reservation failed: the amount exceeds the available treasury balance. Reduce the amount or add funds, then retry.` |
+| Unknown or unsupported asset code (#843) | `Unknown or unsupported asset code "<CODE>". Treasury reservation requires a supported payroll asset (USDC, XLM, EURC). Configure or select a supported asset before reserving funds.` |
 
 Errors name the action and the next step. They do not reveal employee or salary
 data, and they do not silently clamp an invalid amount. When an update fails,
@@ -107,6 +108,7 @@ Treasury reservations guarantee that funds earmarked for approved payroll runs a
 
 | Reason Code | Tone | Trigger Condition | Operator Next Steps |
 | --- | --- | --- | --- |
+| `UNKNOWN_ASSET_CODE` | `blocked` | Asset code not in supported payroll allowlist (#843) | Select or configure a supported payroll asset in Asset Settings |
 | `ASSETS_UNCONFIGURED` | `blocked` | No supported payroll assets configured | Enable a Stellar payroll asset in Asset Settings |
 | `INVALID_TREASURY_DATA` | `blocked` | Negative, missing, or malformed balance, amount, or timestamp | Refresh balances and revalidate or cancel corrupted locks |
 | `INSUFFICIENT_TREASURY_BALANCE` | `blocked` | Projected payroll exceeds available treasury balance | Top up treasury balance before reserving or executing |

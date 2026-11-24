@@ -19,15 +19,17 @@ const STATUS_LABEL: Record<TreasuryReservationStatus, string> = {
   error: "Not updated",
 };
 
-interface TreasuryReservationProps {
+export interface TreasuryReservationProps {
   balance?: number;
   projectedPayroll?: number;
+  assetCode?: string;
   className?: string;
 }
 
 export function TreasuryReservation({
   balance = MOCK_TREASURY_BALANCE.balance,
   projectedPayroll = MOCK_TREASURY_BALANCE.projectedPayroll,
+  assetCode = "USDC",
   className = "",
 }: TreasuryReservationProps) {
   const [amount, setAmount] = useState(String(projectedPayroll));
@@ -43,6 +45,7 @@ export function TreasuryReservation({
         balance,
         amount: Number(amount),
         currentReservedAmount: state.reservedAmount,
+        assetCode,
       }),
     );
   };
