@@ -69,6 +69,23 @@ There is no error code: the import is not failed, it is gated. The operator
 sees an actionable choice per group (keep one row, or exclude the group), and
 the import only becomes available once every group is resolved.
 
+### Guidance for salary commitment versions
+
+When a group is detected, the panel shows clear guidance for each commitment
+version involved:
+
+- **Same wallet, same salary (`duplicate_salary_commitment`)**: the rows are
+  the same hidden statement bound to one wallet. Keep the most recent version
+  for that wallet, or exclude every row in the group if the employee should not
+  be paid for this period.
+- **Identical commitment value (`identical_commitment_value`)**: the rows carry
+  the same commitment value, which indicates a re-submitted version rather than
+  a new one. Keep a single version; the others are redundant.
+
+The guidance never reveals the salary amount. Only masked wallet addresses,
+truncated commitment values, and row numbers are shown, so operators can
+identify the versions to act on without exposing payroll data.
+
 The `actionableRemediation` copy of a group is:
 
 > Keep a single row for this wallet, or exclude every row in the group, before

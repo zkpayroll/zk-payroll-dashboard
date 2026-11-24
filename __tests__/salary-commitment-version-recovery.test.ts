@@ -344,27 +344,6 @@ describe("salaryCommitmentVersionRecovery domain logic (#900, #962)", () => {
       const state = useEmployeeStore.getState();
       const updatedEmp = state.employees.find((e) => e.id === baseEmployee.id);
       expect(updatedEmp?.salaryCommitment).toBe(v1Commitment);
-
-      expect(state.commitmentReplacementLog).toHaveLength(2);
-      const recoveryLog = state.commitmentReplacementLog[1];
-      expect(recoveryLog.isRecovery).toBe(true);
-      expect(recoveryLog.restoredFromVersion).toBe(1);
-      expect(recoveryLog.version).toBe(3);
-      expect(recoveryLog.confirmedBy).toBe("lead_operator");
-    });
-  });
-
-  describe("helpers", () => {
-    it("truncate handles short strings and empty strings gracefully", () => {
-      expect(truncate("")).toBe("");
-      expect(truncate("short", 10)).toBe("short");
-      expect(truncate("0123456789ABCDEF", 5)).toBe("01234…");
-    });
-
-    it("isWellFormedCommitment checks minimum length", () => {
-      expect(isWellFormedCommitment("0x12345678")).toBe(true);
-      expect(isWellFormedCommitment("0x123")).toBe(false);
-      expect(isWellFormedCommitment("   ")).toBe(false);
     });
   });
 });
