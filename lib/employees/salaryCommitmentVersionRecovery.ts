@@ -88,6 +88,27 @@ export function isWellFormedCommitment(commitment: string): boolean {
 }
 
 /**
+ * Produces privacy-safe, operator-facing guidance for a given commitment version
+ * state. Never includes raw salary values; only version numbers and hash previews.
+ */
+export function describeVersionGuidance(version: SalaryCommitmentVersion): string {
+  switch (version.status) {
+    case "active":
+      return `Version ${version.version} is the active commitment. No recovery is needed.`;
+    case "restored":
+      return `Version ${version.version} is an active restored commitment${
+        version.restoredFromVersion !== undefined
+          ? ` (restored from v${version.restoredFromVersion})`
+          : ""
+      }. Select an earlier superseded version to roll back further.`;
+    case "superseded":
+      return `Version ${version.version} was superseded and can be recovered. Recovery activates commitment ${version.commitmentPreview} for subsequent payroll verification without revealing salary figures.`;
+    default:
+      return `Version ${version.version} has an unknown status. Contact an administrator before attempting recovery.`;
+  }
+}
+
+/**
  * Reconstructs a comprehensive version history for an employee from their base
  * record and any confirmed replacements recorded in `commitmentReplacementLog`.
  */
@@ -210,7 +231,7 @@ export function reviewCommitmentVersionRecovery(
       ok: false,
       error: {
         code: "VERSION_ALREADY_ACTIVE",
-        message: `Commitment version v${targetVersion} is already the active version on this employee.`,
+        message: `Commitment version v${targetVersion} is already the active version on this employee. ${describeVersionGuidance(target)}`,
         suggestedAction: "Select an earlier superseded version to restore.",
       },
     };

@@ -114,6 +114,9 @@ export function CommitmentVersionRecoveryDialog({
                     Suggested action: {result.error.suggestedAction}
                   </p>
                 )}
+                <p className="text-xs text-red-600 mt-1">
+                  Review the version history and select a different superseded version, or contact your payroll administrator. No salary values are shown for security.
+                </p>
               </div>
             </div>
           ) : (
