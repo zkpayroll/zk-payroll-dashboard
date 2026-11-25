@@ -577,7 +577,7 @@ function TransactionHistoryInner({
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, search: e.target.value }))
                 }
-                placeholder="Search run id, receipt reference, period, tx hash, status..."
+                placeholder="Search run id, employer, receipt reference, period, tx hash, status..."
                 className="w-full pl-3 pr-8 py-1.5 rounded-md border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
               />
               {filters.search && (
