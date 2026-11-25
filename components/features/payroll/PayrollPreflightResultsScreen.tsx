@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import type { BatchDestinationConfirmationSummary } from "@/src/payroll/employeePaymentDestinationConfirmation";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -38,6 +39,12 @@ export interface PayrollPreflightResultsScreenProps {
   treasuryBalance?: number;
   proofReady?: boolean;
   contractState?: "active" | "paused" | "locked";
+  /**
+   * Privacy-safe recipient readiness from the payout finalization flow. When
+   * supplied, unresolved destinations become an execution blocker without
+   * revealing employee names, addresses, or salary data.
+   */
+  destinationConfirmation?: BatchDestinationConfirmationSummary;
   checks?: PreflightCheckItem[];
   onRerunPreflight?: () => void;
   onExecutePayroll?: () => void;
@@ -92,6 +99,7 @@ export function PayrollPreflightResultsScreen({
   treasuryBalance = 150000,
   proofReady = true,
   contractState = "active",
+  destinationConfirmation,
   checks = DEFAULT_CHECKS,
   onRerunPreflight,
   onExecutePayroll,
@@ -101,11 +109,30 @@ export function PayrollPreflightResultsScreen({
 }: PayrollPreflightResultsScreenProps) {
   const [showPassedChecks, setShowPassedChecks] = useState(true);
 
-  const blockers = checks.filter((c) => c.severity === "blocker" && !c.fixed);
-  const warnings = checks.filter((c) => c.severity === "warning");
-  const passed = checks.filter((c) => c.severity === "pass" || c.fixed);
+  const recipientCheck: PreflightCheckItem | undefined =
+    destinationConfirmation && !destinationConfirmation.canProceed
+      ? {
+          id: "check-recipient-addresses",
+          title: "Recipient Confirmation Required",
+          category: "wallet",
+          severity: "blocker",
+          description:
+            destinationConfirmation.blockerMessage ??
+            "Recipient confirmation is incomplete. Resolve recipient records before finalizing payouts.",
+        }
+      : undefined;
+  const effectiveChecks = recipientCheck
+    ? [
+        ...checks.filter((check) => check.id !== recipientCheck.id),
+        recipientCheck,
+      ]
+    : checks;
 
-  const totalChecks = checks.length;
+  const blockers = effectiveChecks.filter((c) => c.severity === "blocker" && !c.fixed);
+  const warnings = effectiveChecks.filter((c) => c.severity === "warning");
+  const passed = effectiveChecks.filter((c) => c.severity === "pass" || c.fixed);
+
+  const totalChecks = effectiveChecks.length;
   const passedCount = passed.length;
   const readinessScore = totalChecks > 0 ? Math.round((passedCount / totalChecks) * 100) : 0;
   const isReady = blockers.length === 0;
@@ -132,7 +159,7 @@ export function PayrollPreflightResultsScreen({
         proofReady,
         contractState,
       },
-      checks,
+      checks: effectiveChecks,
     };
 
     const blob = new Blob([JSON.stringify(reportData, null, 2)], {
