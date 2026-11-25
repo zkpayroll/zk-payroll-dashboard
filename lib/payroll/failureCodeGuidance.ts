@@ -135,6 +135,43 @@ const PAYROLL_FAILURE_REGISTRY: Record<string, PayrollFailureGuidance> = {
     ],
     affectedArea: "validation",
   },
+  // #792 — The registry contract rejects a payout because the caller's wallet
+  // is not the registered owner for this payroll batch. Guidance must be
+  // actionable without revealing other operators' addresses or roles.
+  REGISTRY_OWNER_PERMISSION_DENIED: {
+    code: "REGISTRY_OWNER_PERMISSION_DENIED",
+    title: "Payout rejected: registry owner permission required",
+    severity: "error",
+    summary:
+      "The registry contract refused the payout because the connected wallet is not the recorded owner for this payroll batch.",
+    userFacingMessage:
+      "This payout can only be executed by the wallet registered as the payroll batch owner. Your current wallet is not authorized by the registry for this batch.",
+    remediation: [
+      "Confirm which wallet is recorded as the payroll owner in Admin → Payroll Settings.",
+      "Switch to the owner wallet before retrying the execution.",
+      "If the owner needs to change, request an ownership transfer and complete it before resubmitting.",
+    ],
+    affectedArea: "execution",
+  },
+  // #797 — The payroll's proof key has rotated since the proof was generated,
+  // so verification would fail if the stale key were used. Error text MUST
+  // NOT quote the public inputs, witness values, or the stored key blob —
+  // these are either sensitive payroll data or carry it indirectly.
+  STALE_PROOF_KEY: {
+    code: "STALE_PROOF_KEY",
+    title: "Proof rejected: verification key out of date",
+    severity: "error",
+    summary:
+      "The verification key used by this proof no longer matches the key registered on-chain for the circuit. The proof itself is intact, but it cannot be verified against the current key.",
+    userFacingMessage:
+      "The proof was generated against an older verification key. Regenerate the proof with the current key before retrying.",
+    remediation: [
+      "Open the Execute wizard and request a fresh proof — it will be generated with the live verification key.",
+      "If the key was rotated as part of a planned deployment, wait for the registry update to finish propagating before re-running.",
+      "Contact your proof operator if the error repeats on a freshly generated proof.",
+    ],
+    affectedArea: "execution",
+  },
 };
 
 export function getPayrollFailureGuidance(
