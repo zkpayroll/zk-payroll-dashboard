@@ -369,6 +369,17 @@ function PayrollWizard(_props: PayrollWizardProps = {}) {
       return;
     }
 
+    if (employeeIds.length !== selectedEmployees.length) {
+      const message = "The reviewed recipient count changed before submission. Return to review and refresh the batch before signing.";
+      setProof(null);
+      setProofStatus("idle");
+      setProofError(null);
+      setDraftChecksumWarning(message);
+      goToStep("review");
+      toast.error("Recipient count changed", { description: message });
+      return;
+    }
+
     let currentChecksum: string;
     try {
       currentChecksum = await createPayrollDraftChecksum(employeeIds, selectedEmployees, totalAmount);
