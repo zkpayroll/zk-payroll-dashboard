@@ -201,6 +201,11 @@ export function evaluatePaymentAssetCompatibility(
   const hasBlockingIssuerIssue = blockers.length > 0;
 
   // Advisory warnings for ignored/ skipped targets.
+  if (supportedCodes.length > 1) {
+    warnings.push(
+      `This batch uses multiple payout asset identifiers (${supportedCodes.join(", ")}). Confirm the intended asset for each recipient before submission.`,
+    );
+  }
   if (unsupportedAssets.length > 0) {
     warnings.push(`Unsupported assets ignored: ${unsupportedAssets.join(", ")}.`);
   }

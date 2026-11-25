@@ -20,6 +20,9 @@ interface PayrollFailureRecoveryCenterProps {
 }
 
 function classifyFailure(run: PayrollRun): { key: string; label: string } {
+  if (run.status === "paused") {
+    return { key: "paused_batch", label: "Paused batch requires recovery" };
+  }
   if (resolveReconciliationStatus(run) === "failed") {
     return { key: "reconciliation_failed", label: "Reconciliation failed" };
   }
@@ -37,7 +40,9 @@ export default function PayrollFailureRecoveryCenter({
   initialRuns,
 }: PayrollFailureRecoveryCenterProps = {}) {
   const [runs, setRuns] = useState<PayrollRun[]>(() =>
-    (initialRuns ?? MOCK_PAYROLL_RUNS).filter((r) => resolveReconciliationStatus(r) === "failed"),
+    (initialRuns ?? MOCK_PAYROLL_RUNS).filter(
+      (r) => r.status === "paused" || resolveReconciliationStatus(r) === "failed",
+    ),
   );
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -63,6 +68,7 @@ export default function PayrollFailureRecoveryCenter({
     const report = diagnosePayrollRunRetry(run, {
       retryCount: retryAttempts[runId] ?? 0,
     });
+    const canResumePaused = run.status === "paused";
     onRetryPolicyDecision?.(runId, report);
 
     const settlementAlreadyRecorded = Boolean(
@@ -72,7 +78,7 @@ export default function PayrollFailureRecoveryCenter({
     // A settled transaction must never be re-queued from the recovery UI.
     // The check is repeated here, rather than relying only on the button's
     // disabled state, because callers can invoke the handler programmatically.
-    if (status === "pending" && (settlementAlreadyRecorded || !report.canRetry)) {
+    if (status === "pending" && (settlementAlreadyRecorded || (!canResumePaused && !report.canRetry))) {
       setActionError(report.summary);
       return;
     }
@@ -185,6 +191,7 @@ export default function PayrollFailureRecoveryCenter({
                     const settlementAlreadyRecorded = Boolean(
                       run.receiptId || (run.transactionHash && run.status === "verified"),
                     );
+                    const canResumePaused = run.status === "paused";
                     return (
                     <li
                       key={run.id}
@@ -206,6 +213,11 @@ export default function PayrollFailureRecoveryCenter({
                             {run.reconciliationDetails.discrepancies.join("; ")}
                           </p>
                         ) : null}
+                        {canResumePaused && (
+                          <p className="mt-1 text-xs text-amber-700">
+                            This batch is paused. Review the current run state, then resume it to continue processing.
+                          </p>
+                        )}
 
                         {diagnostics.primary && (
                           <div
@@ -241,13 +253,13 @@ export default function PayrollFailureRecoveryCenter({
                           type="button"
                           disabled={
                             pendingAction === run.id + "pending" ||
-                            !diagnostics.canRetry ||
+                            (!canResumePaused && !diagnostics.canRetry) ||
                             settlementAlreadyRecorded
                           }
                           title={
                             settlementAlreadyRecorded
                               ? "Retry blocked — this payout already has a settlement receipt. Verify its final status before taking further action."
-                              : diagnostics.canRetry
+                              : canResumePaused || diagnostics.canRetry
                                 ? undefined
                                 : diagnostics.summary
                           }
@@ -255,7 +267,13 @@ export default function PayrollFailureRecoveryCenter({
                           className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <RotateCcw className="h-3 w-3" aria-hidden />
-                          {pendingAction === run.id + "pending" ? "Retrying…" : "Retry"}
+                          {pendingAction === run.id + "pending"
+                            ? canResumePaused
+                              ? "Resuming…"
+                              : "Retrying…"
+                            : canResumePaused
+                              ? "Resume"
+                              : "Retry"}
                         </button>
                         <button
                           type="button"
