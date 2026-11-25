@@ -7,17 +7,22 @@ import {
   RETENTION_PERIOD_RECOMMENDED_DAYS,
   validateRetentionPeriodDays,
 } from "@/lib/payroll/retentionPeriodValidation";
+import { getRetentionGrantWarning } from "@/lib/audit/retentionGrantImpact";
 
 interface AuditRetentionPolicySectionProps {
   auditRetention: AuditRetentionPolicy;
   onChange: (updates: Partial<AuditRetentionPolicy>) => void;
   issues: PolicyValidationIssue[];
+  previousRetentionDays: number;
+  activeAuditGrantCount: number;
 }
 
 export function AuditRetentionPolicySection({
   auditRetention,
   onChange,
   issues,
+  previousRetentionDays,
+  activeAuditGrantCount,
 }: AuditRetentionPolicySectionProps) {
   const errors = issues.filter((i) => i.severity === "error");
   const warnings = issues.filter((i) => i.severity === "warning");
@@ -29,6 +34,11 @@ export function AuditRetentionPolicySection({
   );
   const retentionCheck = validateRetentionPeriodDays(auditRetention.retentionPeriodDays);
   const validDays = retentionCheck.valid;
+  const retentionGrantWarning = getRetentionGrantWarning(
+    previousRetentionDays,
+    auditRetention.retentionPeriodDays,
+    activeAuditGrantCount,
+  );
   const updateDays = (days: number) => {
     if (validateRetentionPeriodDays(days).valid) setLastValidDays(days);
     onChange({ retentionPeriodDays: days });
@@ -116,6 +126,16 @@ export function AuditRetentionPolicySection({
             <p>Choose 30–3650 whole days. Increasing retention keeps audit records longer; reducing it may make older records eligible for pruning. Review compliance obligations before saving.</p>
             <p>Changing this setting does not delete existing records automatically. Immutable records and legal holds remain protected.</p>
           </div>
+          {retentionGrantWarning.message && (
+            <div
+              role="alert"
+              data-testid="retention-active-grants-warning"
+              className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"
+            >
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+              <p>{retentionGrantWarning.message}</p>
+            </div>
+          )}
           {!validDays && (
             <div role="alert" className="mt-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
               <p>Enter a whole number between 30 and 3650 days before saving. No policy change has been confirmed.</p>

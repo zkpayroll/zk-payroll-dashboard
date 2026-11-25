@@ -21,8 +21,10 @@ import { ApprovalsPolicySection } from "./ApprovalsPolicySection";
 import { CapacityPolicySection } from "./CapacityPolicySection";
 import { AuditRetentionPolicySection } from "./AuditRetentionPolicySection";
 import { ValidationPreviewPanel } from "./ValidationPreviewPanel";
+import { useAuditExportStore } from "@/stores/auditExport";
 
 export function PayrollPolicyEditor() {
+  const auditGrant = useAuditExportStore((state) => state.auditGrant);
   const {
     policy,
     savedPolicy,
@@ -72,6 +74,11 @@ export function PayrollPolicyEditor() {
     () => compilationResult.issues.filter((i) => i.section === "auditRetention"),
     [compilationResult.issues]
   );
+  const activeAuditGrantCount =
+    auditGrant?.status === "active" &&
+    (!auditGrant.expiresAt || new Date(auditGrant.expiresAt).getTime() > Date.now())
+      ? 1
+      : 0;
 
   const getSectionIssueBadge = (issues: typeof timingIssues) => {
     const errCount = issues.filter((i) => i.severity === "error").length;
@@ -302,6 +309,8 @@ export function PayrollPolicyEditor() {
               auditRetention={policy.auditRetention}
               onChange={updateAuditRetention}
               issues={auditIssues}
+              previousRetentionDays={savedPolicy.auditRetention.retentionPeriodDays}
+              activeAuditGrantCount={activeAuditGrantCount}
             />
           )}
         </main>
