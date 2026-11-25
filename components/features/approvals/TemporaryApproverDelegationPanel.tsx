@@ -15,6 +15,10 @@ import {
   type TemporaryDelegation,
   type TemporaryDelegationStatus,
 } from "@/stores/delegatedApprovers";
+import {
+  resolveDelegatedApprovalParentExpiry,
+  type DelegatedApprovalParentExpiry,
+} from "@/lib/payroll/delegatedApprovalExpiry";
 
 const STATUS_BADGE_STYLES: Record<TemporaryDelegationStatus, string> = {
   scheduled: "bg-blue-50 text-blue-700 border-blue-200",
@@ -272,6 +276,33 @@ export default function TemporaryApproverDelegationPanel({
           Temporary Delegations ({currentDelegations.length})
         </h3>
 
+        {/* #778 — warn when a delegation expires with its parent role. */}
+        {(() => {
+          const warned = currentDelegations.filter(
+            (d) =>
+              resolveDelegatedApprovalParentExpiry(d.expiresAt, d.parentRole, now)
+                .warningMessage !== null,
+          );
+          if (warned.length === 0) return null;
+          return (
+            <div
+              role="alert"
+              data-testid="parent-role-expiry-banner"
+              className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg"
+            >
+              <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
+              <span>
+                {warned.length} delegation{warned.length === 1 ? "" : "s"}{" "}
+                {warned.length === 1 ? "expires" : "expire"} with{" "}
+                {warned.length === 1 ? "its" : "their"} parent role, before{" "}
+                {warned.length === 1 ? "its" : "their"} own window ends.
+                Renew the parent role to extend{" "}
+                {warned.length === 1 ? "it" : "them"}.
+              </span>
+            </div>
+          );
+        })()}
+
         {currentDelegations.length === 0 ? (
           <div className="text-center py-6 text-xs text-gray-400 border border-dashed rounded-lg">
             No temporary delegations scheduled. Time-boxed approver authority will appear here.
@@ -281,6 +312,15 @@ export default function TemporaryApproverDelegationPanel({
             {currentDelegations.map((delegation) => {
               const status = getTemporaryDelegationStatus(delegation, now);
               const canRevoke = status === "scheduled" || status === "active";
+              // #778 — a delegation granted under a parent role lapses with
+              // that role, even inside its own window. Surface the warning
+              // on the row so the operator sees it before relying on it.
+              const parentExpiry: DelegatedApprovalParentExpiry =
+                resolveDelegatedApprovalParentExpiry(
+                  delegation.expiresAt,
+                  delegation.parentRole,
+                  now,
+                );
               return (
                 <li
                   key={delegation.id}
@@ -310,6 +350,24 @@ export default function TemporaryApproverDelegationPanel({
                         delegation.expiresAt,
                       )}
                     </p>
+                    {parentExpiry.warningMessage && (
+                      <p
+                        role={
+                          parentExpiry.status === "expired_with_parent"
+                            ? "alert"
+                            : "status"
+                        }
+                        data-testid={`parent-role-warning-${delegation.id}`}
+                        className={`flex items-start gap-1 text-[11px] leading-snug ${
+                          parentExpiry.status === "expired_with_parent"
+                            ? "text-red-700"
+                            : "text-amber-700"
+                        }`}
+                      >
+                        <AlertCircle className="h-3 w-3 shrink-0 mt-px" />
+                        <span>{parentExpiry.warningMessage}</span>
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">

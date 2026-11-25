@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { validateDelegatedApproverInput } from "@/lib/validation/delegatedApprover";
+import type { ParentRoleGrant } from "@/lib/payroll/delegatedApprovalExpiry";
 
 export interface DelegatedApprover {
   id: string;
@@ -11,6 +12,13 @@ export interface DelegatedApprover {
   addedAt: string;
   addedBy?: string;
   companyId?: string;
+  /**
+   * The parent role grant this delegated approval derives from (#778).
+   * When set, the approval expires with its parent role: its effective
+   * expiry is the earliest of its own window and the parent grant's
+   * expiry/revocation. Absent = governed by its own window only.
+   */
+  parentRole?: ParentRoleGrant;
 }
 
 const INITIAL_DELEGATED_APPROVERS: DelegatedApprover[] = [
@@ -51,6 +59,13 @@ export interface TemporaryDelegation {
   companyId?: string;
   /** ISO timestamp set when the delegation is manually revoked early. */
   revokedAt?: string;
+  /**
+   * The parent role grant this temporary delegation derives from (#778).
+   * When set, the delegation expires with its parent role: its effective
+   * expiry is the earliest of `expiresAt` and the parent grant's
+   * expiry/revocation. Absent = governed by its own window only.
+   */
+  parentRole?: ParentRoleGrant;
 }
 
 /** Temporary delegations are capped at 30 days to limit blast radius. */
@@ -84,6 +99,8 @@ interface AddTemporaryDelegationInput {
   startsAt: string;
   expiresAt: string;
   createdBy?: string;
+  /** Parent role grant the delegation derives from (#778). */
+  parentRole?: ParentRoleGrant;
 }
 
 interface DelegatedApproversState {
@@ -93,6 +110,8 @@ interface DelegatedApproversState {
     address: string,
     label?: string,
     addedBy?: string,
+    /** Parent role grant the approval derives from (#778). */
+    parentRole?: ParentRoleGrant,
   ) => { success: boolean; error?: string };
   removeApprover: (idOrAddress: string) => void;
   renewApproval: (idOrAddress: string) => void;
@@ -109,7 +128,7 @@ export const useDelegatedApproversStore = create<DelegatedApproversState>()(
       approvers: INITIAL_DELEGATED_APPROVERS,
       temporaryDelegations: [],
 
-      addApprover: (address, label, addedBy = "Executive Admin") => {
+      addApprover: (address, label, addedBy = "Executive Admin", parentRole) => {
         const trimmedAddress = address.trim();
         const current = get().approvers;
 
@@ -132,6 +151,7 @@ export const useDelegatedApproversStore = create<DelegatedApproversState>()(
           addedAt: new Date().toISOString(),
           addedBy,
           companyId: "company_001",
+          parentRole,
         };
 
         set({ approvers: [newApprover, ...current] });
@@ -166,6 +186,7 @@ export const useDelegatedApproversStore = create<DelegatedApproversState>()(
         startsAt,
         expiresAt,
         createdBy = "Executive Admin",
+        parentRole,
       }) => {
         const trimmedAddress = address.trim();
 
@@ -221,6 +242,7 @@ export const useDelegatedApproversStore = create<DelegatedApproversState>()(
           createdAt: new Date().toISOString(),
           createdBy,
           companyId: "company_001",
+          parentRole,
         };
 
         set({ temporaryDelegations: [delegation, ...current] });
