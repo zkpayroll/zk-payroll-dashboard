@@ -70,6 +70,42 @@ describe("treasury reservation helpers", () => {
     expect(result.message).not.toMatch(/employee|salary/i);
   });
 
+  it("rejects unknown asset codes before treasury reservation (#843)", () => {
+    const result = updateTreasuryReservation({
+      balance: BALANCE,
+      amount: PROJECTED_PAYROLL,
+      assetCode: "UNKNOWN_TOKEN",
+    });
+
+    expect(result.status).toBe("error");
+    expect(result.reservedAmount).toBe(0);
+    expect(result.availableAmount).toBe(BALANCE);
+    expect(result.message).toMatch(/Unknown or unsupported asset code "UNKNOWN_TOKEN"/i);
+    expect(result.message).toMatch(/Treasury reservation requires a supported payroll asset/i);
+    expect(result.message).toMatch(/USDC, XLM, EURC/i);
+    expect(result.message).not.toMatch(/employee|salary/i);
+  });
+
+  it("handles boundary case for asset code validation (#843)", () => {
+    // Valid supported asset codes: USDC, XLM, EURC (case-insensitive with whitespace)
+    const validBoundary = updateTreasuryReservation({
+      balance: BALANCE,
+      amount: PROJECTED_PAYROLL,
+      assetCode: "  xlm  ",
+    });
+    expect(validBoundary.status).toBe("active");
+    expect(validBoundary.reservedAmount).toBe(PROJECTED_PAYROLL);
+
+    // Empty or invalid format asset codes fail safely
+    const emptyAsset = updateTreasuryReservation({
+      balance: BALANCE,
+      amount: PROJECTED_PAYROLL,
+      assetCode: "   ",
+    });
+    expect(emptyAsset.status).toBe("error");
+    expect(emptyAsset.message).toMatch(/Unknown or unsupported asset code/i);
+  });
+
   it("formats aggregate amounts consistently", () => {
     expect(formatReservationAmount(PROJECTED_PAYROLL)).toBe("$19,500");
   });
@@ -166,5 +202,22 @@ describe("<TreasuryReservation />", () => {
       PROJECTED_PAYROLL,
     );
     expect(screen.getByRole("button", { name: /release reservation/i })).toBeDisabled();
+  });
+
+  it("displays actionable error when TreasuryReservation receives unknown asset code (#843)", () => {
+    render(
+      <TreasuryReservation
+        balance={BALANCE}
+        projectedPayroll={PROJECTED_PAYROLL}
+        assetCode="BAD_ASSET"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /reserve funds/i }));
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent(/Unknown or unsupported asset code "BAD_ASSET"/i);
+    expect(alert).toHaveTextContent(/Treasury reservation requires a supported payroll asset/i);
+    expect(screen.getByTestId("reserved-amount")).toHaveTextContent("$0");
   });
 });

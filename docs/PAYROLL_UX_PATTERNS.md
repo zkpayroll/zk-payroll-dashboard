@@ -441,6 +441,32 @@ instead of a generic "no data" message.
 - **Integrated in:** `PayrollHistory`, `TransactionHistory` (history and
   archived modes).
 
+## #845 — Employer Context in Payroll Run Search Results
+
+Free-text payroll run search in `lib/payrollSearch.ts` matches employer/organization
+context alongside run ID, period, transaction hash, status, and settlement
+receipt references.
+
+### Motivation
+In multi-entity or delegated payroll operations, operators need to locate runs
+associated with specific employer organizations by name or company identifier
+without exposing sensitive compensation figures or individual employee data.
+
+### Fields Searched
+- Run ID (`tx.id`)
+- Status (`tx.status`)
+- Transaction hash (`tx.txHash`)
+- Settlement receipt reference (`tx.receiptId` or `rcpt_<id>` for verified runs)
+- Human-readable pay period (`formatRunPeriod(tx)`) and ISO date
+- Reconciliation status label and key
+- **Employer context (#845):** `tx.companyId` and resolved company/employer name (via `resolveCompanyFromRegistry` or caller-provided `companies` registry option)
+
+### Privacy Guarantees
+- Zero matching against private salary amounts or employee compensation figures.
+- Zero matching against individual employee identifiers or employee names.
+- Zero matching against cryptographic proof secrets (`proof`).
+- Matches strictly on public operator metadata and organization identifiers.
+
 ## Mobile Layout for Payroll Preflight Blockers (#527)
 
 Preflight blocker cards (`PayrollRiskWarnings`, `CompanyStateWarnings`, `OverduePayrollAlertBanner`) use flexible responsive layout containers (`flex-col sm:flex-row`, `p-4 sm:p-5`) to maintain full readability on narrow mobile screens. Touch targets (action buttons, dismiss controls) adhere to the minimum 44px height specification.

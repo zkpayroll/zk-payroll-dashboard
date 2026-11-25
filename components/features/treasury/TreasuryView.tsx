@@ -36,6 +36,7 @@ export interface TreasuryViewProps {
   releaseFailures?: PartialReleaseFailure[];
   initialReservations?: FundingReservation[];
   initialTimelineEvents?: FundingReservationEvent[];
+  assetCode?: string;
 }
 
 function TreasuryView({
@@ -43,6 +44,7 @@ function TreasuryView({
   releaseFailures = [],
   initialReservations,
   initialTimelineEvents,
+  assetCode = "USDC",
 }: TreasuryViewProps = {}) {
   const [toastVisible, setToastVisible] = useState(false);
   const [reservationError, setReservationError] = useState<string | null>(null);
@@ -92,7 +94,7 @@ function TreasuryView({
       reservations: currentReservations,
       availableBalance: balance,
       projectedPayroll,
-      assetCode: "USDC",
+      assetCode,
       hasConfiguredAssets: !assetsMissing,
       newReservationAmount: requestedAmountText,
     });
@@ -101,7 +103,11 @@ function TreasuryView({
       const formattedRequest = parsedRequest.ok
         ? formatReservationUnits(parsedRequest.units)
         : requestedAmountText;
-      if (precheckGuidance.reasonCode === "ASSETS_UNCONFIGURED") {
+      if (precheckGuidance.reasonCode === "UNKNOWN_ASSET_CODE") {
+        setReservationError(
+          precheckGuidance.guidance,
+        );
+      } else if (precheckGuidance.reasonCode === "ASSETS_UNCONFIGURED") {
         setReservationError(
           "Cannot create treasury reservation: configure at least one supported Stellar payroll asset in Asset Settings before reserving.",
         );
@@ -118,11 +124,11 @@ function TreasuryView({
         0
       ) {
         setReservationError(
-          `Cannot create treasury reservation: existing active reservations leave insufficient unreserved liquidity for an additional ${formattedRequest} USDC lock. Release or cancel stale reservations, or add funds before reserving.`,
+          `Cannot create treasury reservation: existing active reservations leave insufficient unreserved liquidity for an additional ${formattedRequest} ${precheckGuidance.assetCode} lock. Release or cancel stale reservations, or add funds before reserving.`,
         );
       } else {
         setReservationError(
-          `Cannot create treasury reservation: available unreserved balance cannot cover a ${formattedRequest} USDC lock. Reduce the amount or add funds before reserving.`,
+          `Cannot create treasury reservation: available unreserved balance cannot cover a ${formattedRequest} ${precheckGuidance.assetCode} lock. Reduce the amount or add funds before reserving.`,
         );
       }
       return;
@@ -132,7 +138,7 @@ function TreasuryView({
     useReservationsStore.getState().addReservation({
       id: event.reservationId,
       batchId: event.payrollRunId || `BATCH-${event.reservationId.slice(-4).toUpperCase()}`,
-      asset: "USDC",
+      asset: precheckGuidance.assetCode,
       amount: amount.toFixed(2),
       reservedAt: event.createdAt,
       expiresAt: new Date(Date.now() + RESERVATION_TTL_MS).toISOString(),
@@ -282,13 +288,17 @@ function TreasuryView({
 
       <TreasuryReadinessChecklist />
 
-      <TreasuryReservation balance={balance} projectedPayroll={projectedPayroll} />
+      <TreasuryReservation
+        balance={balance}
+        projectedPayroll={projectedPayroll}
+        assetCode={assetCode}
+      />
       <TreasuryReservationGuidanceCard
         reservations={activeReservations}
         availableBalance={balance}
         projectedPayroll={projectedPayroll}
         newReservationAmount={reservationAmount}
-        assetCode="USDC"
+        assetCode={assetCode}
         hasConfiguredAssets={!assetsMissing}
       />
 

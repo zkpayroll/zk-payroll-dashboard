@@ -636,6 +636,34 @@ describe("Treasury Reservations Component Suite (#890)", () => {
       expect(useReservationsStore.getState().reservations).toHaveLength(0);
     });
 
+    it("explains unknown asset codes before treasury reservation (#843)", () => {
+      render(
+        <TreasuryView
+          configuredAssets={[{ code: "USDC" }]}
+          assetCode="UNKNOWN_TOKEN"
+        />,
+      );
+
+      // Card explains the unknown asset
+      const card = screen.getByTestId("treasury-reservation-guidance-card");
+      expect(card).toHaveAttribute("data-reason", "UNKNOWN_ASSET_CODE");
+      expect(card).toHaveAttribute("data-tone", "blocked");
+      expect(screen.getByText(/Unknown Asset Code "UNKNOWN_TOKEN" Cannot Be Reserved/i)).toBeInTheDocument();
+
+      // Attempting to reserve funds explains the unknown asset and fails closed
+      fireEvent.click(screen.getByTestId("reserve-funds-button"));
+      const alert = screen.getByTestId("reservation-error-alert");
+      expect(alert).toHaveTextContent(/Treasury reservation requires a supported payroll asset/i);
+      expect(alert).toHaveTextContent(/USDC, XLM, EURC/i);
+      // Fails closed: no reservation created
+      expect(useReservationsStore.getState().reservations).toHaveLength(0);
+      // Privacy check: no employee or salary details exposed
+      for (const emp of MOCK_EMPLOYEES) {
+        expect(alert.textContent).not.toContain(emp.name);
+        expect(alert.textContent).not.toContain(emp.id);
+      }
+    });
+
     it("fails closed on malformed timestamps, corrupt amounts, and null prop entries while sanitizing DOM/title attributes", () => {
       const syntheticPub = "G" + "A".repeat(55);
       const { container } = render(

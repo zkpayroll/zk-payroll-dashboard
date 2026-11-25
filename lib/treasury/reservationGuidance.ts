@@ -12,6 +12,7 @@
  */
 
 import { formatTreasuryAmount } from "@/lib/treasury/liquidityReserve";
+import { formatSupportedAssetsList, isSupportedAssetCode } from "@/lib/assets/supportedAssets";
 import {
   RESERVATION_WARNING_WINDOW_MS,
   getReservationStatus,
@@ -196,7 +197,7 @@ export function normalizeAssetCode(assetCode: string | null | undefined): string
   const cleaned = sanitizeReservationIdentifier(assetCode, "USDC")
     .toUpperCase()
     .replace(/[^A-Z0-9_-]/g, "");
-  return cleaned === "" ? "USDC" : cleaned.slice(0, 12);
+  return cleaned === "" ? "USDC" : cleaned.slice(0, 32);
 }
 
 /** Static action reference guide explaining reservation controls without side effects. */
@@ -543,6 +544,7 @@ export function evaluateTreasuryReservationGuidance(
 
   const canCreateNewLock =
     safeInput.hasConfiguredAssets !== false &&
+    isSupportedAssetCode(assetCode) &&
     !hasInvalidInputs &&
     projectedUnits <= availableUnits &&
     activeReservedUnits <= availableUnits &&
@@ -573,6 +575,34 @@ export function evaluateTreasuryReservationGuidance(
       counts,
       remediationHref: "/settings/assets",
       remediationLabel: "Configure Payroll Assets",
+    };
+  }
+
+  // 1b. Unknown or unsupported asset code
+  if (!isSupportedAssetCode(assetCode)) {
+    const supportedList = formatSupportedAssetsList();
+    return {
+      tone: "blocked",
+      reasonCode: "UNKNOWN_ASSET_CODE",
+      badgeLabel: "Unknown asset",
+      title: `Unknown Asset Code "${assetCode}" Cannot Be Reserved`,
+      summary: `Asset code "${assetCode}" is not recognized as a supported Stellar payroll asset.`,
+      guidance: `Treasury reservation requires a supported payroll asset (${supportedList}). Unknown or untrusted asset codes cannot hold treasury liquidity or proceed to settlement.`,
+      nextSteps: [
+        `Select or configure a supported payroll asset (${supportedList}) in Asset Settings`,
+        "Verify the asset code spelling and issuer trustline configuration",
+        "Return to Treasury to reserve liquidity once a supported asset is active",
+      ],
+      actionGuides,
+      canExecutePayroll: false,
+      canCreateReservation: false,
+      assetCode,
+      formattedAvailableBalance,
+      formattedActiveReserved,
+      formattedUnreservedBalance,
+      counts,
+      remediationHref: "/settings/assets",
+      remediationLabel: "View Supported Assets",
     };
   }
 

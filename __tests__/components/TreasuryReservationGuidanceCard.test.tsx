@@ -150,11 +150,39 @@ describe("TreasuryReservationGuidanceCard (#887)", () => {
         now={FIXED_NOW}
       />,
     );
+    const cards = screen.getAllByTestId("treasury-reservation-guidance-card");
+    expect(cards[cards.length - 1]).toHaveAttribute(
+      "data-reason",
+      "UNKNOWN_ASSET_CODE",
+    );
     expect(container.textContent).not.toContain("function");
     for (const emp of MOCK_EMPLOYEES) {
       expect(container.textContent).not.toContain(emp.name);
       expect(container.textContent).not.toContain(emp.id);
     }
+  });
+
+  it("renders unknown asset code guidance with remediation link (#843)", () => {
+    render(
+      <TreasuryReservationGuidanceCard
+        reservations={[]}
+        assetCode="DOGE"
+        availableBalance={45000}
+        projectedPayroll={19500}
+        now={FIXED_NOW}
+      />,
+    );
+
+    const card = screen.getByTestId("treasury-reservation-guidance-card");
+    expect(card).toHaveAttribute("data-reason", "UNKNOWN_ASSET_CODE");
+    expect(card).toHaveAttribute("data-tone", "blocked");
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText(/Unknown Asset Code "DOGE" Cannot Be Reserved/i)).toBeInTheDocument();
+    expect(screen.getByText(/Treasury reservation requires a supported payroll asset/i)).toBeInTheDocument();
+    expect(screen.getByTestId("treasury-reservation-remediation-link")).toHaveAttribute(
+      "href",
+      "/settings/assets",
+    );
   });
 
   it("ignores blank newReservationAmount input instead of flagging false INVALID_TREASURY_DATA", () => {

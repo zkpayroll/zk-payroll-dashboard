@@ -222,6 +222,7 @@ export type TreasuryReplenishmentReadinessResult =
 export type ReservationGuidanceTone = "ready" | "info" | "warning" | "blocked";
 
 export type ReservationGuidanceReasonCode =
+  | "UNKNOWN_ASSET_CODE"
   | "ASSETS_UNCONFIGURED"
   | "INVALID_TREASURY_DATA"
   | "INSUFFICIENT_TREASURY_BALANCE"

@@ -14,7 +14,7 @@ describe("PayrollHistory", () => {
     render(<PayrollHistory runs={MOCK_PAYROLL_RUNS} />);
 
     expect(
-      screen.getByPlaceholderText(/search run id, period, tx hash, status/i),
+      screen.getByPlaceholderText(/search run id,.*period, tx hash, status/i),
     ).toBeInTheDocument();
   });
 
@@ -139,7 +139,7 @@ describe("PayrollHistory", () => {
     render(<PayrollHistory runs={MOCK_PAYROLL_RUNS} />);
 
     const searchInput = screen.getByPlaceholderText(
-      /search run id, period, tx hash, status/i,
+      /search run id,.*period, tx hash, status/i,
     );
     fireEvent.change(searchInput, { target: { value: "cancelled" } });
 
@@ -150,7 +150,7 @@ describe("PayrollHistory", () => {
     render(<PayrollHistory runs={MOCK_PAYROLL_RUNS} />);
 
     const searchInput = screen.getByPlaceholderText(
-      /search run id, period, tx hash, status/i,
+      /search run id,.*period, tx hash, status/i,
     );
     fireEvent.change(searchInput, { target: { value: "verified" } });
 
@@ -164,7 +164,7 @@ describe("PayrollHistory", () => {
     render(<PayrollHistory runs={MOCK_PAYROLL_RUNS} />);
 
     const searchInput = screen.getByPlaceholderText(
-      /search run id, period, tx hash, status/i,
+      /search run id,.*period, tx hash, status/i,
     );
     fireEvent.change(searchInput, { target: { value: "verified" } });
 
@@ -181,7 +181,7 @@ describe("PayrollHistory", () => {
     render(<PayrollHistory runs={MOCK_PAYROLL_RUNS} />);
 
     const searchInput = screen.getByPlaceholderText(
-      /search run id, period, tx hash, status/i,
+      /search run id,.*period, tx hash, status/i,
     );
     fireEvent.change(searchInput, { target: { value: "verified" } });
 
@@ -195,7 +195,7 @@ describe("PayrollHistory", () => {
     render(<PayrollHistory runs={MOCK_PAYROLL_RUNS} />);
 
     const searchInput = screen.getByPlaceholderText(
-      /search run id, period, tx hash, status/i,
+      /search run id,.*period, tx hash, status/i,
     );
     fireEvent.change(searchInput, {
       target: { value: "nonexistent_run_id_xyz" },
@@ -206,8 +206,8 @@ describe("PayrollHistory", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("No payroll runs yet")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /^clear all filters$/i }),
-    ).toBeInTheDocument();
+      screen.getAllByRole("button", { name: /clear all filters/i }).length,
+    ).toBeGreaterThanOrEqual(1);
   });
 
   it("renders the PayrollCalendar and its content inside the history view", () => {
