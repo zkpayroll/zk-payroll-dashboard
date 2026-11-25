@@ -79,3 +79,35 @@ export function evaluateAuditorAccessExpiry(
   };
 }
 
+// #796 — Compact, per-row warning helper for audit-grant tables. Returns
+// `null` when the grant is not in a warning state (either plenty of time
+// remaining, already expired, or expiry unknown — those are handled by the
+// page-level banner and the status badge).
+export interface AuditGrantExpiryWarning {
+  label: string;
+  message: string;
+  remainingDays: number;
+}
+
+export function formatAuditGrantExpiryWarning(
+  input: AuditorAccessExpiryInput,
+  now: number = Date.now(),
+  warningWindowMs: number = AUDITOR_ACCESS_EXPIRING_WINDOW_MS,
+): AuditGrantExpiryWarning | null {
+  const evaluation = evaluateAuditorAccessExpiry(input, now, warningWindowMs);
+  if (evaluation.state !== "expiring_soon" || evaluation.remainingMs === null) {
+    return null;
+  }
+  // Ceiling the remainder so "<23h 59m" still reads "1 day" rather than "0",
+  // which would collapse into the expired state visually.
+  const remainingDays = Math.max(
+    1,
+    Math.ceil(evaluation.remainingMs / (24 * 60 * 60 * 1000)),
+  );
+  return {
+    label: `Expires in ${remainingDays} day${remainingDays === 1 ? "" : "s"}`,
+    message: `Audit grant expires in ${remainingDays} day${remainingDays === 1 ? "" : "s"}. Extend or re-issue it before the deadline to avoid interrupting access.`,
+    remainingDays,
+  };
+}
+

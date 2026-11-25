@@ -27,7 +27,10 @@ import {
   AuditGrantRevocationStatus,
   formatRevocationTimestamp,
 } from "@/components/features/audit/AuditGrantRevocationStatus";
-import { evaluateAuditorAccessExpiry } from "@/lib/date/auditorAccessExpiry";
+import {
+  evaluateAuditorAccessExpiry,
+  formatAuditGrantExpiryWarning,
+} from "@/lib/date/auditorAccessExpiry";
 
 // Initial seeded audit grants for operators and integrators
 export const MOCK_AUDIT_GRANTS: AuditGrantDetail[] = [
@@ -478,6 +481,11 @@ export default function AuditGrantsPage() {
                   filteredGrants.map((grant) => {
                     const isRevoked = grant.status === "revoked" || Boolean(grant.revokedAt);
                     const ledgerExpiry = formatGrantLedgerExpiry(grant.expiresAtLedger);
+                    // #796 — per-row "Expires in N days" chip when the grant
+                    // is within the warning window. null otherwise.
+                    const expiryWarning = isRevoked
+                      ? null
+                      : formatAuditGrantExpiryWarning(grant);
 
                     return (
                       <tr
@@ -534,6 +542,17 @@ export default function AuditGrantsPage() {
                                 <Clock className="w-3 h-3" />
                                 <span>Expires: {new Date(grant.expiresAt).toLocaleDateString()}</span>
                               </div>
+                              {expiryWarning && (
+                                <span
+                                  data-testid={`grant-expiry-warning-${grant.id}`}
+                                  role="status"
+                                  title={expiryWarning.message}
+                                  className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
+                                >
+                                  <ShieldAlert className="w-3 h-3 text-amber-600" />
+                                  {expiryWarning.label}
+                                </span>
+                              )}
                               {ledgerExpiry && (
                                 <p
                                   data-testid={`grant-list-ledger-expiry-${grant.id}`}

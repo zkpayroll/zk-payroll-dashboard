@@ -41,6 +41,59 @@ const ACTION_CONFIG: Record<
   submission_failed: { icon: ShieldAlert,  colour: "text-red-600 bg-red-50 ring-red-100"        },
 };
 
+// ─── Finalization collapsing ────────────────────────────────────────────────
+//
+// #793 — Finalization events (`submitted`, `period_locked`) can land multiple
+// times for the same run when webhooks retry or when the operator reclicks.
+// The duplicate banner further down calls them out, but readers scrolling
+// the timeline itself still see the repeated row, which clutters the view
+// and makes the actual first finalization harder to find. Here we fold a
+// run of same-action finalization events into one anchor row with a
+// "+N more" chip so the timeline stays scannable without losing the extra
+// occurrences (they are still kept in the audit store).
+
+const FINALIZATION_ACTIONS: ReadonlyArray<PayrollApprovalActionType> = [
+  "submitted",
+  "period_locked",
+];
+
+export function isFinalizationAction(
+  action: PayrollApprovalActionType,
+): boolean {
+  return FINALIZATION_ACTIONS.includes(action);
+}
+
+export interface CollapsedTimelineItem {
+  anchor: PayrollApprovalEvent;
+  /** Additional repeated finalization events hidden behind the anchor row. */
+  repeated: PayrollApprovalEvent[];
+}
+
+/**
+ * Collapse runs of adjacent, same-action finalization events for the same
+ * payroll run into a single entry. Non-finalization events pass through
+ * unchanged. `events` is expected to be sorted ascending by timestamp.
+ */
+export function collapseFinalizationDuplicates(
+  events: PayrollApprovalEvent[],
+): CollapsedTimelineItem[] {
+  const out: CollapsedTimelineItem[] = [];
+  for (const event of events) {
+    const last = out[out.length - 1];
+    if (
+      last &&
+      isFinalizationAction(event.action) &&
+      last.anchor.action === event.action &&
+      last.anchor.payrollRunId === event.payrollRunId
+    ) {
+      last.repeated.push(event);
+      continue;
+    }
+    out.push({ anchor: event, repeated: [] });
+  }
+  return out;
+}
+
 // ─── Duplicate detection ────────────────────────────────────────────────────────
 
 interface DuplicateEventGroup {
@@ -148,9 +201,12 @@ function formatRelative(ts: string): string {
 function TimelineRow({
   event,
   isLast,
+  repeatedCount = 0,
 }: {
   event: PayrollApprovalEvent;
   isLast: boolean;
+  /** #793 — Count of hidden same-action finalization repeats folded into this row. */
+  repeatedCount?: number;
 }) {
   const cfg = ACTION_CONFIG[event.action];
   const Icon = cfg.icon;
@@ -180,6 +236,17 @@ function TimelineRow({
             <span className="text-sm font-semibold text-gray-900">
               {getActionLabel(event.action)}
             </span>
+            {/* #793 — Count of hidden repeat finalization events, visible to
+                keep the audit trail honest while keeping the timeline tidy. */}
+            {repeatedCount > 0 && (
+              <span
+                data-testid="finalization-repeat-count"
+                className="inline-flex items-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-700"
+                title={`${repeatedCount} further ${getActionLabel(event.action)} event${repeatedCount === 1 ? "" : "s"} were hidden`}
+              >
+                +{repeatedCount} more
+              </span>
+            )}
             <time
               dateTime={event.timestamp}
               title={formatAbsolute(event.timestamp)}
@@ -395,11 +462,15 @@ export function PayrollActivityTimeline({
             }
             className={compact ? "pl-0" : "pl-1"}
           >
-            {events.map((event, idx) => (
+            {/* #793 — Collapse adjacent same-action finalization events for
+                the same run before rendering so the reader sees one row with
+                a "+N more" chip instead of a run of identical lines. */}
+            {collapseFinalizationDuplicates(events).map((item, idx, arr) => (
               <TimelineRow
-                key={event.id}
-                event={event}
-                isLast={idx === events.length - 1}
+                key={item.anchor.id}
+                event={item.anchor}
+                isLast={idx === arr.length - 1}
+                repeatedCount={item.repeated.length}
               />
             ))}
           </ol>
