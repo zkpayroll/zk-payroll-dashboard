@@ -234,9 +234,7 @@ export default function PayrollRunDetail({ run: propRun, proofReference, userRol
   const freshness = evaluateProofFreshness({ reference: proofReference });
   const approvalState = evaluateApprovalExpiry(approvalInput);
   const lastUpdated = getPayrollLastUpdated(run);
-  const companyEvaluation = useMemo(() => {
-    return evaluatePayrollRunCompany(run);
-  }, [run]);
+  const companyEvaluation = evaluatePayrollRunCompany(run);
 
   return (
     <section aria-labelledby="payroll-run-detail-heading" className="space-y-6">

@@ -22,6 +22,7 @@ import {
   parseReservationAmountUnits,
 } from "@/lib/treasury/reservationGuidance";
 import PartialReleaseFailureAlert from "./PartialReleaseFailureAlert";
+import { TokenTransferStatusAlert, type TokenTransferOutcome } from "./TokenTransferStatusAlert";
 import type { PartialReleaseFailure } from "@/lib/treasury/partialRelease";
 import SupportedAssetsEmptyState from "@/components/features/assets/SupportedAssetsEmptyState";
 import { hasSupportedPayrollAssets } from "@/lib/assets/supportedAssets";
@@ -34,6 +35,7 @@ import {
 export interface TreasuryViewProps {
   configuredAssets?: Array<{ code: string; issuer?: string }>;
   releaseFailures?: PartialReleaseFailure[];
+  tokenTransferOutcome?: TokenTransferOutcome | null;
   initialReservations?: FundingReservation[];
   initialTimelineEvents?: FundingReservationEvent[];
   assetCode?: string;
@@ -42,6 +44,7 @@ export interface TreasuryViewProps {
 function TreasuryView({
   configuredAssets,
   releaseFailures = [],
+  tokenTransferOutcome,
   initialReservations,
   initialTimelineEvents,
   assetCode = "USDC",
@@ -161,6 +164,8 @@ function TreasuryView({
       <h2 id="treasury-heading" className="text-lg font-semibold text-gray-900">
         Treasury
       </h2>
+
+      <TokenTransferStatusAlert outcome={tokenTransferOutcome} />
 
       {releaseFailures.map((failure) => (
         <PartialReleaseFailureAlert key={failure.releaseId} failure={failure} />

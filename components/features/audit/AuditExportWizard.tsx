@@ -343,12 +343,6 @@ function SelectStep() {
           filteredEntries.map((entry) => (
             <label
               key={entry.id}
-              htmlFor={`audit-entry-${entry.id}`}
-              aria-label={`Select ${entry.title}`}
-              className={`flex items-start gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-colors ${entry.selected ? "bg-blue-50/50" : ""}`}
-            >
-              <input
-                id={`audit-entry-${entry.id}`}
               htmlFor={`entry-${entry.id}`}
               className={`flex items-start gap-3 p-3 cursor-pointer hover:bg-muted/50 ${
                 entry.selected
@@ -595,9 +589,6 @@ function ConfigureStep() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm font-medium mb-3 block">Export Format</p>
-        <div className="grid grid-cols-3 gap-3">
-          {FORMAT_OPTIONS.map((opt) => (
         <h3 className="text-lg font-semibold">
           Packet Metadata
         </h3>
@@ -641,9 +632,6 @@ function ConfigureStep() {
         </div>
       </div>
 
-      <div>
-        <p className="text-sm font-medium mb-3 block">Date Range</p>
-        <div className="flex gap-3">
       <div className="border rounded-lg p-4">
         <h4 className="text-sm font-semibold mb-4">
           Audit date range
