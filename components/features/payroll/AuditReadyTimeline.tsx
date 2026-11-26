@@ -14,14 +14,12 @@ import {
 import type {
   AuditTimelineEvent,
   AuditReadyTimeline as AuditReadyTimelineData,
-  AuditReadyTimeline as AuditReadyTimelineModel,
   AuditTimelineEventType,
 } from "@/types/models";
 
 interface AuditReadyTimelineProps {
   payrollId?: string;
   timeline?: AuditReadyTimelineData;
-  timeline?: AuditReadyTimelineModel;
   className?: string;
 }
 
@@ -50,7 +48,6 @@ const EVENT_ICONS: Record<AuditTimelineEventType, typeof CheckCircle2> = {
 };
 
 function generateMockTimeline(payrollId: string): AuditReadyTimelineData {
-function generateMockTimeline(payrollId: string): AuditReadyTimelineModel {
 
   const now = new Date();
   const events: AuditTimelineEvent[] = [
